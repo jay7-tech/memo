@@ -162,15 +162,19 @@ def main():
         text = text.replace("hello pc", "").strip()
         
         # Check standard commands
-        if "focus on" in text or "start focus" in text:
+        # Relaxed matching: verify 'focus' and 'on'/'off' exist in the phrase
+        if "focus" in text and ("on" in text or "start" in text or "enable" in text):
             scene_state.focus_mode = True
             print(">> SYSTEM: Focus Mode ENABLED (Voice)")
             speak("Focus mode enabled.")
-        elif "focus off" in text or "stop focus" in text:
+        elif "focus" in text and ("off" in text or "stop" in text or "disable" in text):
             scene_state.focus_mode = False
             print(">> SYSTEM: Focus Mode DISABLED (Voice)")
             speak("Focus mode disabled.")
-        elif "register me" in text:
+        elif "register" in text:
+             # Handles "register me", "register [name]", "register face"
+             # If name follows, we might want to capture it? 
+             # For now, trigger the interactive one.
              print(">> SYSTEM: Voice registration triggered.")
              speak("Please look at the camera for registration.")
              scene_state.register_trigger = True

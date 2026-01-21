@@ -11,6 +11,7 @@ class RulesEngine:
         self.rep_joint = 'RIGHT_WRIST' # Default to tracking right wrist
         
         self.last_proximity_alert = 0
+        self.last_focus_alert = 0
         self.last_greeted_name = None
         self.last_greeted_time = 0
     
@@ -74,7 +75,9 @@ class RulesEngine:
         # ONLY IN FOCUS MODE
         if scene_state.focus_mode and 'cell phone' in current_visible_objects:
              # Trigger faster
-             events.append("TTS: Put the phone away and focus on your work!")
+             if timestamp - self.last_focus_alert > 5.0:
+                 events.append("TTS: Put the phone away and focus on your work!")
+                 self.last_focus_alert = timestamp
 
         # 4. Hydration Helper (Feature 7)
         # Track 'bottle' movement?
@@ -112,6 +115,7 @@ class RulesEngine:
             # > 60% is very close.
             if proximity_score > 0.55:
                  # Debounce: Only alert every 15 seconds
+                 if timestamp - self.last_proximity_alert > 15.0:
                      events.append("TTS: You are too close to the screen. Please move back.")
                      self.last_proximity_alert = timestamp
         
