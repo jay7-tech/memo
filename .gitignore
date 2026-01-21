@@ -1,15 +1,57 @@
+# Basics
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-.DS_Store
 
-# User Data (Privacy)
+# Distribution / Build
+build/
+dist/
+*.egg-info/
+*.spec
+
+# Testing / Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Environments
+.env
+.venv/
+venv/
+env/
+python_env/
+
+# IDEs / Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS Files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Project Specific - Runtime Data & Logs
+memory.json
+*.log
+debug_mp.py
+
+# Project Specific - User Data (Privacy)
 user_embedding.npy
 user_name.txt
 *.npy
 
-# Environment
-.env
-venv/
-env/
+# Project Specific - Media / Assets (Runtime generated)
+selfie_*.jpg
+*.jpg
+*.png
+# Keep this if you have static assets you want to track, otherwise specific folder ignores are better
+# !assets/*.jpg 
+
+# Project Specific - Models (Large Files)
+*.pt
+*.onnx
+*.tflite
