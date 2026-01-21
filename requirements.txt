@@ -3,3 +3,6 @@ ultralytics>=8.0.0
 numpy>=1.24.0
 pyttsx3
 facenet-pytorch
+SpeechRecognition
+pyaudio
+requests

@@ -113,6 +113,7 @@ def input_loop():
         except Exception as e:
             print(f"Input error: {e}")
 
+def main():
     global running, voice_input
     
     # Init Audio
@@ -150,6 +151,7 @@ def input_loop():
     rules_engine = RulesEngine()
     
     # Init Face Rec (Might be slow on first load)
+    from perception.face_rec import FaceRecognizer
     face_rec = FaceRecognizer()
     
     # Init Voice Listener
@@ -197,6 +199,10 @@ def input_loop():
     last_tts_time = 0
     frame_count = 0
     
+    # Persistent variables for frame skipping
+    detections = []
+    pose_data = None
+    
     while running:
         frame = cam.get_frame()
         if frame is None:
@@ -216,8 +222,10 @@ def input_loop():
         frame_count += 1
         
         # Perception
-        detections = detector.detect(frame)
-        pose_data = pose_estimator.estimate(frame)
+        # Run inference every 3rd frame to reduce latency
+        if frame_count % 3 == 0:
+            detections = detector.detect(frame)
+            pose_data = pose_estimator.estimate(frame)
         
         # Face Recognition
         # Only run every 5th frame to save CPU/GPU
