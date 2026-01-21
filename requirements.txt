@@ -6,3 +6,4 @@ facenet-pytorch
 SpeechRecognition
 pyaudio
 requests
+flask

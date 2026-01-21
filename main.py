@@ -201,12 +201,21 @@ def main():
         print(f"Voice Init Failed (Microphone issue?): {e}")
         voice_input = None
 
-    # Start input thread (for keyboard text)
     input_t = threading.Thread(target=input_loop, daemon=True)
     input_t.start()
     
+    # Init Dashboard
+    from interface import dashboard
+    try:
+        dashboard.set_scene_state(scene_state)
+        dash_t = threading.Thread(target=dashboard.start_server, daemon=True)
+        dash_t.start()
+    except Exception as e:
+        print(f"Dashboard init failed: {e}")
+    
     print("Starting Vision System... Press 'q' in the window or type 'quit' to stop.")
     print("To register your face, type 'register me' in the console or look at camera.")
+    print("Dashboard available at: http://localhost:5000")
 
     last_tts_time = 0
     frame_count = 0
@@ -358,6 +367,15 @@ def main():
         cv2.putText(frame, f"Pose: {h_state}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
         cv2.putText(frame, f"Identity: {ident}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         cv2.putText(frame, f"Focus Mode: {f_mode}", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255) if scene_state.focus_mode else (200, 200, 200), 2)
+        
+        # Update Dashboard
+        # Optimization: Update less frequently and use smaller frame
+        if frame_count % 10 == 0:
+            try:
+                # Resize for web (bandwidth/cpu saver)
+                preview = cv2.resize(frame, (480, 270))
+                dashboard.update_frame(preview)
+            except Exception: pass
         
         cv2.imshow("Vision System Debug", frame)
         
