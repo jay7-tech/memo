@@ -1,18 +1,21 @@
 import time
 import math
 
+import json
+import os
+
 class SceneState:
     def __init__(self):
-        # objects: { label: { 'last_seen': float, 'bbox': [x,y,w,h], 'position': str } }
-        self.objects = {}
+        self.objects = {} 
+        # Structure: { 'label': { 'last_seen': float, 'bbox': [x,y,w,h], 'position': 'left/center/right' } }
         
-        # human: { 'present': bool, 'pose_state': str, 'keypoints': dict, 'last_seen': float }
+        # human: { 'present': bool, 'pose_state': str, 'keypoints': dict, 'last_seen': float, 'identity': str }
         self.human = {
             'present': False,
             'pose_state': 'unknown',
             'keypoints': {},
             'last_seen': 0.0,
-            'identity': None # 'Jayadeep' or None
+            'identity': None
         }
         
         # System flags
@@ -20,7 +23,33 @@ class SceneState:
         self.register_trigger = False
         self.register_name = "User"
         
-        self.width = 640 # Default, updated on first frame
+        self.width = 640 
+        
+        self.load_memory()
+
+    def save_memory(self):
+        try:
+            data = {
+                'objects': self.objects,
+                'focus_mode': self.focus_mode
+            }
+            with open("memory.json", "w") as f:
+                json.dump(data, f, indent=4)
+            print("[System] Memory saved.")
+        except Exception as e:
+            print(f"[Error] Failed to save memory: {e}")
+
+    def load_memory(self):
+        if os.path.exists("memory.json"):
+            try:
+                with open("memory.json", "r") as f:
+                    data = json.load(f)
+                    self.objects = data.get('objects', {})
+                    self.focus_mode = data.get('focus_mode', False)
+                    # We don't load 'human' state as that is real-time
+                print("[System] Memory loaded.")
+            except Exception as e:
+                print(f"[Error] Failed to load memory: {e}")
 
     def update(self, detections, pose_data, timestamp, frame_width=640, frame_height=480):
         self.width = frame_width

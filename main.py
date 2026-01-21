@@ -17,8 +17,8 @@ import subprocess
 scene_state = SceneState()
 query_handler = QueryHandler()
 running = True
-
-# TTS Queue
+engine = None
+voice_input = None
 tts_queue = queue.Queue()
 
 def tts_worker():
@@ -55,7 +55,7 @@ def speak(text):
     tts_queue.put(text)
 
 def input_loop():
-    global running
+    global running, voice_input
     print("System Ready. Commands: 'focus on', 'focus off', 'where is X', 'quit'.")
     while running:
         try:
@@ -89,7 +89,18 @@ def input_loop():
                      print(f">> SYSTEM: Look at the camera... registering for {name}")
                      speak(f"Please look at the camera, {name}.")
                      scene_state.register_name = name
+                     scene_state.register_name = name
                      scene_state.register_trigger = True
+            elif clean_input == 'voice on':
+                if voice_input:
+                    voice_input.set_active(True)
+                    speak("I am listening.")
+                else:
+                    print("Voice module not initialized.")
+            elif clean_input == 'voice off':
+                if voice_input:
+                    voice_input.set_active(False)
+                    speak("Voice input stopped.")
             else:
                 response = query_handler.handle_query(user_input, scene_state)
                 if response:
@@ -102,8 +113,7 @@ def input_loop():
         except Exception as e:
             print(f"Input error: {e}")
 
-def main():
-    global running
+    global running, voice_input
     
     # Init Audio
     init_tts()
@@ -140,10 +150,44 @@ def main():
     rules_engine = RulesEngine()
     
     # Init Face Rec (Might be slow on first load)
-    from perception.face_rec import FaceRecognizer
     face_rec = FaceRecognizer()
     
-    # Start input thread
+    # Init Voice Listener
+    # We define a callback to handle voice commands
+    def on_voice_command(text):
+        # Inject into the text processing logic
+        # Clean text
+        text = text.replace("hello pc", "").strip()
+        
+        # Check standard commands
+        if "focus on" in text or "start focus" in text:
+            scene_state.focus_mode = True
+            print(">> SYSTEM: Focus Mode ENABLED (Voice)")
+            speak("Focus mode enabled.")
+        elif "focus off" in text or "stop focus" in text:
+            scene_state.focus_mode = False
+            print(">> SYSTEM: Focus Mode DISABLED (Voice)")
+            speak("Focus mode disabled.")
+        elif "register me" in text:
+             print(">> SYSTEM: Voice registration triggered.")
+             speak("Please look at the camera for registration.")
+             scene_state.register_trigger = True
+        else:
+            # Query?
+            response = query_handler.handle_query(text, scene_state)
+            if response:
+                print(f"\n>> SYSTEM: {response}\n")
+                speak(response)
+    
+    # Initialize Voice (might take a sec to calibrate)
+    from interface.voice_input import VoiceListener
+    try:
+        voice_input = VoiceListener(callback_func=on_voice_command)
+    except Exception as e:
+        print(f"Voice Init Failed (Microphone issue?): {e}")
+        voice_input = None
+
+    # Start input thread (for keyboard text)
     input_t = threading.Thread(target=input_loop, daemon=True)
     input_t.start()
     
@@ -298,6 +342,7 @@ def main():
         # Keyboard Shortcuts
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
+            scene_state.save_memory() # Save on exit
             running = False
             break
         elif key == ord('f'): # Toggle Focus Mode
@@ -305,9 +350,19 @@ def main():
             status = "enabled" if scene_state.focus_mode else "disabled"
             print(f">> SYSTEM: Focus Mode {status.upper()}")
             speak(f"Focus mode {status}")
+        elif key == ord('v'): # Toggle Voice Mode
+            if voice_input:
+                new_state = not voice_input.is_listening_active
+                if new_state:
+                     voice_input.set_active(True)
+                     speak("I am listening.")
+                else:
+                     voice_input.set_active(False)
+                     speak("Voice input stopped.")
             
     cam.release()
     cv2.destroyAllWindows()
+    scene_state.save_memory() # Double check save
     print("System Shutdown.")
 
 if __name__ == "__main__":
