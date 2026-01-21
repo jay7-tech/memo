@@ -1,9 +1,17 @@
+# Computer Vision & AI
 opencv-python>=4.8.0
-ultralytics>=8.0.0
+ultralytics>=8.0.0      # YOLOv8 for Object/Pose
 numpy>=1.24.0
-pyttsx3
-facenet-pytorch
-SpeechRecognition
-pyaudio
-requests
-flask
+torch
+torchvision
+facenet-pytorch         # Face Recognition
+
+# Audio & Speech
+pyttsx3                 # Text-to-Speech (Offline)
+SpeechRecognition       # Speech-to-Text
+pyaudio                 # Microphone Input
+
+# Dashboard & API
+flask                   # Web Dashboard
+requests                # HTTP Requests (for IP Camera)
+werkzeug                # Flask utility

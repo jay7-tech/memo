@@ -57,4 +57,34 @@ MEMO watches out for your physical well-being.
     *Note: Visual C++ Build Tools may be required for some dependencies on Windows.*
 
 
+## 🎮 Usage
+
+1.  **Run the System**:
+    ```bash
+    # Default Webcam (Source 0)
+    python main.py
+
+    # IP Camera (Example)
+    python main.py http://192.168.1.5:8080/video 90
+    ```
+
+2.  **Web Dashboard 🌐**:
+    Visit **[http://localhost:5000](http://localhost:5000)** to view the live feed and control the system remotely.
+
+3.  **Voice Commands 🗣️**:
+    - **Toggle Voice**: Press `v` or type `voice on`.
+    - **Commands**:
+        - *"Focus on"* / *"Focus off"*
+        - *"Register me"*
+        - *"Where is my [object]?"*
+        - *"Selfie"* (Takes a photo)
+
+4.  **Keyboard Shortcuts**:
+    - `q`: Quit
+    - `v`: Toggle Voice
+    - `f`: Toggle Focus Mode
+    - `s`: Take Selfie
+
+---
+
 **Author**: [Jayadeep / Jay7-Tech]
