@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.DS_Store
+
+# User Data (Privacy)
+user_embedding.npy
+user_name.txt
+*.npy
+
+# Environment
+.env
+venv/
+env/

@@ -25,16 +25,25 @@ class FaceRecognizer:
         if os.path.exists("user_embedding.npy"):
             try:
                 self.known_embedding = np.load("user_embedding.npy")
-                self.user_name = "Jayadeep" # Hardcoded or load from config
-                print("FaceRec: Loaded existing user profile.")
+                # Try to load name
+                if os.path.exists("user_name.txt"):
+                    with open("user_name.txt", "r") as f:
+                        self.user_name = f.read().strip()
+                else:
+                    self.user_name = "User"
+                
+                print(f"FaceRec: Loaded profile for {self.user_name}")
             except:
                 pass
         
-    def save_user(self, embedding):
+    def save_user(self, embedding, name="User"):
         if embedding is not None:
             self.known_embedding = embedding
+            self.user_name = name
             np.save("user_embedding.npy", embedding)
-            print("FaceRec: Saved new user profile.")
+            with open("user_name.txt", "w") as f:
+                f.write(name)
+            print(f"FaceRec: Saved profile for {name}")
 
     def get_embedding(self, face_crop):
         """
@@ -104,7 +113,7 @@ class FaceRecognizer:
         
         return None
         
-    def register_face(self, frame, bbox):
+    def register_face(self, frame, bbox, name="User"):
         x, y, w, h = map(int, bbox)
         h_img, w_img = frame.shape[:2]
         x = max(0, x)
@@ -116,6 +125,6 @@ class FaceRecognizer:
         emb = self.get_embedding(crop)
         
         if emb is not None:
-             self.save_user(emb)
+             self.save_user(emb, name)
              return True
         return False

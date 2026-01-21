@@ -74,9 +74,22 @@ def input_loop():
                 print(">> SYSTEM: Focus Mode DISABLED.")
                 speak("Focus mode disabled.")
             elif clean_input == 'register me':
-                 print(">> SYSTEM: Look at the camera...")
-                 speak("Please look at the camera.")
+                 print(">> SYSTEM: What should I call you? (Type name):")
+                 name = input().strip()
+                 if not name: name = "User"
+                 print(f">> SYSTEM: Look at the camera... registering for {name}")
+                 speak(f"Please look at the camera, {name}.")
+                 scene_state.register_name = name
                  scene_state.register_trigger = True
+                 
+            elif clean_input.startswith('register '):
+                 # Handle "register Jayadeep" directly
+                 name = clean_input.replace('register ', '').strip()
+                 if name:
+                     print(f">> SYSTEM: Look at the camera... registering for {name}")
+                     speak(f"Please look at the camera, {name}.")
+                     scene_state.register_name = name
+                     scene_state.register_trigger = True
             else:
                 response = query_handler.handle_query(user_input, scene_state)
                 if response:
@@ -227,9 +240,9 @@ def main():
                      face_h = 240
                      x = int(nose[0]) - 100
                      y = int(nose[1]) - 100
-                     if face_rec.register_face(frame, [x, y, face_w, face_h]):
-                         print(">> SYSTEM: Face Registered Successfully.")
-                         speak("Face registered. I will remember you.")
+                     if face_rec.register_face(frame, [x, y, face_w, face_h], name=scene_state.register_name):
+                         print(f">> SYSTEM: Face Registered Successfully for {scene_state.register_name}.")
+                         speak(f"Face registered. I will remember you, {scene_state.register_name}.")
                          scene_state.register_trigger = False
                      else:
                          print(">> SYSTEM: Failed to register face. Look closer.")

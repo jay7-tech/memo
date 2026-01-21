@@ -17,6 +17,8 @@ class SceneState:
         
         # System flags
         self.focus_mode = False 
+        self.register_trigger = False
+        self.register_name = "User"
         
         self.width = 640 # Default, updated on first frame
 
