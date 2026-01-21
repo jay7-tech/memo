@@ -178,6 +178,14 @@ def main():
              print(">> SYSTEM: Voice registration triggered.")
              speak("Please look at the camera for registration.")
              scene_state.register_trigger = True
+        elif "selfie" in text or "snap" in text or "photo" in text:
+             print(">> SYSTEM: Taking Selfie...")
+             speak("Say cheese!")
+             # We rely on main loop to handle capture? Or do it here via a flag?
+             # Since 'frame' is in main loop scope, we can't save it directly here easily 
+             # unless we pass it or set a flag.
+             # Setting a flag is cleaner.
+             scene_state.selfie_trigger = True
         else:
             # Query?
             response = query_handler.handle_query(text, scene_state)
@@ -221,6 +229,8 @@ def main():
             scale = max_height / h_raw
             new_w = int(w_raw * scale)
             frame = cv2.resize(frame, (new_w, max_height))
+            
+        clean_frame = frame.copy()
             
         timestamp = time.time()
         frame_count += 1
@@ -362,6 +372,12 @@ def main():
             status = "enabled" if scene_state.focus_mode else "disabled"
             print(f">> SYSTEM: Focus Mode {status.upper()}")
             speak(f"Focus mode {status}")
+        elif key == ord('s'):
+             # Trigger selfie manually
+             print(">> SYSTEM: Taking Selfie (Manual)...")
+             speak("Smile!")
+             scene_state.selfie_trigger = True
+            
         elif key == ord('v'): # Toggle Voice Mode
             if voice_input:
                 new_state = not voice_input.is_listening_active
@@ -371,6 +387,37 @@ def main():
                 else:
                      voice_input.set_active(False)
                      speak("Voice input stopped.")
+        
+        # PROCESS SELFIE TRIGGER
+        if scene_state.selfie_trigger:
+             timestamp_str = time.strftime("%Y%m%d-%H%M%S")
+             filename = f"selfie_{timestamp_str}.jpg"
+             
+             # Draw a flash effect or just save pure frame?
+             # User probably wants the raw photo without bounding boxes?
+             # The 'frame' variable here has detections drawn on it from Visualization step above?
+             # Wait, visualization (lines 338+) happens AFTER this loop cycle?
+             # No, visualization code is inside loop.
+             # I need to find where visualization is.
+             # Visualization happens at lines 330+ (approx).
+             # If I save BEFORE visualization, I get clean image.
+             # If I save AFTER, I get HUDP/HUD.
+             # Usually selfies are clean.
+             # But 'frame' is mutable. If I draw on it, it's dirty.
+             # Let's save a copy?
+             # Wait, I am at the end of loop (Input handling)?
+             # Input handling is usually `cv2.waitKey` which is at the END of loop.
+             # Visualization is BEFORE `cv2.imshow`.
+             
+             # If I want clean selfie, I should capture it earlier or use a copy.
+             # But I'm inserting code at key handling (end of loop).
+             # In this frame, `frame` already has boxes drawn.
+             # It's okay. "HUD Selfie" is cool for a robot companion.
+             
+             cv2.imwrite(filename, clean_frame)
+             print(f">> SYSTEM: Saved {filename}")
+             speak("Photo taken.")
+             scene_state.selfie_trigger = False
             
     cam.release()
     cv2.destroyAllWindows()

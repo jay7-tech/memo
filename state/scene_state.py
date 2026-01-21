@@ -23,6 +23,8 @@ class SceneState:
         self.register_trigger = False
         self.register_name = "User"
         
+        self.selfie_trigger = False # Flag for snapshot
+        
         self.width = 640 
         
         self.load_memory()
