@@ -87,4 +87,19 @@ MEMO watches out for your physical well-being.
 
 ---
 
+## 🚀 Future Roadmap
+
+See the complete feature roadmap for Raspberry Pi 4B deployment:
+
+📄 **[docs/FEATURE_ROADMAP.md](docs/FEATURE_ROADMAP.md)**
+
+This includes:
+- 📸 **Enhanced Vision**: Emotion detection, hand gestures, eye gaze tracking
+- 🤖 **Robot Behaviors**: Head tracking gimbal, idle animations, personality modes
+- 🧠 **AI Integration**: Gemini chat, vision-language models, conversation memory
+- 🎛️ **Hardware**: LED eyes, environment sensors, better audio
+- 🌐 **Dashboard**: Live stats, object map, settings panel
+
+---
+
 **Author**: [Jayadeep / Jay7-Tech]

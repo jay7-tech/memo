@@ -1,0 +1,1519 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MEMO - Desktop Companion Robot Feature Roadmap</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-card: #1a1a24;
+            --text-primary: #f0f0f5;
+            --text-secondary: #a0a0b0;
+            --accent-purple: #8b5cf6;
+            --accent-blue: #3b82f6;
+            --accent-cyan: #06b6d4;
+            --accent-green: #22c55e;
+            --accent-orange: #f97316;
+            --accent-pink: #ec4899;
+            --border-color: rgba(139, 92, 246, 0.2);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.7;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 60px 0;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%);
+            border-radius: 24px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 48px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.05) 0%, transparent 50%);
+            animation: pulse 4s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 0.5;
+            }
+
+            50% {
+                transform: scale(1.1);
+                opacity: 0.8;
+            }
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-cyan) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 16px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header .subtitle {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        .meta-info {
+            display: flex;
+            justify-content: center;
+            gap: 32px;
+            margin-top: 24px;
+            flex-wrap: wrap;
+            position: relative;
+            z-index: 1;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .meta-item .icon {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Table of Contents */
+        .toc {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 48px;
+            border: 1px solid var(--border-color);
+        }
+
+        .toc h2 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: var(--accent-purple);
+        }
+
+        .toc-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 12px;
+        }
+
+        .toc-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            text-decoration: none;
+            color: var(--text-primary);
+            transition: all 0.2s;
+        }
+
+        .toc-item:hover {
+            background: rgba(139, 92, 246, 0.2);
+            transform: translateX(4px);
+        }
+
+        .toc-number {
+            width: 28px;
+            height: 28px;
+            background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-blue) 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        /* Sections */
+        .section {
+            margin-bottom: 48px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .section-icon {
+            font-size: 2rem;
+        }
+
+        .section h2 {
+            font-size: 1.75rem;
+            font-weight: 600;
+        }
+
+        /* Feature Cards */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s;
+        }
+
+        .feature-card:hover {
+            border-color: var(--accent-purple);
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(139, 92, 246, 0.1);
+        }
+
+        .feature-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .feature-emoji {
+            font-size: 1.5rem;
+        }
+
+        .feature-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .feature-description {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-bottom: 16px;
+        }
+
+        .feature-meta {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .tag {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .tag-easy {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--accent-green);
+        }
+
+        .tag-medium {
+            background: rgba(249, 115, 22, 0.2);
+            color: var(--accent-orange);
+        }
+
+        .tag-hard {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .tag-tech {
+            background: rgba(59, 130, 246, 0.2);
+            color: var(--accent-blue);
+        }
+
+        /* Status Table */
+        .status-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+
+        .status-table th,
+        .status-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .status-table th {
+            background: var(--bg-secondary);
+            font-weight: 600;
+            color: var(--accent-purple);
+        }
+
+        .status-table tr:hover td {
+            background: rgba(139, 92, 246, 0.05);
+        }
+
+        .status-done {
+            color: var(--accent-green);
+        }
+
+        .status-pending {
+            color: var(--text-secondary);
+        }
+
+        /* Code Block */
+        .code-block {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 16px 0;
+            overflow-x: auto;
+            border: 1px solid var(--border-color);
+        }
+
+        .code-block pre {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: var(--text-primary);
+            margin: 0;
+        }
+
+        .code-block .comment {
+            color: #6b7280;
+        }
+
+        .code-block .keyword {
+            color: var(--accent-purple);
+        }
+
+        .code-block .string {
+            color: var(--accent-green);
+        }
+
+        .code-block .function {
+            color: var(--accent-cyan);
+        }
+
+        /* Roadmap Timeline */
+        .timeline {
+            position: relative;
+            padding-left: 40px;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 15px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(180deg, var(--accent-purple) 0%, var(--accent-cyan) 100%);
+        }
+
+        .timeline-item {
+            position: relative;
+            margin-bottom: 32px;
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid var(--border-color);
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -33px;
+            top: 28px;
+            width: 16px;
+            height: 16px;
+            background: var(--accent-purple);
+            border-radius: 50%;
+            border: 3px solid var(--bg-primary);
+        }
+
+        .timeline-phase {
+            font-size: 0.8rem;
+            color: var(--accent-purple);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .timeline-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .timeline-tasks {
+            list-style: none;
+        }
+
+        .timeline-tasks li {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+            color: var(--text-secondary);
+        }
+
+        .timeline-tasks li::before {
+            content: '○';
+            color: var(--accent-cyan);
+        }
+
+        /* Hardware Section */
+        .hardware-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .hardware-item {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            text-align: center;
+        }
+
+        .hardware-item .price {
+            color: var(--accent-green);
+            font-weight: 600;
+            font-size: 1.25rem;
+        }
+
+        .hardware-item .name {
+            font-weight: 600;
+            margin: 8px 0;
+        }
+
+        .hardware-item .purpose {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        /* GPIO Diagram */
+        .gpio-diagram {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 24px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            overflow-x: auto;
+            border: 1px solid var(--border-color);
+        }
+
+        /* Quick Wins */
+        .quick-win {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(34, 197, 94, 0.2);
+        }
+
+        .quick-win-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .quick-win-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .quick-win-time {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--accent-green);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 48px 0;
+            border-top: 1px solid var(--border-color);
+            margin-top: 48px;
+        }
+
+        .footer-brand {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-cyan) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 16px;
+        }
+
+        .footer-text {
+            color: var(--text-secondary);
+        }
+
+        /* Print Styles */
+        @media print {
+            body {
+                background: white;
+                color: black;
+            }
+
+            .container {
+                max-width: 100%;
+            }
+
+            .header,
+            .feature-card,
+            .timeline-item,
+            .toc,
+            .quick-win {
+                background: #f8f9fa;
+                border-color: #dee2e6;
+                break-inside: avoid;
+            }
+
+            .header h1 {
+                background: none;
+                -webkit-text-fill-color: #8b5cf6;
+            }
+
+            .code-block {
+                background: #f8f9fa;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .meta-info {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .timeline {
+                padding-left: 24px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>🤖 MEMO</h1>
+            <p class="subtitle">Desktop Companion Robot - Complete Feature Roadmap</p>
+            <p class="subtitle" style="font-size: 1rem; margin-top: 12px;">Vision-First AI Companion for Raspberry Pi 4B
+            </p>
+            <div class="meta-info">
+                <div class="meta-item">
+                    <span>📅</span>
+                    <span>Last Updated: January 26, 2026</span>
+                </div>
+                <div class="meta-item">
+                    <span>🎯</span>
+                    <span>Target: Raspberry Pi 4B + Logitech Camera</span>
+                </div>
+                <div class="meta-item">
+                    <span>👤</span>
+                    <span>Author: Jayadeep / Jay7-Tech</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Table of Contents -->
+        <nav class="toc">
+            <h2>📋 Table of Contents</h2>
+            <div class="toc-grid">
+                <a href="#current" class="toc-item">
+                    <span class="toc-number">1</span>
+                    <span>Current Features</span>
+                </a>
+                <a href="#vision" class="toc-item">
+                    <span class="toc-number">2</span>
+                    <span>Camera & Vision</span>
+                </a>
+                <a href="#behavior" class="toc-item">
+                    <span class="toc-number">3</span>
+                    <span>Robot Behavior</span>
+                </a>
+                <a href="#ai" class="toc-item">
+                    <span class="toc-number">4</span>
+                    <span>AI & LLM Integration</span>
+                </a>
+                <a href="#hardware" class="toc-item">
+                    <span class="toc-number">5</span>
+                    <span>Hardware Integration</span>
+                </a>
+                <a href="#dashboard" class="toc-item">
+                    <span class="toc-number">6</span>
+                    <span>Dashboard & Remote</span>
+                </a>
+                <a href="#security" class="toc-item">
+                    <span class="toc-number">7</span>
+                    <span>Security & Privacy</span>
+                </a>
+                <a href="#roadmap" class="toc-item">
+                    <span class="toc-number">8</span>
+                    <span>Implementation Roadmap</span>
+                </a>
+                <a href="#optimization" class="toc-item">
+                    <span class="toc-number">9</span>
+                    <span>Performance Tips</span>
+                </a>
+                <a href="#quickwins" class="toc-item">
+                    <span class="toc-number">10</span>
+                    <span>Quick Wins</span>
+                </a>
+            </div>
+        </nav>
+
+        <!-- Current Features -->
+        <section id="current" class="section">
+            <div class="section-header">
+                <span class="section-icon">✅</span>
+                <h2>Current Features (Implemented)</h2>
+            </div>
+            <table class="status-table">
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>Technology</th>
+                        <th>Module</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Object Detection</td>
+                        <td>YOLOv8n</td>
+                        <td><code>perception/object_detection.py</code></td>
+                        <td class="status-done">✅ Working</td>
+                    </tr>
+                    <tr>
+                        <td>Pose Estimation</td>
+                        <td>YOLOv8n-pose (17 keypoints)</td>
+                        <td><code>perception/pose_estimation.py</code></td>
+                        <td class="status-done">✅ Working</td>
+                    </tr>
+                    <tr>
+                        <td>Face Recognition</td>
+                        <td>FaceNet (InceptionResnetV1)</td>
+                        <td><code>perception/face_rec.py</code></td>
+                        <td class="status-done">✅ Working</td>
+                    </tr>
+                    <tr>
+                        <td>Spatial Memory</td>
+                        <td>JSON-based tracking</td>
+                        <td><code>state/scene_state.py</code></td>
+                        <td class="status-done">✅ Working</td>
+                    </tr>
+                    <tr>
+                        <td>Voice Commands</td>
+                        <td>Speech Recognition</td>
+                        <td><code>interface/voice_input.py</code></td>
+                        <td class="status-done">✅ Working</td>
+                    </tr>
+                    <tr>
+                        <td>Text-to-Speech</td>
+                        <td>PowerShell Speech API</td>
+                        <td><code>main.py</code></td>
+                        <td class="status-done">✅ Working</td>
+                    </tr>
+                    <tr>
+                        <td>Focus Mode</td>
+                        <td>Rule-based detection</td>
+                        <td><code>reasoning/rules.py</code></td>
+                        <td class="status-done">✅ Working</td>
+                    </tr>
+                    <tr>
+                        <td>Selfie Capture</td>
+                        <td>OpenCV</td>
+                        <td><code>main.py</code></td>
+                        <td class="status-done">✅ Working</td>
+                    </tr>
+                    <tr>
+                        <td>Web Dashboard</td>
+                        <td>Flask</td>
+                        <td><code>interface/dashboard.py</code></td>
+                        <td class="status-done">✅ Working</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Camera & Vision Features -->
+        <section id="vision" class="section">
+            <div class="section-header">
+                <span class="section-icon">📸</span>
+                <h2>Camera & Vision Features</h2>
+            </div>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">🔍</span>
+                        <span class="feature-title">Multi-Face Recognition</span>
+                    </div>
+                    <p class="feature-description">Track and recognize multiple people simultaneously in the frame.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-medium">Medium</span>
+                        <span class="tag tag-tech">MobileFaceNet</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">👁️</span>
+                        <span class="feature-title">Eye Gaze Tracking</span>
+                    </div>
+                    <p class="feature-description">Detect where the user is looking (at screen, away, distracted).</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-medium">Medium</span>
+                        <span class="tag tag-tech">MediaPipe Face Mesh</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">😊</span>
+                        <span class="feature-title">Emotion Detection</span>
+                    </div>
+                    <p class="feature-description">Recognize facial emotions: happy, sad, angry, surprised, neutral,
+                        focused.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-medium">Medium</span>
+                        <span class="tag tag-tech">TFLite (~2MB)</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">🎯</span>
+                        <span class="feature-title">Attention Tracking</span>
+                    </div>
+                    <p class="feature-description">Determine if user is paying attention to the robot/screen.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-easy">Easy</span>
+                        <span class="tag tag-tech">Face + Gaze</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">🖐️</span>
+                        <span class="feature-title">Hand Gesture Recognition</span>
+                    </div>
+                    <p class="feature-description">Recognize gestures: thumbs up, peace sign, stop, wave.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-medium">Medium</span>
+                        <span class="tag tag-tech">MediaPipe Hands</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">👋</span>
+                        <span class="feature-title">Activity Recognition</span>
+                    </div>
+                    <p class="feature-description">Detect: typing, reading, drinking, eating, sleeping.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-hard">Hard</span>
+                        <span class="tag tag-tech">Custom Classifier</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">🔄</span>
+                        <span class="feature-title">Motion Detection</span>
+                    </div>
+                    <p class="feature-description">Trigger on movement for security/wake feature.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-easy">Easy</span>
+                        <span class="tag tag-tech">Frame Differencing</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">📐</span>
+                        <span class="feature-title">Depth Estimation</span>
+                    </div>
+                    <p class="feature-description">Monocular depth for spatial awareness.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-medium">Medium</span>
+                        <span class="tag tag-tech">MiDaS-small</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Robot Behavior -->
+        <section id="behavior" class="section">
+            <div class="section-header">
+                <span class="section-icon">🤖</span>
+                <h2>Robot Behavior & Interaction</h2>
+            </div>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">🔊</span>
+                        <span class="feature-title">Wake Word Detection</span>
+                    </div>
+                    <p class="feature-description">"Hey MEMO" offline activation without cloud dependency.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-easy">Easy</span>
+                        <span class="tag tag-tech">OpenWakeWord</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">🎤</span>
+                        <span class="feature-title">Streaming ASR</span>
+                    </div>
+                    <p class="feature-description">Real-time speech-to-text transcription.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-medium">Medium</span>
+                        <span class="tag tag-tech">Vosk / Whisper</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">👀</span>
+                        <span class="feature-title">Head Tracking Gimbal</span>
+                    </div>
+                    <p class="feature-description">Pan-tilt servo that follows user's face.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-medium">Medium</span>
+                        <span class="tag tag-tech">PCA9685 + Servos</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">😵</span>
+                        <span class="feature-title">Idle Behaviors</span>
+                    </div>
+                    <p class="feature-description">Random movements, "bored" animations when not engaged.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-easy">Easy</span>
+                        <span class="tag tag-tech">State Machine</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">🗣️</span>
+                        <span class="feature-title">Personalized Responses</span>
+                    </div>
+                    <p class="feature-description">Different responses based on recognized identity.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-easy">Easy</span>
+                        <span class="tag tag-tech">User Profiles</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">💡</span>
+                        <span class="feature-title">Emotion-Reactive LEDs</span>
+                    </div>
+                    <p class="feature-description">Change LED color/pattern based on detected emotion.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-easy">Easy</span>
+                        <span class="tag tag-tech">NeoPixel</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">📅</span>
+                        <span class="feature-title">Context Awareness</span>
+                    </div>
+                    <p class="feature-description">Time-based greetings: "Good morning" vs "Good evening".</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-easy">Easy</span>
+                        <span class="tag tag-tech">datetime</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">🧠</span>
+                        <span class="feature-title">Conversation Memory</span>
+                    </div>
+                    <p class="feature-description">Remember past conversations with each user.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-medium">Medium</span>
+                        <span class="tag tag-tech">SQLite</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">🎭</span>
+                        <span class="feature-title">Personality Modes</span>
+                    </div>
+                    <p class="feature-description">Switch between "helpful", "sarcastic", "cute" styles.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-easy">Easy</span>
+                        <span class="tag tag-tech">LLM Prompts</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- AI & LLM -->
+        <section id="ai" class="section">
+            <div class="section-header">
+                <span class="section-icon">🧠</span>
+                <h2>AI & LLM Integration</h2>
+            </div>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">💬</span>
+                        <span class="feature-title">Gemini/GPT Chat</span>
+                    </div>
+                    <p class="feature-description">Natural conversational AI with context awareness.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-easy">Easy</span>
+                        <span class="tag tag-tech">Gemini 1.5 Flash</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">🖼️</span>
+                        <span class="feature-title">Vision-Language Model</span>
+                    </div>
+                    <p class="feature-description">"What do you see?" → Describes room and objects.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-medium">Medium</span>
+                        <span class="tag tag-tech">Gemini Vision</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">📚</span>
+                        <span class="feature-title">RAG System</span>
+                    </div>
+                    <p class="feature-description">Answer questions about personal documents.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-hard">Hard</span>
+                        <span class="tag tag-tech">ChromaDB</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">🔊</span>
+                        <span class="feature-title">Voice Cloning</span>
+                    </div>
+                    <p class="feature-description">Speak in a custom or cloned voice.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-medium">Medium</span>
+                        <span class="tag tag-tech">Edge-TTS</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">📝</span>
+                        <span class="feature-title">Summarization</span>
+                    </div>
+                    <p class="feature-description">"What happened while I was away?" summary.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-medium">Medium</span>
+                        <span class="tag tag-tech">LLM</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">🎯</span>
+                        <span class="feature-title">Intent Classification</span>
+                    </div>
+                    <p class="feature-description">Better understanding of user commands.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-medium">Medium</span>
+                        <span class="tag tag-tech">Classifier</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Hardware Integration -->
+        <section id="hardware" class="section">
+            <div class="section-header">
+                <span class="section-icon">🎛️</span>
+                <h2>Hardware Integration (Pi4B Specific)</h2>
+            </div>
+
+            <h3 style="margin: 24px 0 16px; color: var(--accent-purple);">Recommended Components</h3>
+            <div class="hardware-grid">
+                <div class="hardware-item">
+                    <div class="price">$5</div>
+                    <div class="name">PCA9685</div>
+                    <div class="purpose">Servo Controller</div>
+                </div>
+                <div class="hardware-item">
+                    <div class="price">$6</div>
+                    <div class="name">2x SG90 Servos</div>
+                    <div class="purpose">Pan/Tilt Movement</div>
+                </div>
+                <div class="hardware-item">
+                    <div class="price">$30</div>
+                    <div class="name">ReSpeaker 4-Mic</div>
+                    <div class="purpose">Voice Capture</div>
+                </div>
+                <div class="hardware-item">
+                    <div class="price">$10</div>
+                    <div class="name">USB Speaker</div>
+                    <div class="purpose">Audio Output</div>
+                </div>
+                <div class="hardware-item">
+                    <div class="price">$5</div>
+                    <div class="name">WS2812B Ring</div>
+                    <div class="purpose">LED Eyes</div>
+                </div>
+                <div class="hardware-item">
+                    <div class="price">$5</div>
+                    <div class="name">SSD1306 OLED</div>
+                    <div class="purpose">Robot Face</div>
+                </div>
+                <div class="hardware-item">
+                    <div class="price">$4</div>
+                    <div class="name">DHT22</div>
+                    <div class="purpose">Temp & Humidity</div>
+                </div>
+                <div class="hardware-item">
+                    <div class="price">$25</div>
+                    <div class="name">UPS HAT</div>
+                    <div class="purpose">Power Backup</div>
+                </div>
+            </div>
+
+            <h3 style="margin: 32px 0 16px; color: var(--accent-purple);">GPIO Pinout Reference</h3>
+            <div class="gpio-diagram">
+                <pre style="color: var(--text-secondary);">
+┌─────────────────────────────────────────┐
+│           Raspberry Pi 4B GPIO          │
+├─────────────────────────────────────────┤
+│  3.3V  [1]  [2]  5V                     │
+│  SDA   [3]  [4]  5V      ──► PCA9685    │
+│  SCL   [5]  [6]  GND                    │
+│  GPIO4 [7]  [8]  TXD                    │
+│  GND   [9]  [10] RXD                    │
+│  GPIO17[11] [12] GPIO18  ──► NeoPixel   │
+│  GPIO27[13] [14] GND                    │
+│  GPIO22[15] [16] GPIO23                 │
+│  3.3V  [17] [18] GPIO24  ──► DHT22      │
+│  MOSI  [19] [20] GND                    │
+│  MISO  [21] [22] GPIO25                 │
+│  SCLK  [23] [24] CE0                    │
+│  GND   [25] [26] CE1                    │
+│  GPIO5 [29] [30] GND                    │
+│  GPIO6 [31] [32] GPIO12  ──► IR LED     │
+│  GPIO13[33] [34] GND                    │
+│  GPIO19[35] [36] GPIO16                 │
+│  GPIO26[37] [38] GPIO20                 │
+│  GND   [39] [40] GPIO21                 │
+└─────────────────────────────────────────┘
+</pre>
+            </div>
+        </section>
+
+        <!-- Dashboard Features -->
+        <section id="dashboard" class="section">
+            <div class="section-header">
+                <span class="section-icon">🌐</span>
+                <h2>Dashboard & Remote Control</h2>
+            </div>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">📊</span>
+                        <span class="feature-title">Live Stats Dashboard</span>
+                    </div>
+                    <p class="feature-description">CPU, RAM, temperature, FPS metrics in real-time.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-easy">Easy</span>
+                        <span class="tag tag-tech">Flask + WebSocket</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">🗺️</span>
+                        <span class="feature-title">Object Map View</span>
+                    </div>
+                    <p class="feature-description">2D visualization of detected objects on desk.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-medium">Medium</span>
+                        <span class="tag tag-tech">Canvas / D3.js</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">📱</span>
+                        <span class="feature-title">Mobile App Control</span>
+                    </div>
+                    <p class="feature-description">PWA or Flutter app for mobile control.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-medium">Medium</span>
+                        <span class="tag tag-tech">PWA</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">📹</span>
+                        <span class="feature-title">Video Recording</span>
+                    </div>
+                    <p class="feature-description">Record clips on motion or command.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-easy">Easy</span>
+                        <span class="tag tag-tech">OpenCV</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">🕐</span>
+                        <span class="feature-title">Activity Timeline</span>
+                    </div>
+                    <p class="feature-description">History with thumbnails of events.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-medium">Medium</span>
+                        <span class="tag tag-tech">SQLite</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">⚙️</span>
+                        <span class="feature-title">Settings Panel</span>
+                    </div>
+                    <p class="feature-description">Web UI to configure thresholds and options.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-easy">Easy</span>
+                        <span class="tag tag-tech">Flask Forms</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Security Features -->
+        <section id="security" class="section">
+            <div class="section-header">
+                <span class="section-icon">🔐</span>
+                <h2>Security & Privacy Features</h2>
+            </div>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">🚨</span>
+                        <span class="feature-title">Intruder Detection</span>
+                    </div>
+                    <p class="feature-description">Alert if unknown face appears in frame.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-easy">Easy</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">🔒</span>
+                        <span class="feature-title">Privacy Mode</span>
+                    </div>
+                    <p class="feature-description">Quick camera/mic shutoff via command.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-easy">Easy</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">📦</span>
+                        <span class="feature-title">Package Detection</span>
+                    </div>
+                    <p class="feature-description">Detect when packages are delivered.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-medium">Medium</span>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <span class="feature-emoji">🎭</span>
+                        <span class="feature-title">Face Blur</span>
+                    </div>
+                    <p class="feature-description">Auto-blur non-registered faces in recordings.</p>
+                    <div class="feature-meta">
+                        <span class="tag tag-medium">Medium</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Implementation Roadmap -->
+        <section id="roadmap" class="section">
+            <div class="section-header">
+                <span class="section-icon">🏗️</span>
+                <h2>Implementation Roadmap</h2>
+            </div>
+            <div class="timeline">
+                <div class="timeline-item">
+                    <div class="timeline-phase">Phase 1 • Week 1-2</div>
+                    <div class="timeline-title">Core Pi4B Migration</div>
+                    <ul class="timeline-tasks">
+                        <li>Optimize camera for Pi4B (reduce to 480p)</li>
+                        <li>Convert models to TFLite/ONNX for 2-3x speedup</li>
+                        <li>Add offline wake word (OpenWakeWord)</li>
+                        <li>Set up head tracking gimbal (PCA9685 + servos)</li>
+                    </ul>
+                </div>
+
+                <div class="timeline-item">
+                    <div class="timeline-phase">Phase 2 • Week 3-4</div>
+                    <div class="timeline-title">Enhanced Perception</div>
+                    <ul class="timeline-tasks">
+                        <li>Hand gesture recognition (MediaPipe Hands)</li>
+                        <li>Eye gaze / attention tracking</li>
+                        <li>Emotion detection (TFLite model)</li>
+                        <li>Motion-triggered wake from sleep</li>
+                    </ul>
+                </div>
+
+                <div class="timeline-item">
+                    <div class="timeline-phase">Phase 3 • Week 5-6</div>
+                    <div class="timeline-title">Smart Interaction</div>
+                    <ul class="timeline-tasks">
+                        <li>Gemini integration for natural chat</li>
+                        <li>Vision-Language ("What do you see?")</li>
+                        <li>Personalized per-user responses</li>
+                        <li>Conversation memory (SQLite)</li>
+                    </ul>
+                </div>
+
+                <div class="timeline-item">
+                    <div class="timeline-phase">Phase 4 • Week 7-8</div>
+                    <div class="timeline-title">Hardware Polish</div>
+                    <ul class="timeline-tasks">
+                        <li>LED eyes/expressions (NeoPixel ring)</li>
+                        <li>Environment sensors (temp, humidity)</li>
+                        <li>Better audio setup (ReSpeaker)</li>
+                        <li>Idle behaviors & personality animations</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Performance Optimization -->
+        <section id="optimization" class="section">
+            <div class="section-header">
+                <span class="section-icon">⚡</span>
+                <h2>Raspberry Pi 4B Performance Tips</h2>
+            </div>
+
+            <h3 style="margin: 24px 0 16px; color: var(--accent-purple);">Model Optimization</h3>
+            <table class="status-table">
+                <thead>
+                    <tr>
+                        <th>Optimization</th>
+                        <th>Speedup</th>
+                        <th>How</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>YOLOv8n INT8</td>
+                        <td>2-3x</td>
+                        <td><code>yolo export format=tflite int8=True</code></td>
+                    </tr>
+                    <tr>
+                        <td>MediaPipe</td>
+                        <td>Native</td>
+                        <td>Already optimized for ARM</td>
+                    </tr>
+                    <tr>
+                        <td>ONNX Runtime</td>
+                        <td>1.5x</td>
+                        <td><code>pip install onnxruntime</code></td>
+                    </tr>
+                    <tr>
+                        <td>TFLite</td>
+                        <td>2x</td>
+                        <td>Quantized models</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3 style="margin: 32px 0 16px; color: var(--accent-purple);">Processing Tips</h3>
+            <table class="status-table">
+                <thead>
+                    <tr>
+                        <th>Technique</th>
+                        <th>Benefit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Process every 3rd frame</td>
+                        <td>3x effective FPS</td>
+                    </tr>
+                    <tr>
+                        <td>Lower resolution (480x360)</td>
+                        <td>2x speedup from 720p</td>
+                    </tr>
+                    <tr>
+                        <td>Async inference threading</td>
+                        <td>Better responsiveness</td>
+                    </tr>
+                    <tr>
+                        <td>Use PiCamera2 libcamera</td>
+                        <td>Lower latency than USB</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3 style="margin: 32px 0 16px; color: var(--accent-purple);">System Commands</h3>
+            <div class="code-block">
+                <pre><span class="comment"># Increase GPU memory</span>
+sudo raspi-config
+<span class="comment"># → Performance Options → GPU Memory → 256</span>
+
+<span class="comment"># Disable unnecessary services</span>
+sudo systemctl disable bluetooth
+sudo systemctl disable cups
+
+<span class="comment"># Overclock (with cooling)</span>
+<span class="comment"># Edit /boot/config.txt</span>
+<span class="comment"># over_voltage=6</span>
+<span class="comment"># arm_freq=2000</span></pre>
+            </div>
+        </section>
+
+        <!-- Quick Wins -->
+        <section id="quickwins" class="section">
+            <div class="section-header">
+                <span class="section-icon">🎯</span>
+                <h2>Quick Wins (Implement in Under a Day)</h2>
+            </div>
+
+            <div class="quick-win">
+                <div class="quick-win-header">
+                    <span class="quick-win-title">🔄 Motion Detection</span>
+                    <span class="quick-win-time">⏱️ 2 hours</span>
+                </div>
+                <div class="code-block">
+                    <pre><span class="keyword">def</span> <span class="function">detect_motion</span>(prev_frame, curr_frame, threshold=25):
+    diff = cv2.absdiff(
+        cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY),
+        cv2.cvtColor(curr_frame, cv2.COLOR_BGR2GRAY)
+    )
+    motion_pixels = np.sum(diff > threshold)
+    <span class="keyword">return</span> motion_pixels > 5000  <span class="comment"># Adjust threshold</span></pre>
+                </div>
+            </div>
+
+            <div class="quick-win">
+                <div class="quick-win-header">
+                    <span class="quick-win-title">📅 Time-Based Greetings</span>
+                    <span class="quick-win-time">⏱️ 30 minutes</span>
+                </div>
+                <div class="code-block">
+                    <pre><span class="keyword">from</span> datetime <span class="keyword">import</span> datetime
+
+<span class="keyword">def</span> <span class="function">get_greeting</span>(name):
+    hour = datetime.now().hour
+    <span class="keyword">if</span> 5 <= hour < 12:
+        <span class="keyword">return</span> <span class="string">f"Good morning, {name}!"</span>
+    <span class="keyword">elif</span> 12 <= hour < 17:
+        <span class="keyword">return</span> <span class="string">f"Good afternoon, {name}!"</span>
+    <span class="keyword">elif</span> 17 <= hour < 21:
+        <span class="keyword">return</span> <span class="string">f"Good evening, {name}!"</span>
+    <span class="keyword">else</span>:
+        <span class="keyword">return</span> <span class="string">f"Working late, {name}?"</span></pre>
+                </div>
+            </div>
+
+            <div class="quick-win">
+                <div class="quick-win-header">
+                    <span class="quick-win-title">🔊 Wake Word (OpenWakeWord)</span>
+                    <span class="quick-win-time">⏱️ 1 hour</span>
+                </div>
+                <div class="code-block">
+                    <pre><span class="comment"># Install</span>
+pip install openwakeword
+
+<span class="comment"># Usage</span>
+<span class="keyword">from</span> openwakeword.model <span class="keyword">import</span> Model
+owwModel = Model(wakeword_models=[<span class="string">"hey_jarvis"</span>])
+prediction = owwModel.predict(audio_frame)</pre>
+                </div>
+            </div>
+
+            <div class="quick-win">
+                <div class="quick-win-header">
+                    <span class="quick-win-title">💡 NeoPixel LED Feedback</span>
+                    <span class="quick-win-time">⏱️ 2 hours</span>
+                </div>
+                <div class="code-block">
+                    <pre><span class="keyword">from</span> rpi_ws281x <span class="keyword">import</span> PixelStrip, Color
+
+LED_PIN = 18
+LED_COUNT = 16
+strip = PixelStrip(LED_COUNT, LED_PIN)
+strip.begin()
+
+<span class="keyword">def</span> <span class="function">set_mood</span>(emotion):
+    colors = {
+        <span class="string">"happy"</span>: Color(255, 255, 0),   <span class="comment"># Yellow</span>
+        <span class="string">"sad"</span>: Color(0, 0, 255),       <span class="comment"># Blue</span>
+        <span class="string">"angry"</span>: Color(255, 0, 0),     <span class="comment"># Red</span>
+        <span class="string">"neutral"</span>: Color(100, 100, 100)
+    }
+    <span class="keyword">for</span> i <span class="keyword">in</span> range(LED_COUNT):
+        strip.setPixelColor(i, colors.get(emotion))
+    strip.show()</pre>
+                </div>
+            </div>
+
+            <div class="quick-win">
+                <div class="quick-win-header">
+                    <span class="quick-win-title">🖐️ Gesture Detection (Thumbs Up)</span>
+                    <span class="quick-win-time">⏱️ 3 hours</span>
+                </div>
+                <div class="code-block">
+                    <pre><span class="keyword">import</span> mediapipe <span class="keyword">as</span> mp
+
+mp_hands = mp.solutions.hands
+hands = mp_hands.Hands(max_num_hands=1)
+
+<span class="keyword">def</span> <span class="function">detect_gesture</span>(frame):
+    results = hands.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+    <span class="keyword">if</span> results.multi_hand_landmarks:
+        landmarks = results.multi_hand_landmarks[0].landmark
+        thumb_tip = landmarks[4]
+        thumb_ip = landmarks[3]
+        <span class="keyword">if</span> thumb_tip.y < thumb_ip.y:  <span class="comment"># Thumb pointing up</span>
+            <span class="keyword">return</span> <span class="string">"thumbs_up"</span>
+    <span class="keyword">return</span> None</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-brand">MEMO</div>
+            <p class="footer-text">Memory & Environmental Monitoring Observer</p>
+            <p class="footer-text" style="margin-top: 16px;">Made with ❤️ by <strong>Jayadeep / Jay7-Tech</strong></p>
+            <p class="footer-text" style="margin-top: 8px; font-size: 0.85rem;">
+                📧 GitHub: <a href="https://github.com/jay7-tech/memo"
+                    style="color: var(--accent-purple);">jay7-tech/memo</a>
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        // Smooth scroll for TOC links
+        document.querySelectorAll('.toc-item').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const target = document.querySelector(link.getAttribute('href'));
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        });
+
+        // Add print button
+        const printBtn = document.createElement('button');
+        printBtn.innerHTML = '🖨️ Print / Save as PDF';
+        printBtn.style.cssText = `
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            font-family: inherit;
+            box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);
+            z-index: 1000;
+        `;
+        printBtn.onclick = () => window.print();
+        document.body.appendChild(printBtn);
+    </script>
+</body>
+
+</html>

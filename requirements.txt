@@ -5,13 +5,23 @@ numpy>=1.24.0
 torch
 torchvision
 facenet-pytorch         # Face Recognition
+mediapipe>=0.10.0       # Hand gestures, face mesh
 
 # Audio & Speech
 pyttsx3                 # Text-to-Speech (Offline)
 SpeechRecognition       # Speech-to-Text
 pyaudio                 # Microphone Input
+openwakeword>=0.6.0     # Offline wake word detection
+vosk>=0.3.45            # Better offline ASR
 
 # Dashboard & API
 flask                   # Web Dashboard
+flask-socketio>=5.3.0   # WebSocket for real-time updates
+python-socketio>=5.10.0
 requests                # HTTP Requests (for IP Camera)
 werkzeug                # Flask utility
+
+# Utilities
+colorlog>=6.8.0         # Colored console logging
+pyyaml>=6.0             # Configuration management
+psutil>=5.9.0           # System stats monitoring
