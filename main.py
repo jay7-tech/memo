@@ -435,7 +435,9 @@ class MEMOApp:
         print(f"[MEMO] Dashboard: http://localhost:5000")
         print("[MEMO] Press 'q' in window or type 'quit' to exit\n")
         
-        speak(self.personality.ready_message())
+        # We already said startup_message() at the very beginning of run()
+        # No need for a second greeting here.
+
         
         # Main loop
         while self.running:

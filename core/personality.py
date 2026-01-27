@@ -94,30 +94,59 @@ class AIPersonality:
         print(f"[AI] ✓ Personality initialized with {self.backend} backend")
     
     def _init_backend(self):
-        """Initialize the AI backend."""
+        """Initialize the AI backend with a robust model search and fallback."""
+        # Try Gemini first
         if self.backend == 'gemini' and self.gemini_key:
             try:
                 import google.generativeai as genai
                 genai.configure(api_key=self.gemini_key)
-                self._gemini_model = genai.GenerativeModel('models/gemini-2.0-flash')
-                print("[AI] ✓ Gemini connected")
-                return
+                
+                # Prioritize gemini-1.5-flash as it's the most stable free-tier model
+                prospective_models = [
+                    'models/gemini-1.5-flash',
+                    'models/gemini-pro',
+                    'gemini-1.5-flash'
+                ]
+                
+                print("[AI] Testing Gemini connection...")
+                for m_name in prospective_models:
+                    try:
+                        temp_model = genai.GenerativeModel(m_name)
+                        # Quick check
+                        temp_model.generate_content("hi", generation_config={"max_output_tokens": 1})
+                        self._gemini_model = temp_model
+                        self.backend = 'gemini'
+                        print(f"[AI] ✓ Brain: Gemini ({m_name}) connected.")
+                        return
+                    except Exception as e:
+                        if "429" in str(e):
+                            print(f"[AI] ! Gemini {m_name} Quota Exceeded. Trying Ollama...")
+                            break # Fall through to Ollama check
+                        continue
             except Exception as e:
-                print(f"[AI] Gemini init failed: {e}")
+                print(f"[AI] Gemini setup error: {e}")
         
-        if self.backend == 'ollama' or (self.backend == 'gemini' and not self._gemini_model):
-            try:
-                import requests
-                resp = requests.get(f"{self.ollama_url}/api/tags", timeout=2)
-                if resp.status_code == 200:
+        # Fallback: Try Ollama
+        try:
+            import requests
+            resp = requests.get(f"{self.ollama_url}/api/tags", timeout=2)
+            if resp.status_code == 200:
+                # Check if our configured model exists, or pick one from the list
+                models = [m['name'] for m in resp.json().get('models', [])]
+                if self.ollama_model in models:
                     self.backend = 'ollama'
-                    print(f"[AI] ✓ Ollama connected ({self.ollama_model})")
+                    print(f"[AI] ✓ Brain: Ollama ({self.ollama_model}) connected.")
                     return
-            except:
-                pass
+                elif models:
+                    self.ollama_model = models[0]
+                    self.backend = 'ollama'
+                    print(f"[AI] ✓ Brain: Ollama (using {self.ollama_model}) connected.")
+                    return
+        except:
+            pass
         
         self.backend = 'fallback'
-        print("[AI] Using fallback responses")
+        print("[AI] Brain: Local Fallback activated (No LLM).")
     
     def _get_time_context(self) -> str:
         hour = datetime.now().hour
@@ -156,12 +185,12 @@ class AIPersonality:
         system_prompt = MEMO_PERSONALITY.format(context=context)
         
         if response_type == "quick":
-            full_prompt = f"{system_prompt}\n\nUser: {prompt}\n\nRespond in under 10 words, be playful and casual:"
+            full_prompt = f"{system_prompt}\n\nUser: {prompt}\n\nRespond in under 10 words, be playful and casual. DONT greet the user."
         else:
-            full_prompt = f"{system_prompt}\n\nUser: {prompt}\n\nRespond naturally as MEMO:"
+            full_prompt = f"{system_prompt}\n\nUser: {prompt}\n\nRespond naturally as MEMO."
         
         try:
-            if self.backend == 'gemini':
+            if self.backend == 'gemini' and self._gemini_model:
                 response = self._generate_gemini(full_prompt)
             elif self.backend == 'ollama':
                 response = self._generate_ollama(full_prompt)
@@ -173,7 +202,6 @@ class AIPersonality:
             return response
             
         except Exception as e:
-            print(f"[AI] Error: {e}")
             return self._generate_fallback(prompt)
     
     def _generate_gemini(self, prompt: str) -> str:
@@ -184,13 +212,19 @@ class AIPersonality:
             response = self._gemini_model.generate_content(
                 prompt,
                 generation_config={
-                    'temperature': 0.9,  # More creative
+                    'temperature': 0.9,
                     'max_output_tokens': 50,
                 }
             )
             return response.text.strip()
         except Exception as e:
-            print(f"[AI Gemini] Error: {e}")
+            error_str = str(e)
+            if "429" in error_str:
+                print("[AI Gemini] ! Quota exceeded.")
+            elif "403" in error_str:
+                print("[AI Gemini] ! API Key error.")
+            elif "404" in error_str:
+                print("[AI Gemini] ! Model not found.")
             return self._generate_fallback(prompt)
     
     def _generate_ollama(self, prompt: str) -> str:
@@ -209,42 +243,30 @@ class AIPersonality:
             if response.status_code == 200:
                 return response.json().get('response', '').strip()
         except Exception as e:
-            print(f"[AI Ollama] Error: {e}")
+            pass
         return self._generate_fallback(prompt)
     
     def _generate_fallback(self, prompt: str) -> str:
+        """Friendly local responses when AI is offline."""
         prompt_lower = prompt.lower()
         
-        if any(word in prompt_lower for word in ['hello', 'hi', 'hey', 'sup']):
-            return random.choice([
-                f"Yo {self.user_name}! What's good? 😎",
-                f"Heyyy! Missed ya!",
-                f"What's up, {self.user_name}? 🤙",
-                f"Oh hey! Look who's here!",
-            ])
+        # Identity queries
+        if 'who are you' in prompt_lower or 'your name' in prompt_lower:
+            return "I'm MEMO, your desktop buddy! 🤙"
         
-        if any(word in prompt_lower for word in ['how are you', 'status', "what's up"]):
-            return random.choice([
-                "Vibing! You?",
-                "Just chilling here 😌",
-                "Living my best digital life!",
-                "Can't complain! What's new?",
-            ])
-        
-        if any(word in prompt_lower for word in ['bye', 'goodbye', 'quit']):
-            return random.choice([
-                f"Later, {self.user_name}! ✌️",
-                "Peace out! 🤙",
-                "Catch ya later, alligator!",
-                f"Bye {self.user_name}! Don't be a stranger!",
-            ])
-        
-        return random.choice([
-            "Haha, nice!",
-            "Interesting... 🤔",
-            f"You got it, {self.user_name}!",
-            "Cool cool cool!",
-        ])
+        if 'who am i' in prompt_lower or 'my name' in prompt_lower:
+            return f"You're {self.user_name}! My favorite human. 😄"
+
+        # General curiosity
+        responses = [
+            "Ooh, good question! My brain's a bit foggy right now though. ☁️",
+            "I'm not exactly sure, but I'm vibes-only right now! 😎",
+            "Total mystery to me! Let's just vibe instead. 🤙",
+            "I'd look that up for you, but I'm currently in 'chill mode'. 😌",
+            "Interesting... I'll have to think about that one! 🤔",
+            "You always have the most interesting questions! I'm stumped though. 😄"
+        ]
+        return random.choice(responses)
     
     # === PLAYFUL PRE-BUILT RESPONSES ===
     
@@ -252,52 +274,16 @@ class AIPersonality:
         time_period = self._get_time_context()
         
         greetings = {
-            'morning': [
-                "Mornin'! ☀️ Another day, another vibe!",
-                "Rise and shine! Or don't, I'm not your mom 😄",
-                "Good morning! *yawns digitally*",
-                "Morning, sunshine! Coffee time? ☕",
-            ],
-            'afternoon': [
-                "Hey hey! Afternoon vibes! 🌤️",
-                "What's good! Let's hang!",
-                "Yo! Perfect time to chill!",
-                "Afternoon! How's it going?",
-            ],
-            'evening': [
-                "Evening! Prime time to hang! 🌆",
-                "Heyyy! Evening crew represent!",
-                "What's up! Evening vibes are the best!",
-                "Yo! The night is young!",
-            ],
-            'night': [
-                "Night owl gang! 🦉",
-                "Late night crew, let's go!",
-                "Burning the midnight oil, huh? Same!",
-                "Hey night owl! Can't sleep either? 😄",
-            ],
+            'morning': ["Mornin'! ☀️ Let's vibe."],
+            'afternoon': ["Yo! Chill afternoon vibes. 🌤️"],
+            'evening': ["Evening! What's good? 🌆"],
+            'night': ["Night owl crew represent! 🦉"],
         }
         return random.choice(greetings.get(time_period, greetings['afternoon']))
     
     def greeting(self, name: str) -> str:
         self.user_name = name
-        time_period = self._get_time_context()
-        
-        greetings = [
-            f"Yooo {name}! 👋",
-            f"Oh hey {name}! What's good?",
-            f"Look who it is! Hey {name}!",
-            f"{name}! My favorite human! 😄",
-            f"Ayyy {name}'s here!",
-            f"What's up {name}! 🤙",
-        ]
-        
-        if time_period == 'night':
-            greetings.append(f"Night owl {name}! 🦉")
-        elif time_period == 'morning':
-            greetings.append(f"Morning, {name}! Early bird gets the... whatever 😄")
-        
-        return random.choice(greetings)
+        return f"Yo {name}! �"
     
     def focus_on(self) -> str:
         return random.choice([
