@@ -1,15 +1,98 @@
+"""
+MEMO - Rules Engine Module
+==========================
+
+This module provides event-based reasoning on scene state changes.
+
+Features:
+    - Object appearance/disappearance detection
+    - Pose state change monitoring
+    - Focus mode distraction detection
+    - Screen proximity alerting
+    - Personalized greeting system
+    - Posture duration tracking
+
+Event Types Generated:
+    - "Object appeared: {label}" - When a new object enters view
+    - "Object disappeared: {label}" - When an object leaves view
+    - "TTS: You have been sitting for a while..." - Posture reminder
+    - "TTS: Put the phone away and focus..." - Focus mode distraction
+    - "TTS: You are too close to the screen..." - Proximity warning
+    - "TTS: Hello {name}. Welcome back." - Personalized greeting
+
+Rule Processing:
+    1. Track current vs previous visible objects (500ms threshold)
+    2. Monitor pose state transitions
+    3. Check focus mode + distraction conditions
+    4. Calculate screen proximity from shoulder/ear keypoints
+    5. Trigger greeting when known user is recognized
+
+Debouncing:
+    - Proximity alerts: 15 second cooldown
+    - Focus alerts: 5 second cooldown
+    - Greetings: Reset after 5 seconds of absence
+
+Dependencies:
+    - SceneState from state/scene_state.py
+
+Example:
+    >>> engine = RulesEngine()
+    >>> events = engine.check_rules(scene_state, timestamp)
+    >>> for event in events:
+    ...     if event.startswith("TTS:"):
+    ...         speak(event[4:])  # Send to TTS
+    ...     else:
+    ...         log(event)  # Log to console
+
+Author: Jayadeep / Jay7-Tech
+Module: reasoning/rules.py
+"""
+
+
 class RulesEngine:
+    """
+    Event-based rules engine for MEMO desktop companion.
+    
+    The RulesEngine analyzes scene state at each frame and generates
+    events when significant changes occur. Events can trigger TTS
+    responses, log entries, or other actions.
+    
+    Attributes:
+        prev_objects (set): Set of object labels visible in previous check.
+        prev_pose_state (str): Previous pose state ('sitting', 'standing', 'unknown').
+        last_proximity_alert (float): Timestamp of last proximity warning.
+        last_focus_alert (float): Timestamp of last focus mode warning.
+        last_greeted_name (str): Name of last greeted user.
+        last_greeted_time (float): Timestamp of last greeting.
+    
+    Methods:
+        check_rules(scene_state, timestamp): Analyze state and return events.
+    
+    Example:
+        >>> engine = RulesEngine()
+        >>> while running:
+        ...     events = engine.check_rules(scene_state, time.time())
+        ...     for event in events:
+        ...         process_event(event)
+    """
+    
     def __init__(self):
+        """
+        Initialize the RulesEngine with default state.
+        
+        All tracking variables are reset to initial values.
+        """
         self.prev_objects = set()
         self.prev_pose_state = 'unknown'
         self.last_check_time = 0
         
-        # Rep Counting
+        # Rep Counting (future feature)
         self.rep_count = 0
-        self.rep_stage = None # 'up' or 'down'
+        self.rep_stage = None  # 'up' or 'down'
         self.prev_wrist_y = None
-        self.rep_joint = 'RIGHT_WRIST' # Default to tracking right wrist
+        self.rep_joint = 'RIGHT_WRIST'  # Default to tracking right wrist
         
+        # Debounce timers
         self.last_proximity_alert = 0
         self.last_focus_alert = 0
         self.last_greeted_name = None

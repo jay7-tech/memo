@@ -1,20 +1,106 @@
+"""
+MEMO - Object Detection Module
+==============================
+
+This module provides real-time object detection using YOLOv8.
+
+Features:
+    - YOLOv8n for fast, lightweight detection (80 COCO classes)
+    - Configurable confidence thresholds per object class
+    - Special handling for cell phone vs mouse disambiguation
+    - Returns bounding boxes in [x, y, width, height] format
+
+Dependencies:
+    - ultralytics (YOLOv8)
+    - opencv-python (cv2)
+
+Example:
+    >>> detector = ObjectDetector('yolov8n.pt')
+    >>> detections = detector.detect(frame)
+    >>> for det in detections:
+    ...     print(f"{det['label']}: {det['confidence']:.2f}")
+
+Author: Jayadeep / Jay7-Tech
+Module: perception/object_detection.py
+"""
+
 from ultralytics import YOLO
 import cv2
 
+
 class ObjectDetector:
-    def __init__(self, model_name='yolov8n.pt'):
+    """
+    Real-time object detection using YOLOv8.
+    
+    This class wraps the Ultralytics YOLOv8 model for detecting objects
+    in video frames. It's optimized for desktop companion use cases with
+    custom confidence thresholds to reduce false positives.
+    
+    Attributes:
+        model (YOLO): The loaded YOLOv8 model instance.
+    
+    Supported Objects (COCO Classes):
+        - person, cell phone, laptop, keyboard, mouse, cup, bottle
+        - book, clock, remote, scissors, chair, backpack, etc.
+        - Full list: 80 COCO classes
+    
+    Example:
+        >>> detector = ObjectDetector()
+        >>> frame = cv2.imread('desk.jpg')
+        >>> detections = detector.detect(frame)
+        >>> print(f"Found {len(detections)} objects")
+    """
+    
+    def __init__(self, model_name: str = 'yolov8n.pt'):
+        """
+        Initialize the ObjectDetector with a YOLOv8 model.
+        
+        Args:
+            model_name (str): Path to YOLO model file or model name.
+                Options:
+                - 'yolov8n.pt' (nano, fastest, ~6MB) - DEFAULT
+                - 'yolov8s.pt' (small, balanced)
+                - 'yolov8m.pt' (medium, more accurate)
+                - 'yolov8l.pt' (large, high accuracy)
+                - 'yolov8x.pt' (extra large, highest accuracy)
+                
+        Note:
+            For Raspberry Pi 4B, use 'yolov8n.pt' or TFLite version.
+        """
         # Load lightweight YOLO model
         self.model = YOLO(model_name)
     
     def detect(self, frame):
         """
-        Detects objects in the frame.
-        Returns a list of dicts:
-        {
-          "label": str,
-          "bbox": [x, y, w, h],
-          "confidence": float
-        }
+        Detect objects in the given video frame.
+        
+        Runs YOLOv8 inference on the frame and returns a list of
+        detected objects with their bounding boxes and confidence scores.
+        
+        Args:
+            frame (numpy.ndarray): BGR image from OpenCV (shape: H x W x 3).
+        
+        Returns:
+            list[dict]: List of detection dictionaries, each containing:
+                - 'label' (str): Object class name (e.g., 'person', 'cell phone')
+                - 'bbox' (list[float]): Bounding box as [x, y, width, height]
+                    - x, y: Top-left corner coordinates
+                    - width, height: Box dimensions in pixels
+                - 'confidence' (float): Detection confidence (0.0 to 1.0)
+        
+        Example:
+            >>> detections = detector.detect(frame)
+            >>> for det in detections:
+            ...     label = det['label']
+            ...     x, y, w, h = det['bbox']
+            ...     conf = det['confidence']
+            ...     cv2.rectangle(frame, (int(x), int(y)), 
+            ...                   (int(x+w), int(y+h)), (0,255,0), 2)
+        
+        Note:
+            - Cell phone detection uses higher confidence threshold (0.75)
+              to avoid false positives with computer mouse.
+            - General objects use 0.5 confidence threshold.
         """
         results = self.model(frame, verbose=False)
         detections = []

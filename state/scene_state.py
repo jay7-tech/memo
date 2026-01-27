@@ -1,8 +1,67 @@
+"""
+MEMO - Scene State Module
+=========================
+
+This module manages the global state of the observed scene.
+
+Features:
+    - Object tracking with position (left/center/right)
+    - Human presence and pose state tracking
+    - Identity storage from face recognition
+    - Focus mode flag management
+    - Persistent memory storage (JSON)
+
+Data Structures:
+
+    objects (dict):
+        {
+            'label': {
+                'last_seen': float,      # Unix timestamp
+                'bbox': [x, y, w, h],    # Bounding box
+                'position': str          # 'left', 'center', 'right'
+            }
+        }
+    
+    human (dict):
+        {
+            'present': bool,             # Is a person visible?
+            'pose_state': str,           # 'sitting', 'standing', 'unknown'
+            'keypoints': dict,           # Pose keypoints {name: (x, y)}
+            'last_seen': float,          # Unix timestamp
+            'identity': str or None,     # Recognized name
+            'pose_start_time': float     # When current pose started
+        }
+
+Pose Detection Logic:
+    - Uses hip-knee angle to determine sitting vs standing
+    - Requires LEFT/RIGHT_HIP, LEFT/RIGHT_KNEE keypoints
+    - Vertical thigh = standing, horizontal thigh = sitting
+
+Persistence:
+    - memory.json: Stores objects dict and focus_mode flag
+    - Loaded on startup, saved on explicit call
+
+Dependencies:
+    - json (persistence)
+    - time (timestamps)
+    - math (pose calculations)
+
+Example:
+    >>> scene = SceneState()
+    >>> scene.update(detections, pose_data, timestamp)
+    >>> print(f"Human present: {scene.human['present']}")
+    >>> print(f"Pose: {scene.human['pose_state']}")
+    >>> scene.save_memory()
+
+Author: Jayadeep / Jay7-Tech
+Module: state/scene_state.py
+"""
+
 import time
 import math
-
 import json
 import os
+
 
 class SceneState:
     def __init__(self):

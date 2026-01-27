@@ -1,3 +1,7 @@
+import os
+# Fix OpenMP duplicate library issue (common with mixed Conda/pip installations)
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+
 import cv2
 import threading
 import time
@@ -10,6 +14,9 @@ from state import SceneState
 from reasoning import RulesEngine
 from interface import QueryHandler
 
+# Import improved TTS engine
+from interface.tts_engine import init_tts, speak, speak_now, stop_tts
+
 import queue
 import subprocess
 
@@ -19,40 +26,6 @@ query_handler = QueryHandler()
 running = True
 engine = None
 voice_input = None
-tts_queue = queue.Queue()
-
-def tts_worker():
-    """
-    Worker to handle TTS using PowerShell.
-    This avoids Python threading/COM issues with pyttsx3.
-    """
-    while True:
-        text = tts_queue.get()
-        if text is None:
-            break
-            
-        try:
-            # Escape single quotes for PowerShell
-            safe_text = text.replace("'", "''")
-            cmd = f"Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('{safe_text}');"
-            
-            # Run without opening a window, wait for completion to pace speech
-            subprocess.run(["powershell", "-NoProfile", "-Command", cmd], check=False)
-            
-        except Exception as e:
-            print(f"TTS Error: {e}")
-        
-        tts_queue.task_done()
-
-def init_tts():
-    # Start the worker thread
-    t = threading.Thread(target=tts_worker, daemon=True)
-    t.start()
-
-def speak(text):
-    # Debug print to confirm logic is triggering
-    # print(f"[DEBUG] Queuing speech: {text}")
-    tts_queue.put(text)
 
 def input_loop():
     global running, voice_input
@@ -94,7 +67,8 @@ def input_loop():
             elif clean_input == 'voice on':
                 if voice_input:
                     voice_input.set_active(True)
-                    speak("I am listening.")
+                    print(">> SYSTEM: Voice input ENABLED. I'm listening.")
+                    # Don't speak - it interferes with listening
                 else:
                     print("Voice module not initialized.")
             elif clean_input == 'voice off':
@@ -162,12 +136,16 @@ def main():
         text = text.replace("hello pc", "").strip()
         
         # Check standard commands
-        # Relaxed matching: verify 'focus' and 'on'/'off' exist in the phrase
-        if "focus" in text and ("on" in text or "start" in text or "enable" in text):
+        # Relaxed matching for focus mode
+        text_lower = text.lower()
+        
+        # Focus mode ON
+        if "focus" in text_lower and any(word in text_lower for word in ["on", "start", "enable", "begin", "activate"]):
             scene_state.focus_mode = True
             print(">> SYSTEM: Focus Mode ENABLED (Voice)")
-            speak("Focus mode enabled.")
-        elif "focus" in text and ("off" in text or "stop" in text or "disable" in text):
+            speak("Focus mode enabled. I will watch for distractions.")
+        # Focus mode OFF - check this AFTER focus ON to avoid conflicts
+        elif "focus" in text_lower and any(word in text_lower for word in ["off", "stop", "disable", "end", "deactivate", "of"]):
             scene_state.focus_mode = False
             print(">> SYSTEM: Focus Mode DISABLED (Voice)")
             speak("Focus mode disabled.")
@@ -187,11 +165,14 @@ def main():
              # Setting a flag is cleaner.
              scene_state.selfie_trigger = True
         else:
-            # Query?
+            # Handle other queries - WHERE IS, WHAT DO YOU SEE, etc.
             response = query_handler.handle_query(text, scene_state)
             if response:
-                print(f"\n>> SYSTEM: {response}\n")
+                print(f"\n>> MEMO: {response}\n")
                 speak(response)
+            else:
+                # Generic acknowledgment for unrecognized commands
+                print(f">> SYSTEM: I heard: {text}")
     
     # Initialize Voice (might take a sec to calibrate)
     from interface.voice_input import VoiceListener
@@ -401,10 +382,11 @@ def main():
                 new_state = not voice_input.is_listening_active
                 if new_state:
                      voice_input.set_active(True)
-                     speak("I am listening.")
+                     print(">> SYSTEM: Voice input ENABLED")
+                     # Don't speak - interferes with listening
                 else:
                      voice_input.set_active(False)
-                     speak("Voice input stopped.")
+                     print(">> SYSTEM: Voice input DISABLED")
         
         # PROCESS SELFIE TRIGGER
         if scene_state.selfie_trigger:
