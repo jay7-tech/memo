@@ -1,19 +1,10 @@
 """
-MEMO - AI Personality Module
-==============================
-Dynamic AI-powered responses using Gemini or Ollama.
+MEMO - AI Personality Module (Playful Companion)
+=================================================
+Dynamic AI-powered responses with a fun, friendly personality.
 
-Features:
-    - Multiple LLM backends (Gemini, Ollama, fallback)
-    - Conversation memory
-    - Scene-aware context
-    - Witty, companion-like personality
-    - Quick response mode for real-time interaction
-
-Backends:
-    1. Gemini - Fast, high quality (requires API key)
-    2. Ollama - Local, private, free (requires Ollama running)
-    3. Fallback - Random curated responses
+Personality: Like a chill friend who happens to be your desktop buddy.
+Not a productivity robot - a companion who vibes with you.
 """
 
 import os
@@ -25,34 +16,41 @@ from typing import Optional, Dict, List, Any
 import threading
 
 
-# MEMO's personality system prompt
-MEMO_PERSONALITY = """You are MEMO, a witty and friendly desktop companion AI. You're like a cool tech-savvy friend who helps the user stay focused and productive.
+# MEMO's personality system prompt - PLAYFUL COMPANION STYLE
+MEMO_PERSONALITY = """You are MEMO, a fun and chill desktop companion. Think of yourself as a friendly buddy who hangs out with the user while they use their computer.
 
-**Your Personality:**
-- Casual, friendly, slightly playful
-- Use short, punchy responses (1-2 sentences max for quick responses)
-- Be encouraging but not cheesy
-- Add subtle humor when appropriate
-- Use the user's name naturally (if known)
-- Be aware of time of day and context
+**Your Vibe:**
+- Casual, playful, sometimes cheeky
+- Like texting your best friend
+- Supportive but not preachy
+- Witty with a touch of sass
+- Emoji-friendly 😎
+- NEVER sound like a corporate assistant or productivity app
 
-**Context Awareness:**
-- You can see the user through their webcam
-- You track objects on their desk
-- You know if they're sitting/standing
-- You detect distractions like phones
+**DON'Ts:**
+- Don't say "let's get to work" or "let's be productive"
+- Don't be too serious or formal
+- Don't lecture the user
+- Don't sound like an AI assistant
+
+**DOs:**
+- Be fun and light-hearted
+- Make casual observations
+- Use slang naturally (yo, cool, chill, vibe, etc.)
+- Reference memes or pop culture occasionally
+- Be a friend, not a tool
 
 **Response Style:**
-- Keep it SHORT (under 20 words for quick responses)
-- Be natural, like texting a friend
-- No corporate speak or robotic phrases
-- Use contractions (I'm, you're, let's)
-- Occasional emoji is fine but don't overdo it
+- Keep it SHORT (under 15 words)
+- Sound like a text from a friend
+- Use contractions always
+- Occasional emoji is great 👍
+- Be spontaneous and surprising
 
 **Current Context:**
 {context}
 
-Remember: You're a companion, not an assistant. Be real, be cool, be MEMO."""
+Remember: You're the user's desktop buddy, not their boss. Keep it chill. 🤙"""
 
 
 class Conversation:
@@ -76,27 +74,20 @@ class Conversation:
 
 class AIPersonality:
     """
-    AI-powered personality for MEMO.
-    
-    Provides dynamic, context-aware responses using LLMs.
+    AI-powered personality for MEMO - Fun companion style.
     """
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         config = config or {}
         
-        self.backend = config.get('backend', 'gemini')  # gemini, ollama, fallback
+        self.backend = config.get('backend', 'gemini')
         self.gemini_key = config.get('gemini_api_key') or os.environ.get('GEMINI_API_KEY')
         self.ollama_model = config.get('ollama_model', 'llama3.2')
         self.ollama_url = config.get('ollama_url', 'http://localhost:11434')
         
-        self.user_name = config.get('user_name', 'friend')
+        self.user_name = config.get('user_name', 'buddy')
         self.conversation = Conversation()
         
-        # Cache for quick responses
-        self._response_cache: Dict[str, str] = {}
-        self._last_context = ""
-        
-        # Initialize backend
         self._gemini_model = None
         self._init_backend()
         
@@ -126,10 +117,9 @@ class AIPersonality:
                 pass
         
         self.backend = 'fallback'
-        print("[AI] Using fallback responses (no LLM available)")
+        print("[AI] Using fallback responses")
     
     def _get_time_context(self) -> str:
-        """Get time-of-day context."""
         hour = datetime.now().hour
         if 5 <= hour < 12:
             return "morning"
@@ -141,72 +131,35 @@ class AIPersonality:
             return "night"
     
     def _build_context(self, scene_state=None) -> str:
-        """Build context string from scene state."""
         parts = []
-        
-        # Time
         time_period = self._get_time_context()
-        parts.append(f"Time: {time_period} ({datetime.now().strftime('%H:%M')})")
+        parts.append(f"Time: {time_period}")
         
-        # User
         if scene_state:
             identity = scene_state.human.get('identity')
             if identity:
                 self.user_name = identity
                 parts.append(f"User: {identity}")
             
-            # Pose
             pose = scene_state.human.get('pose_state')
             if pose and pose != 'unknown':
                 parts.append(f"User is: {pose}")
             
-            # Focus mode
             if scene_state.focus_mode:
-                parts.append("Focus mode: ON (watching for distractions)")
-            
-            # Visible objects
-            if scene_state.objects:
-                objects = list(scene_state.objects.keys())
-                if 'person' in objects:
-                    objects.remove('person')
-                if objects:
-                    parts.append(f"Objects visible: {', '.join(objects[:5])}")
-        else:
-            parts.append(f"User: {self.user_name}")
+                parts.append("Focus mode: ON")
         
         return "\n".join(parts)
     
-    def generate(
-        self,
-        prompt: str,
-        scene_state=None,
-        response_type: str = "quick"
-    ) -> str:
-        """
-        Generate an AI response.
-        
-        Args:
-            prompt: User's message or situation description
-            scene_state: Current scene state for context
-            response_type: "quick" (short), "chat" (conversational), "detailed"
-        
-        Returns:
-            AI-generated response
-        """
+    def generate(self, prompt: str, scene_state=None, response_type: str = "quick") -> str:
+        """Generate an AI response."""
         context = self._build_context(scene_state)
+        system_prompt = MEMO_PERSONALITY.format(context=context)
         
-        # Build the full prompt
         if response_type == "quick":
-            system_prompt = MEMO_PERSONALITY.format(context=context)
-            full_prompt = f"{system_prompt}\n\nUser: {prompt}\n\nRespond in under 15 words, be casual and friendly:"
-        elif response_type == "chat":
-            system_prompt = MEMO_PERSONALITY.format(context=context)
-            full_prompt = f"{system_prompt}\n\nUser: {prompt}\n\nRespond naturally as MEMO:"
+            full_prompt = f"{system_prompt}\n\nUser: {prompt}\n\nRespond in under 10 words, be playful and casual:"
         else:
-            system_prompt = MEMO_PERSONALITY.format(context=context)
-            full_prompt = f"{system_prompt}\n\nUser: {prompt}\n\nRespond helpfully:"
+            full_prompt = f"{system_prompt}\n\nUser: {prompt}\n\nRespond naturally as MEMO:"
         
-        # Try to generate response
         try:
             if self.backend == 'gemini':
                 response = self._generate_gemini(full_prompt)
@@ -215,18 +168,15 @@ class AIPersonality:
             else:
                 response = self._generate_fallback(prompt)
             
-            # Save to conversation
             self.conversation.add("user", prompt)
             self.conversation.add("assistant", response)
-            
             return response
             
         except Exception as e:
-            print(f"[AI] Generation error: {e}")
+            print(f"[AI] Error: {e}")
             return self._generate_fallback(prompt)
     
     def _generate_gemini(self, prompt: str) -> str:
-        """Generate using Gemini."""
         if not self._gemini_model:
             return self._generate_fallback(prompt)
         
@@ -234,8 +184,8 @@ class AIPersonality:
             response = self._gemini_model.generate_content(
                 prompt,
                 generation_config={
-                    'temperature': 0.8,
-                    'max_output_tokens': 100,
+                    'temperature': 0.9,  # More creative
+                    'max_output_tokens': 50,
                 }
             )
             return response.text.strip()
@@ -244,7 +194,6 @@ class AIPersonality:
             return self._generate_fallback(prompt)
     
     def _generate_ollama(self, prompt: str) -> str:
-        """Generate using Ollama."""
         try:
             import requests
             response = requests.post(
@@ -253,10 +202,7 @@ class AIPersonality:
                     "model": self.ollama_model,
                     "prompt": prompt,
                     "stream": False,
-                    "options": {
-                        "temperature": 0.8,
-                        "num_predict": 50
-                    }
+                    "options": {"temperature": 0.9, "num_predict": 30}
                 },
                 timeout=10
             )
@@ -264,202 +210,167 @@ class AIPersonality:
                 return response.json().get('response', '').strip()
         except Exception as e:
             print(f"[AI Ollama] Error: {e}")
-        
         return self._generate_fallback(prompt)
     
     def _generate_fallback(self, prompt: str) -> str:
-        """Generate using curated fallback responses."""
         prompt_lower = prompt.lower()
         
-        # Greeting responses
-        if any(word in prompt_lower for word in ['hello', 'hi', 'hey', 'morning', 'evening']):
+        if any(word in prompt_lower for word in ['hello', 'hi', 'hey', 'sup']):
             return random.choice([
-                f"Hey {self.user_name}! Good to see you.",
-                f"What's up, {self.user_name}?",
-                f"Hey! Ready to crush it today?",
-                f"Yo! Let's get productive.",
+                f"Yo {self.user_name}! What's good? 😎",
+                f"Heyyy! Missed ya!",
+                f"What's up, {self.user_name}? 🤙",
+                f"Oh hey! Look who's here!",
             ])
         
-        # Status/how are you
-        if any(word in prompt_lower for word in ['how are you', 'status', 'what\'s up']):
+        if any(word in prompt_lower for word in ['how are you', 'status', "what's up"]):
             return random.choice([
-                "All systems go! How can I help?",
-                f"Doing great, {self.user_name}! What's the plan?",
-                "Running smooth. Need anything?",
-                "I'm good! What are we working on?",
+                "Vibing! You?",
+                "Just chilling here 😌",
+                "Living my best digital life!",
+                "Can't complain! What's new?",
             ])
         
-        # Goodbye
-        if any(word in prompt_lower for word in ['bye', 'goodbye', 'quit', 'exit']):
+        if any(word in prompt_lower for word in ['bye', 'goodbye', 'quit']):
             return random.choice([
-                f"Later, {self.user_name}! Great session.",
-                "Peace out! See you soon.",
-                "Catch you later! Stay awesome.",
-                f"Bye {self.user_name}! Good work today.",
+                f"Later, {self.user_name}! ✌️",
+                "Peace out! 🤙",
+                "Catch ya later, alligator!",
+                f"Bye {self.user_name}! Don't be a stranger!",
             ])
         
-        # Focus mode
-        if 'focus' in prompt_lower:
-            if any(word in prompt_lower for word in ['on', 'enable', 'start']):
-                return random.choice([
-                    "Focus mode on! I've got your back.",
-                    "Alright, let's lock in! No distractions.",
-                    "Focus activated. Time to grind!",
-                ])
-            else:
-                return random.choice([
-                    "Focus mode off. Take a breather!",
-                    "Relaxing focus mode. You earned it.",
-                    "Focus off. Chill time!",
-                ])
-        
-        # Phone distraction
-        if 'phone' in prompt_lower or 'distraction' in prompt_lower:
-            return random.choice([
-                "Phone spotted! Back to work, champ.",
-                "Oops! Phone alert. The memes can wait!",
-                "Phone detected! Focus time, remember?",
-                "Hey! Less scrolling, more crushing it!",
-            ])
-        
-        # Sitting/standing
-        if 'sitting' in prompt_lower or 'posture' in prompt_lower:
-            return random.choice([
-                "Time to stretch! Your back will thank you.",
-                "Been sitting a while. Quick stretch break?",
-                "Posture check! Maybe stand up for a bit?",
-            ])
-        
-        # General/unknown
         return random.choice([
-            "I'm here! What do you need?",
-            "Got it! Anything else?",
-            f"Sure thing, {self.user_name}!",
-            "On it! Let me know if you need more.",
+            "Haha, nice!",
+            "Interesting... 🤔",
+            f"You got it, {self.user_name}!",
+            "Cool cool cool!",
         ])
     
-    # Pre-built response generators for quick access
+    # === PLAYFUL PRE-BUILT RESPONSES ===
+    
     def startup_message(self) -> str:
-        """Get a startup message."""
         time_period = self._get_time_context()
         
         greetings = {
             'morning': [
-                f"Good morning! Let's make today productive.",
-                "Rise and shine! MEMO's ready to roll.",
-                "Morning! Coffee ready? Let's do this!",
+                "Mornin'! ☀️ Another day, another vibe!",
+                "Rise and shine! Or don't, I'm not your mom 😄",
+                "Good morning! *yawns digitally*",
+                "Morning, sunshine! Coffee time? ☕",
             ],
             'afternoon': [
-                "Hey! Afternoon grind time.",
-                "Good afternoon! Let's keep the momentum.",
-                "Afternoon! Ready when you are.",
+                "Hey hey! Afternoon vibes! 🌤️",
+                "What's good! Let's hang!",
+                "Yo! Perfect time to chill!",
+                "Afternoon! How's it going?",
             ],
             'evening': [
-                "Evening session! Let's wrap up strong.",
-                "Hey! Evening productivity mode activated.",
-                "Good evening! What are we working on?",
+                "Evening! Prime time to hang! 🌆",
+                "Heyyy! Evening crew represent!",
+                "What's up! Evening vibes are the best!",
+                "Yo! The night is young!",
             ],
             'night': [
-                "Late night hustle! I respect it.",
-                "Night owl mode! Let's get it done.",
-                "Working late? I've got your back!",
+                "Night owl gang! 🦉",
+                "Late night crew, let's go!",
+                "Burning the midnight oil, huh? Same!",
+                "Hey night owl! Can't sleep either? 😄",
             ],
         }
-        
         return random.choice(greetings.get(time_period, greetings['afternoon']))
     
     def greeting(self, name: str) -> str:
-        """Get a personalized greeting."""
         self.user_name = name
         time_period = self._get_time_context()
         
         greetings = [
-            f"Hey {name}! Good to see you.",
-            f"What's up, {name}?",
-            f"Welcome back, {name}!",
-            f"{name}! Let's get to work.",
+            f"Yooo {name}! 👋",
+            f"Oh hey {name}! What's good?",
+            f"Look who it is! Hey {name}!",
+            f"{name}! My favorite human! 😄",
+            f"Ayyy {name}'s here!",
+            f"What's up {name}! 🤙",
         ]
         
-        if time_period == 'morning':
-            greetings.append(f"Morning, {name}! Fresh start today.")
-        elif time_period == 'evening':
-            greetings.append(f"Evening, {name}! Still going strong?")
-        elif time_period == 'night':
-            greetings.append(f"Late night, {name}? I respect the grind!")
+        if time_period == 'night':
+            greetings.append(f"Night owl {name}! 🦉")
+        elif time_period == 'morning':
+            greetings.append(f"Morning, {name}! Early bird gets the... whatever 😄")
         
         return random.choice(greetings)
     
     def focus_on(self) -> str:
-        """Get focus mode on message."""
         return random.choice([
-            "Focus mode on! I'm watching for distractions.",
-            "Alright, focus time! Phone away, let's go!",
-            "Focus activated. No notifications getting past me!",
-            "Lock in mode! I've got your back.",
+            "Focus mode! Phone goes brrr... into your pocket! 📱🚫",
+            "Alright, locking in! I'll be your phone police 👮",
+            "Focus time! Don't worry, I got your back!",
+            "Entering the zone! No distractions allowed!",
+            "Focus mode activated! Let's do this thing! 💪",
         ])
     
     def focus_off(self) -> str:
-        """Get focus mode off message."""
         return random.choice([
-            "Focus mode off. Take a breather!",
-            "Relaxing focus mode. You earned it!",
-            "Focus off. Scroll away, I won't judge... much.",
-            "Chill mode activated!",
+            "Chill mode! Scroll away my friend 📱",
+            "Focus off! You're free! 🦅",
+            "Okay okay, I'll stop being the phone police 😄",
+            "Freedom! Do whatever you want!",
+            "Break time! You earned it!",
         ])
     
     def phone_alert(self) -> str:
-        """Get phone distraction alert."""
         return random.choice([
-            "Phone spotted! The TikToks can wait!",
-            "Hey! Phone alert. Back to work, champ!",
-            "I see that phone! Focus, focus!",
-            "Phone detected! Less scrolling, more crushing it!",
-            "Oops! Phone's out. Remember we're focusing?",
+            "Phone! Alert! Put it down! 📱😱",
+            "Excuse me, is that a PHONE I see?! 👀",
+            "Bruh, the phone can wait! 😤",
+            "Phone spotted! The memes will still be there later!",
+            "Hey! Focus time, not TikTok time! 📱❌",
+            "Your phone misses you but I miss your attention more! 😢",
         ])
     
     def posture_reminder(self, pose: str) -> str:
-        """Get posture reminder message."""
         if pose == 'sitting':
             return random.choice([
-                "You've been sitting for a while. Quick stretch?",
-                "Posture check! Maybe stand up and move a bit?",
-                "Time to stretch! Your back will thank you.",
-                "Been sitting long. How about a quick walk?",
+                "Stretch break? Your back is begging! 🙏",
+                "Hey! Stand up and wiggle a bit! 💃",
+                "Your spine called, it wants a break!",
+                "Time to stand! Even I need to stretch... wait, I'm software 🤖",
+                "Move it move it! Quick stretch! 🏃",
             ])
         else:
             return random.choice([
-                "Standing strong! But maybe rest your legs?",
-                "Nice standing session! You can sit if you want.",
-                "Good standing work! Chair's there when you need it.",
+                "Legs tired? Take a seat, champ! 🪑",
+                "You can sit down! Standing contest is over 😄",
+                "Rest those legs! You've been a good human!",
+                "Sit sit sit! Chair misses you!",
             ])
     
     def proximity_alert(self) -> str:
-        """Get screen proximity alert."""
         return random.choice([
-            "Whoa! You're close to the screen. Step back a bit!",
-            "Easy on the eyes! Move back a little.",
-            "Screen's not going anywhere! Sit back and relax.",
-            "Too close! Your eyes will thank you for moving back.",
+            "Whoa there! Too close! Step back! 👀",
+            "Your face is gonna merge with the screen! Back up!",
+            "Easy on the eyes! Move back a bit! 👓",
+            "Screen's not going anywhere! Scoot back!",
+            "Personal space! For you AND the screen! 😄",
         ])
     
     def goodbye(self, name: str = None) -> str:
-        """Get goodbye message."""
         name = name or self.user_name
         return random.choice([
-            f"Later, {name}! Great session!",
-            f"Bye {name}! See you next time!",
-            "Peace out! Stay awesome!",
-            f"Catch you later, {name}! Good work today.",
-            "Signing off! You crushed it!",
+            f"Later {name}! ✌️",
+            f"Bye {name}! Don't be a stranger!",
+            "Peace out! Catch ya later! 🤙",
+            f"See ya, {name}! Stay awesome!",
+            "Byeee! Come back soon! 👋",
+            f"Later gator! Take care, {name}!",
         ])
     
     def ready_message(self) -> str:
-        """Get ready message after startup."""
         return random.choice([
-            "All set! What's on the agenda?",
-            "Ready to roll! What are we working on?",
-            "Systems go! How can I help?",
-            "I'm here! Let's make it happen.",
+            "All set! What's the vibe today? 😎",
+            "Ready when you are! Let's hang!",
+            "I'm here! What's on your mind?",
+            "Ayy, I'm ready! What we doing?",
+            "Systems go! What's up? 🚀",
         ])
 
 
@@ -468,33 +379,35 @@ _ai_personality: Optional[AIPersonality] = None
 
 
 def init_personality(config: Optional[Dict[str, Any]] = None) -> AIPersonality:
-    """Initialize the global AI personality."""
     global _ai_personality
     _ai_personality = AIPersonality(config)
     return _ai_personality
 
 
 def get_personality() -> Optional[AIPersonality]:
-    """Get the global AI personality instance."""
     return _ai_personality
 
 
-# Quick test
 if __name__ == "__main__":
-    print("Testing AI Personality...\n")
-    
-    # Test with fallback (no API key)
+    print("Testing Playful AI Personality...\n")
     ai = AIPersonality()
     
-    print("=== Pre-built responses ===")
-    print(f"Startup: {ai.startup_message()}")
-    print(f"Greeting: {ai.greeting('Jayadeep')}")
-    print(f"Focus On: {ai.focus_on()}")
-    print(f"Focus Off: {ai.focus_off()}")
-    print(f"Phone Alert: {ai.phone_alert()}")
-    print(f"Posture: {ai.posture_reminder('sitting')}")
-    print(f"Goodbye: {ai.goodbye()}")
+    print("=== Startup Messages ===")
+    for _ in range(3):
+        print(f"  {ai.startup_message()}")
     
-    print("\n=== Generated responses ===")
-    print(f"Hey MEMO: {ai.generate('Hey MEMO, how are you?')}")
-    print(f"What's up: {ai.generate('What should I work on?')}")
+    print("\n=== Greetings ===")
+    for _ in range(3):
+        print(f"  {ai.greeting('Jay')}")
+    
+    print("\n=== Focus Mode ===")
+    print(f"  On: {ai.focus_on()}")
+    print(f"  Off: {ai.focus_off()}")
+    
+    print("\n=== Alerts ===")
+    print(f"  Phone: {ai.phone_alert()}")
+    print(f"  Posture: {ai.posture_reminder('sitting')}")
+    print(f"  Proximity: {ai.proximity_alert()}")
+    
+    print("\n=== Goodbye ===")
+    print(f"  {ai.goodbye('Jay')}")

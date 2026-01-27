@@ -28,8 +28,9 @@
       "hello memo"
     ],
     "wake_word_threshold": 0.5,
-    "tts_rate": 175,
+    "tts_rate": 1,
     "tts_volume": 1.0,
+    "tts_voice": "Zira",
     "language": "en-US"
   },
   "dashboard": {
@@ -56,7 +57,7 @@
   },
   "ai": {
     "backend": "gemini",
-    "gemini_api_key": "",
+    "gemini_api_key": "AIzaSyAZo93BW66oT_bjhh-gfMPRJDpZ4lBa_J0",
     "ollama_model": "llama3.2",
     "ollama_url": "http://localhost:11434"
   }

@@ -105,18 +105,40 @@ class TTSEngine:
                 self._speaking = False
     
     def _speak_sapi(self, text: str):
-        """Speak using Windows SAPI (most reliable)."""
+        """Speak using Windows SAPI with natural voice."""
         try:
-            # Escape single quotes
-            safe_text = text.replace("'", "''")
+            # Escape quotes for VBS
+            safe_text = text.replace('"', '""').replace("'", "''")
             
-            # Create a VBS script (more reliable than PowerShell for SAPI)
+            # VBS script with voice selection and rate control
+            # Rate: -10 (slowest) to 10 (fastest), 0 is default
+            # We use 1-2 for slightly faster, more natural speech
             vbs_content = f'''
-CreateObject("SAPI.SpVoice").Speak "{safe_text.replace('"', '""')}"
+Set speech = CreateObject("SAPI.SpVoice")
+
+' Try to find a natural-sounding voice
+For Each voice In speech.GetVoices
+    ' Prefer Zira (female, natural) or David (male, clearer)
+    If InStr(voice.GetDescription, "Zira") > 0 Then
+        Set speech.Voice = voice
+        Exit For
+    ElseIf InStr(voice.GetDescription, "Eva") > 0 Then
+        Set speech.Voice = voice
+        Exit For
+    ElseIf InStr(voice.GetDescription, "David") > 0 Then
+        Set speech.Voice = voice
+    End If
+Next
+
+' Set rate: slightly faster for casual feel (1 = a bit faster)
+speech.Rate = 1
+
+' Speak the text
+speech.Speak "{safe_text}"
 '''
             # Write temp VBS file
             vbs_path = os.path.join(os.environ.get('TEMP', '.'), 'memo_speak.vbs')
-            with open(vbs_path, 'w') as f:
+            with open(vbs_path, 'w', encoding='utf-8') as f:
                 f.write(vbs_content)
             
             # Run VBS
