@@ -1,271 +1,381 @@
 """
-MEMO - Face Recognition Module
-===============================
-
-This module provides face recognition capabilities using FaceNet (InceptionResnetV1).
+MEMO - Face Recognition Module (Multi-User)
+============================================
+Supports multiple user profiles with persistent storage.
 
 Features:
-    - Face embedding extraction using pre-trained FaceNet model (VGGFace2)
-    - Single-user registration and recognition
-    - Cosine similarity matching for robust identification
-    - Persistent user profile storage (embedding + name)
+    - Multi-user face registration and recognition
+    - Cosine similarity matching with configurable threshold
+    - Persistent storage in JSON format
+    - Best match selection among all users
+    - Backward compatible with single-user files
 
 Architecture:
     - Model: InceptionResnetV1 (FaceNet variant)
-    - Pretrained: VGGFace2 dataset (3.31M identities)
+    - Pretrained: VGGFace2 dataset
     - Embedding Size: 512-dimensional vector
     - Input: 160x160 RGB face crop
-
-Recognition Pipeline:
-    1. Receive face bounding box from object detector
-    2. Crop and resize face region to 160x160
-    3. Normalize pixel values: (x - 127.5) / 128.0
-    4. Extract 512-dim embedding via InceptionResnetV1
-    5. Compare with stored embedding using cosine similarity
-    6. Return identity if similarity > 0.6 threshold
-
-Storage:
-    - user_embedding.npy: 512-dim numpy array
-    - user_name.txt: Registered user's name
-
-Dependencies:
-    - torch
-    - facenet-pytorch
-    - numpy
-    - opencv-python
-
-Example:
-    >>> face_rec = FaceRecognizer()
-    >>> # Register a new user
-    >>> face_rec.register_face(frame, bbox=[100, 50, 150, 150], name="Jayadeep")
-    >>> # Recognize in subsequent frames
-    >>> identity = face_rec.recognize(frame, bbox)
-    >>> print(f"Detected: {identity}")
-
-Performance:
-    - Inference: ~50ms on CPU, ~10ms on CUDA
-    - Accuracy: ~99.65% on LFW dataset
-
-Author: Jayadeep / Jay7-Tech
-Module: perception/face_rec.py
 """
 
 import torch
-from facenet_pytorch import InceptionResnetV1
 import numpy as np
 import cv2
 import os
+import json
+from typing import Optional, Dict, List, Tuple
+
+# Check for facenet-pytorch
+HAS_FACENET = False
+try:
+    from facenet_pytorch import InceptionResnetV1
+    HAS_FACENET = True
+except ImportError:
+    pass
 
 
 class FaceRecognizer:
     """
-    Face recognition using FaceNet (InceptionResnetV1).
+    Multi-user face recognition using FaceNet.
     
-    This class provides face recognition capabilities for identifying
-    registered users in video frames. It uses FaceNet embeddings and
-    cosine similarity matching.
-    
-    Attributes:
-        device (str): Computation device ('cpu' or 'cuda').
-        resnet (Model): InceptionResnetV1 model for embedding extraction.
-        known_embedding (ndarray): 512-dim embedding of registered user.
-        user_name (str): Name of registered user.
-    
-    Example:
-        >>> face_rec = FaceRecognizer()
-        >>> # Register your face
-        >>> face_rec.register_face(frame, [100, 50, 150, 150], "Jayadeep")
-        >>> # Later, recognize
-        >>> identity = face_rec.recognize(frame, [100, 50, 150, 150])
-        >>> print(f"Hello, {identity}!")  # "Hello, Jayadeep!"
+    Supports registering multiple users and recognizing any of them.
+    Embeddings are stored persistently and loaded on startup.
     """
     
-    def __init__(self):
+    def __init__(
+        self,
+        threshold: float = 0.6,
+        users_file: str = "face_users.json",
+        embeddings_dir: str = "face_embeddings"
+    ):
         """
-        Initialize FaceRecognizer with InceptionResnetV1 model.
+        Initialize FaceRecognizer.
         
-        Automatically selects CUDA if available, otherwise uses CPU.
-        Loads any existing user profile from disk.
+        Args:
+            threshold: Cosine similarity threshold for recognition (0.0-1.0)
+            users_file: Path to JSON file storing user metadata
+            embeddings_dir: Directory to store user embeddings
         """
-        self.device = 'cpu'  # Use CPU to avoid interfering with YOLO GPU usage if any
-        if torch.cuda.is_available():
-            self.device = 'cuda'
+        self.threshold = threshold
+        self.users_file = users_file
+        self.embeddings_dir = embeddings_dir
+        
+        # Check if facenet-pytorch is available
+        if not HAS_FACENET:
+            print("[FaceRec] facenet-pytorch not available - face recognition disabled")
+            self.model = None
+            self.users = {}
+            return
+        
+        # Device selection
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        print(f"[FaceRec] Using device: {self.device}")
+        
+        # Load model
+        try:
+            self.model = InceptionResnetV1(pretrained='vggface2').eval().to(self.device)
+            print("[FaceRec] ✓ Model loaded")
+        except Exception as e:
+            print(f"[FaceRec] Model load failed: {e}")
+            self.model = None
+            self.users = {}
+            return
+        
+        # User storage: {"name": {"embedding": np.array, "registered": timestamp}}
+        self.users: Dict[str, Dict] = {}
+        
+        # Create embeddings directory
+        os.makedirs(self.embeddings_dir, exist_ok=True)
+        
+        # Load existing users
+        self._load_users()
+        
+        # Migrate from old single-user format if exists
+        self._migrate_legacy()
+    
+    def _load_users(self):
+        """Load users from disk."""
+        if not os.path.exists(self.users_file):
+            return
+        
+        try:
+            with open(self.users_file, 'r') as f:
+                user_meta = json.load(f)
             
-        print(f"FaceRec using device: {self.device}")
-        
-        # Load Pretrained Model (vggface2 or casia-webface)
-        self.resnet = InceptionResnetV1(pretrained='vggface2').eval().to(self.device)
-        
-        self.known_embedding = None
-        self.user_name = "User"
-        
-        # Load known face if exists
-        self.load_user()
-
-    def load_user(self) -> None:
-        """
-        Load saved user profile from disk.
-        
-        Loads:
-            - user_embedding.npy: 512-dimensional face embedding
-            - user_name.txt: Registered user's name
-        
-        Called automatically during initialization.
-        """
-        if os.path.exists("user_embedding.npy"):
-            try:
-                self.known_embedding = np.load("user_embedding.npy")
-                # Try to load name
-                if os.path.exists("user_name.txt"):
-                    with open("user_name.txt", "r") as f:
-                        self.user_name = f.read().strip()
-                else:
-                    self.user_name = "User"
+            for name, meta in user_meta.items():
+                emb_file = os.path.join(self.embeddings_dir, f"{name}.npy")
+                if os.path.exists(emb_file):
+                    embedding = np.load(emb_file)
+                    self.users[name] = {
+                        'embedding': embedding,
+                        'registered': meta.get('registered', 0)
+                    }
+            
+            print(f"[FaceRec] ✓ Loaded {len(self.users)} users: {list(self.users.keys())}")
+            
+        except Exception as e:
+            print(f"[FaceRec] Error loading users: {e}")
+    
+    def _save_users(self):
+        """Save users to disk."""
+        try:
+            # Save metadata
+            meta = {}
+            for name, data in self.users.items():
+                meta[name] = {'registered': data.get('registered', 0)}
                 
-                print(f"FaceRec: Loaded profile for {self.user_name}")
-            except:
-                pass
+                # Save embedding
+                emb_file = os.path.join(self.embeddings_dir, f"{name}.npy")
+                np.save(emb_file, data['embedding'])
+            
+            with open(self.users_file, 'w') as f:
+                json.dump(meta, f, indent=2)
+            
+            print(f"[FaceRec] ✓ Saved {len(self.users)} users")
+            
+        except Exception as e:
+            print(f"[FaceRec] Error saving users: {e}")
+    
+    def _migrate_legacy(self):
+        """Migrate from old single-user format."""
+        legacy_emb = "user_embedding.npy"
+        legacy_name = "user_name.txt"
         
-    def save_user(self, embedding: np.ndarray, name: str = "User") -> None:
+        if os.path.exists(legacy_emb) and os.path.exists(legacy_name):
+            try:
+                embedding = np.load(legacy_emb)
+                with open(legacy_name, 'r') as f:
+                    name = f.read().strip()
+                
+                if name and name not in self.users:
+                    self.users[name] = {
+                        'embedding': embedding,
+                        'registered': os.path.getmtime(legacy_emb)
+                    }
+                    self._save_users()
+                    print(f"[FaceRec] ✓ Migrated legacy user: {name}")
+                
+                # Optionally remove legacy files
+                # os.remove(legacy_emb)
+                # os.remove(legacy_name)
+                
+            except Exception as e:
+                print(f"[FaceRec] Legacy migration failed: {e}")
+    
+    def get_embedding(self, face_crop: np.ndarray) -> Optional[np.ndarray]:
         """
-        Save user profile to disk.
+        Extract face embedding from cropped face image.
         
         Args:
-            embedding (ndarray): 512-dimensional face embedding vector.
-            name (str): User's name to associate with the embedding.
-        
-        Saves:
-            - user_embedding.npy: The embedding array
-            - user_name.txt: The user's name
-        """
-        if embedding is not None:
-            self.known_embedding = embedding
-            self.user_name = name
-            np.save("user_embedding.npy", embedding)
-            with open("user_name.txt", "w") as f:
-                f.write(name)
-            print(f"FaceRec: Saved profile for {name}")
-
-    def get_embedding(self, face_crop: np.ndarray) -> np.ndarray:
-        """
-        Extract 512-dimensional face embedding from a cropped face image.
-        
-        Processing Pipeline:
-            1. Resize to 160x160 (InceptionResnetV1 input size)
-            2. Convert BGR to RGB color space
-            3. Normalize: (pixel - 127.5) / 128.0
-            4. Convert to PyTorch tensor
-            5. Forward pass through InceptionResnetV1
-        
-        Args:
-            face_crop (ndarray): BGR face image (any size).
+            face_crop: BGR face image (any size)
         
         Returns:
-            ndarray: 512-dimensional embedding vector.
-            None: If input is invalid or empty.
-        
-        Note:
-            The embedding is L2-normalizable but returned raw from model.
-            Cosine similarity is used for matching in recognize().
+            512-dimensional embedding or None
         """
+        if self.model is None:
+            return None
+        
         if face_crop is None or face_crop.size == 0:
             return None
+        
+        try:
+            # Resize to 160x160
+            img = cv2.resize(face_crop, (160, 160))
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             
-        # Resize to 160x160 (Stack requirements for InceptionResnetV1)
-        img = cv2.resize(face_crop, (160, 160))
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        
-        # Normalize/Whiten: (x - 127.5) / 128.0
-        # Facenet-pytorch expects [0, 1] range if using its transform, 
-        # BUT standard practice for this model is fixed standardization.
-        # Actually facenet-pytorch's fixed_image_standardization does (x - 127.5)/128.0
-        
-        img = np.float32(img)
-        img = (img - 127.5) / 128.0
-        
-        # To Tensor: (C, H, W)
-        img_tensor = torch.tensor(img).permute(2, 0, 1).unsqueeze(0).to(self.device)
-        
-        with torch.no_grad():
-            emb = self.resnet(img_tensor)
+            # Normalize: (x - 127.5) / 128.0
+            img = np.float32(img)
+            img = (img - 127.5) / 128.0
             
-        return emb.cpu().numpy()[0]
-
-    def recognize(self, frame: np.ndarray, bbox: list) -> str:
+            # To tensor: (C, H, W)
+            img_tensor = torch.tensor(img).permute(2, 0, 1).unsqueeze(0).to(self.device)
+            
+            with torch.no_grad():
+                emb = self.model(img_tensor)
+            
+            return emb.cpu().numpy()[0]
+            
+        except Exception as e:
+            print(f"[FaceRec] Embedding error: {e}")
+            return None
+    
+    def register_face(
+        self,
+        frame: np.ndarray,
+        bbox: List[int],
+        name: str = "User"
+    ) -> bool:
         """
-        Recognize a face in the frame and return the identity.
-        
-        Extracts embedding from the face region and compares it to
-        the stored user embedding using cosine similarity.
+        Register a new user's face.
         
         Args:
-            frame (ndarray): Full BGR video frame.
-            bbox (list): Face bounding box as [x, y, width, height].
+            frame: Full BGR video frame
+            bbox: Face bounding box [x, y, width, height]
+            name: User's name
         
         Returns:
-            str: User's name if cosine similarity > 0.6 threshold.
-            None: If no match, no registered user, or invalid bbox.
-        
-        Algorithm:
-            1. Crop face region from frame
-            2. Extract embedding via get_embedding()
-            3. Normalize both embeddings to unit vectors
-            4. Compute cosine similarity: dot(emb, known)
-            5. Return name if similarity > 0.6
-        
-        Example:
-            >>> identity = face_rec.recognize(frame, det['bbox'])
-            >>> if identity:
-            ...     print(f"Welcome back, {identity}!")
+            True if registration successful
         """
-        x, y, w, h = map(int, bbox)
+        if self.model is None:
+            print("[FaceRec] Model not available")
+            return False
         
-        # Check bounds
+        # Extract face crop
+        x, y, w, h = map(int, bbox)
         h_img, w_img = frame.shape[:2]
+        
+        # Clamp to image bounds
         x = max(0, x)
         y = max(0, y)
         w = min(w, w_img - x)
         h = min(h, h_img - y)
         
-        if w < 20 or h < 20: return None
+        if w < 30 or h < 30:
+            print("[FaceRec] Face too small")
+            return False
         
         crop = frame[y:y+h, x:x+w]
-        emb = self.get_embedding(crop)
+        embedding = self.get_embedding(crop)
         
-        if self.known_embedding is not None and emb is not None:
-            # Calculate distance (Euclidean makes most sense for FaceNet)
-            # dist = np.linalg.norm(emb - self.known_embedding)
+        if embedding is None:
+            print("[FaceRec] Could not extract embedding")
+            return False
+        
+        # Store user
+        import time
+        self.users[name] = {
+            'embedding': embedding,
+            'registered': time.time()
+        }
+        
+        self._save_users()
+        print(f"[FaceRec] ✓ Registered: {name}")
+        return True
+    
+    def recognize(
+        self,
+        frame: np.ndarray,
+        bbox: List[int]
+    ) -> Optional[str]:
+        """
+        Recognize a face and return the user's name.
+        
+        Args:
+            frame: Full BGR video frame
+            bbox: Face bounding box [x, y, width, height]
+        
+        Returns:
+            User's name if recognized, None otherwise
+        """
+        if self.model is None or not self.users:
+            return None
+        
+        # Extract face crop
+        x, y, w, h = map(int, bbox)
+        h_img, w_img = frame.shape[:2]
+        
+        # Clamp to bounds
+        x = max(0, x)
+        y = max(0, y)
+        w = min(w, w_img - x)
+        h = min(h, h_img - y)
+        
+        if w < 20 or h < 20:
+            return None
+        
+        crop = frame[y:y+h, x:x+w]
+        embedding = self.get_embedding(crop)
+        
+        if embedding is None:
+            return None
+        
+        # Compare with all users
+        best_match = None
+        best_similarity = 0.0
+        
+        # Normalize query embedding
+        emb_norm = embedding / (np.linalg.norm(embedding) + 1e-8)
+        
+        for name, data in self.users.items():
+            known_emb = data['embedding']
+            known_norm = known_emb / (np.linalg.norm(known_emb) + 1e-8)
             
-            # Cosine Similarity is often better for embeddings
-            # (A . B) / (|A| * |B|)
-            # Vectors from InceptionResnetV1 are usually not normalized to unit length by default?
-            # Actually they are NOT.
+            # Cosine similarity
+            similarity = float(np.dot(emb_norm, known_norm))
             
-            emb_norm = emb / np.linalg.norm(emb)
-            known_norm = self.known_embedding / np.linalg.norm(self.known_embedding)
-            
-            cos_sim = np.dot(emb_norm, known_norm)
-            
-            # Threshold: > 0.6 is usually same person for Facenet
-            # Let's say 0.7 to be safe/secure
-            
-            if cos_sim > 0.6: # Tunable
-                return self.user_name
+            if similarity > best_similarity:
+                best_similarity = similarity
+                best_match = name
+        
+        # Return match if above threshold
+        if best_similarity >= self.threshold:
+            return best_match
         
         return None
+    
+    def list_users(self) -> List[str]:
+        """Get list of registered users."""
+        return list(self.users.keys())
+    
+    def remove_user(self, name: str) -> bool:
+        """
+        Remove a registered user.
         
-    def register_face(self, frame, bbox, name="User"):
-        x, y, w, h = map(int, bbox)
-        h_img, w_img = frame.shape[:2]
-        x = max(0, x)
-        y = max(0, y)
-        w = min(w, w_img - x)
-        h = min(h, h_img - y)
+        Args:
+            name: User's name to remove
         
-        crop = frame[y:y+h, x:x+w]
-        emb = self.get_embedding(crop)
+        Returns:
+            True if user was removed
+        """
+        if name in self.users:
+            del self.users[name]
+            
+            # Remove embedding file
+            emb_file = os.path.join(self.embeddings_dir, f"{name}.npy")
+            if os.path.exists(emb_file):
+                os.remove(emb_file)
+            
+            self._save_users()
+            print(f"[FaceRec] Removed user: {name}")
+            return True
         
-        if emb is not None:
-             self.save_user(emb, name)
-             return True
         return False
+    
+    def get_user_count(self) -> int:
+        """Get number of registered users."""
+        return len(self.users)
+
+
+# Backward compatibility: maintain old function signatures
+def load_user() -> Tuple[Optional[np.ndarray], str]:
+    """Legacy function for backward compatibility."""
+    recognizer = FaceRecognizer()
+    if recognizer.users:
+        first_user = list(recognizer.users.keys())[0]
+        return recognizer.users[first_user]['embedding'], first_user
+    return None, "User"
+
+
+# Quick test
+if __name__ == "__main__":
+    print("Testing FaceRecognizer...")
+    
+    face_rec = FaceRecognizer()
+    print(f"Registered users: {face_rec.list_users()}")
+    print(f"User count: {face_rec.get_user_count()}")
+    
+    # Test with webcam
+    cap = cv2.VideoCapture(0)
+    if cap.isOpened():
+        ret, frame = cap.read()
+        if ret:
+            # Fake bbox for center of frame
+            h, w = frame.shape[:2]
+            bbox = [w//4, h//4, w//2, h//2]
+            
+            # Test recognition
+            result = face_rec.recognize(frame, bbox)
+            print(f"Recognition result: {result}")
+        
+        cap.release()
+    
+    print("Test complete")

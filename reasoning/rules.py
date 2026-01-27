@@ -1,230 +1,338 @@
 """
-MEMO - Rules Engine Module
-==========================
-
-This module provides event-based reasoning on scene state changes.
+MEMO - Rules Engine Module (Enhanced)
+======================================
+Event-based reasoning with configurable timings and new features.
 
 Features:
     - Object appearance/disappearance detection
-    - Pose state change monitoring
+    - Pose state change monitoring (sitting/standing)
     - Focus mode distraction detection
     - Screen proximity alerting
     - Personalized greeting system
     - Posture duration tracking
+    - Hydration reminders (NEW)
+    - Configurable timings (NEW)
 
-Event Types Generated:
-    - "Object appeared: {label}" - When a new object enters view
-    - "Object disappeared: {label}" - When an object leaves view
-    - "TTS: You have been sitting for a while..." - Posture reminder
-    - "TTS: Put the phone away and focus..." - Focus mode distraction
-    - "TTS: You are too close to the screen..." - Proximity warning
-    - "TTS: Hello {name}. Welcome back." - Personalized greeting
-
-Rule Processing:
-    1. Track current vs previous visible objects (500ms threshold)
-    2. Monitor pose state transitions
-    3. Check focus mode + distraction conditions
-    4. Calculate screen proximity from shoulder/ear keypoints
-    5. Trigger greeting when known user is recognized
-
-Debouncing:
-    - Proximity alerts: 15 second cooldown
-    - Focus alerts: 5 second cooldown
-    - Greetings: Reset after 5 seconds of absence
-
-Dependencies:
-    - SceneState from state/scene_state.py
-
-Example:
-    >>> engine = RulesEngine()
-    >>> events = engine.check_rules(scene_state, timestamp)
-    >>> for event in events:
-    ...     if event.startswith("TTS:"):
-    ...         speak(event[4:])  # Send to TTS
-    ...     else:
-    ...         log(event)  # Log to console
-
-Author: Jayadeep / Jay7-Tech
-Module: reasoning/rules.py
+Event Types:
+    - "Object appeared: {label}"
+    - "Object disappeared: {label}"
+    - "TTS: You have been sitting for a while..."
+    - "TTS: Put the phone away and focus..."
+    - "TTS: You are too close to the screen..."
+    - "TTS: Hello {name}. Welcome back."
+    - "TTS: Remember to drink some water!" (NEW)
 """
+
+from typing import Dict, List, Set, Any, Optional
+import time
+
+
+class RulesConfig:
+    """Configuration for rules engine timings."""
+    
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        config = config or {}
+        
+        # Posture reminder (seconds)
+        self.sitting_reminder = config.get('sitting_reminder', 2700)  # 45 minutes
+        self.standing_reminder = config.get('standing_reminder', 1800)  # 30 minutes
+        
+        # Alert cooldowns (seconds)
+        self.focus_cooldown = config.get('focus_cooldown', 10.0)
+        self.proximity_cooldown = config.get('proximity_cooldown', 30.0)
+        self.hydration_cooldown = config.get('hydration_cooldown', 1800)  # 30 minutes
+        
+        # Thresholds
+        self.proximity_threshold = config.get('proximity_threshold', 0.55)
+        self.object_visibility_timeout = config.get('object_visibility_timeout', 0.5)
+        self.greeting_reset_time = config.get('greeting_reset_time', 300.0)  # 5 minutes
+        
+        # Feature toggles
+        self.enable_hydration = config.get('enable_hydration', True)
+        self.enable_posture = config.get('enable_posture', True)
+        self.enable_proximity = config.get('enable_proximity', True)
+        self.enable_greetings = config.get('enable_greetings', True)
 
 
 class RulesEngine:
     """
     Event-based rules engine for MEMO desktop companion.
     
-    The RulesEngine analyzes scene state at each frame and generates
-    events when significant changes occur. Events can trigger TTS
-    responses, log entries, or other actions.
-    
-    Attributes:
-        prev_objects (set): Set of object labels visible in previous check.
-        prev_pose_state (str): Previous pose state ('sitting', 'standing', 'unknown').
-        last_proximity_alert (float): Timestamp of last proximity warning.
-        last_focus_alert (float): Timestamp of last focus mode warning.
-        last_greeted_name (str): Name of last greeted user.
-        last_greeted_time (float): Timestamp of last greeting.
-    
-    Methods:
-        check_rules(scene_state, timestamp): Analyze state and return events.
-    
-    Example:
-        >>> engine = RulesEngine()
-        >>> while running:
-        ...     events = engine.check_rules(scene_state, time.time())
-        ...     for event in events:
-        ...         process_event(event)
+    Analyzes scene state and generates events for TTS responses,
+    notifications, and other actions.
     """
     
-    def __init__(self):
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
         """
-        Initialize the RulesEngine with default state.
+        Initialize the RulesEngine.
         
-        All tracking variables are reset to initial values.
+        Args:
+            config: Optional configuration dictionary
         """
-        self.prev_objects = set()
+        self.config = RulesConfig(config)
+        
+        # State tracking
+        self.prev_objects: Set[str] = set()
         self.prev_pose_state = 'unknown'
         self.last_check_time = 0
-        
-        # Rep Counting (future feature)
-        self.rep_count = 0
-        self.rep_stage = None  # 'up' or 'down'
-        self.prev_wrist_y = None
-        self.rep_joint = 'RIGHT_WRIST'  # Default to tracking right wrist
         
         # Debounce timers
         self.last_proximity_alert = 0
         self.last_focus_alert = 0
-        self.last_greeted_name = None
+        self.last_hydration_alert = 0
+        self.last_posture_alert = 0
+        
+        # Greeting tracking
+        self.last_greeted_name: Optional[str] = None
         self.last_greeted_time = 0
+        
+        # Hydration tracking
+        self.last_bottle_seen = 0
+        self.bottle_interactions = 0
+        
+        # Rep counting (exercise feature)
+        self.rep_count = 0
+        self.rep_stage: Optional[str] = None
+        self.prev_wrist_y: Optional[float] = None
+        self.rep_joint = 'RIGHT_WRIST'
     
-    def check_rules(self, scene_state, timestamp):
+    def check_rules(self, scene_state, timestamp: float) -> List[str]:
+        """
+        Analyze scene state and generate events.
+        
+        Args:
+            scene_state: Current scene state object
+            timestamp: Current Unix timestamp
+        
+        Returns:
+            List of event strings (prefix "TTS:" for speech)
+        """
         events = []
         
         # 1. Object Appeared / Disappeared
-        # Current present objects (recently seen, e.g. < 0.5s ago)
-        # However, SceneState stores ALL objects ever seen?
-        # SceneState logic I wrote keeps them in dict.
-        # I need to check `last_seen` vs `timestamp`.
+        events.extend(self._check_objects(scene_state, timestamp))
         
-        current_visible_objects = set()
+        # 2. Posture Monitoring
+        if self.config.enable_posture:
+            events.extend(self._check_posture(scene_state, timestamp))
+        
+        # 3. Focus Mode Distraction
+        events.extend(self._check_distraction(scene_state, timestamp))
+        
+        # 4. Hydration Reminder
+        if self.config.enable_hydration:
+            events.extend(self._check_hydration(scene_state, timestamp))
+        
+        # 5. Screen Proximity
+        if self.config.enable_proximity:
+            events.extend(self._check_proximity(scene_state, timestamp))
+        
+        # 6. Personalized Greeting
+        if self.config.enable_greetings:
+            events.extend(self._check_greeting(scene_state, timestamp))
+        
+        self.last_check_time = timestamp
+        return events
+    
+    def _check_objects(self, scene_state, timestamp: float) -> List[str]:
+        """Check for object appearance/disappearance."""
+        events = []
+        
+        # Get currently visible objects
+        current_visible = set()
         for label, data in scene_state.objects.items():
-            if timestamp - data['last_seen'] < 0.5: # 500ms threshold
-                current_visible_objects.add(label)
+            if timestamp - data['last_seen'] < self.config.object_visibility_timeout:
+                current_visible.add(label)
         
-        # Appeared
-        new_objects = current_visible_objects - self.prev_objects
-        for obj in new_objects:
+        # New objects
+        for obj in current_visible - self.prev_objects:
             events.append(f"Object appeared: {obj}")
-            
-        # Disappeared
-        # Only trigger if it was present previously and now isn't.
-        # And we use a timeout. The loop above handles "current visibility".
-        # So diff set is enough.
-        missing_objects = self.prev_objects - current_visible_objects
-        for obj in missing_objects:
-            events.append(f"Object disappeared: {obj}")
-            
-        self.prev_objects = current_visible_objects
         
-        # 2. Pose Changed & Duration Check
+        # Disappeared objects
+        for obj in self.prev_objects - current_visible:
+            events.append(f"Object disappeared: {obj}")
+        
+        self.prev_objects = current_visible
+        return events
+    
+    def _check_posture(self, scene_state, timestamp: float) -> List[str]:
+        """Check posture duration and send reminders."""
+        events = []
+        
+        if not scene_state.human['present']:
+            self.prev_pose_state = 'unknown'
+            return events
+        
         current_pose = scene_state.human['pose_state']
         
-        if scene_state.human['present']:
-            if current_pose != self.prev_pose_state and self.prev_pose_state != 'unknown' and current_pose != 'unknown':
-               # events.append(f"Human pose changed: {self.prev_pose_state} -> {current_pose}")
-               pass # Reduce spam
-               
+        # Track pose change
+        if current_pose != self.prev_pose_state:
+            if self.prev_pose_state != 'unknown' and current_pose != 'unknown':
+                # Reset posture timer on change
+                self.last_posture_alert = timestamp
             self.prev_pose_state = current_pose
-            
-            # Duration Check (Feature 1)
-            if 'pose_start_time' in scene_state.human and scene_state.focus_mode: # Only nag in focus mode? Or always? Let's say always for health.
-                duration = timestamp - scene_state.human['pose_start_time']
-                # Alert every X seconds (e.g., 45 mins = 2700s)
-                # Demo: 60s
-                
-                demo_threshold = 60 # seconds
-                if duration > demo_threshold and int(duration) % 30 == 0: 
-                    if current_pose == 'sitting':
-                        events.append("TTS: You have been sitting for a while. It is time to stretch.")
-                    elif current_pose == 'standing':
-                        events.append("TTS: You have been standing for a while. You can sit now.")
-
-        else:
-            self.prev_pose_state = 'unknown'
-            
-        # 3. Distraction Detection (Feature 3)
-        # Check if 'cell phone' is in visible objects
-        # ONLY IN FOCUS MODE
-        if scene_state.focus_mode and 'cell phone' in current_visible_objects:
-             # Trigger faster
-             if timestamp - self.last_focus_alert > 5.0:
-                 events.append("TTS: Put the phone away and focus on your work!")
-                 self.last_focus_alert = timestamp
-
-        # 4. Hydration Helper (Feature 7)
-        # Track 'bottle' movement?
-        if 'bottle' in scene_state.objects:
-            # We need to track 'last_moved_time' for bottle? 
-            # Complex for MVP. Simple check: 'bottle' seen recently?
-            # Or just periodic reminder if bottle IS present.
-            pass
-            
-        # 5. Screen Proximity Alert (Leaning too close)
-        if scene_state.human['present']:
-            kp = scene_state.human['keypoints']
-            width = scene_state.width
-            
-            # Metric 1: Shoulder Width
-            proximity_score = 0.0
-            
-            if 'LEFT_SHOULDER' in kp and 'RIGHT_SHOULDER' in kp:
-                ls = kp['LEFT_SHOULDER']
-                rs = kp['RIGHT_SHOULDER']
-                # Euclidian distance roughly since mostly horizontal
-                dist = ((ls[0]-rs[0])**2 + (ls[1]-rs[1])**2)**0.5
-                proximity_score = dist / width
-                
-            # Metric 2: Eye/Ear Width (Backup if shoulders cut off but head visible)
-            elif 'LEFT_EAR' in kp and 'RIGHT_EAR' in kp:
-                le = kp['LEFT_EAR']
-                re = kp['RIGHT_EAR']
-                dist = ((le[0]-re[0])**2 + (le[1]-re[1])**2)**0.5
-                # Ears are closer than shoulders, so threshold adjustment needed
-                proximity_score = (dist / width) * 2.5 # Approximate shoulder-to-ear ratio
-                
-            # Threshold Check
-            # If shoulders take up > 50% of the screen width, you're quite close.
-            # > 60% is very close.
-            if proximity_score > 0.55:
-                 # Debounce: Only alert every 15 seconds
-                 if timestamp - self.last_proximity_alert > 15.0:
-                     events.append("TTS: You are too close to the screen. Please move back.")
-                     self.last_proximity_alert = timestamp
         
-        # 6. Greeting Rule
-        # If identity is detected and wasn't before
-        if scene_state.human['identity']:
-            name = scene_state.human['identity']
-            # We need to track 'last_greeted_name' or similar to avoid spam
-            # Simple logic: If we haven't greeted this name in 1 hour?
-            # For MVP: Just once per session or if absent for long time?
-            # Let's use a "last_greeted" timestamp in RulesEngine
+        # Check duration
+        pose_start = scene_state.human.get('pose_start_time', timestamp)
+        duration = timestamp - pose_start
+        
+        # Cooldown check
+        if timestamp - self.last_posture_alert < 60:  # Min 1 minute between alerts
+            return events
+        
+        if current_pose == 'sitting' and duration > self.config.sitting_reminder:
+            events.append("TTS: You have been sitting for a while. Time to stretch and move around!")
+            self.last_posture_alert = timestamp
             
-            if name != self.last_greeted_name: # New person or first time
-                 events.append(f"TTS: Hello {name}. Welcome back.")
-                 self.last_greeted_name = name
-                 self.last_greeted_time = timestamp
-            elif timestamp - self.last_greeted_time > 300: # Re-greet after 5 mins absence?
-                 # Need to check absence. 
-                 # If human.present was False for X mins, then re-greet.
-                 pass
-                 
-        else:
-             # Reset greet if no one is there?
-             if not scene_state.human['present']:
-                 # If absent for > 5 seconds, reset name so we greet again
-                 if timestamp - scene_state.human['last_seen'] > 5.0:
-                     self.last_greeted_name = None
-                 
+        elif current_pose == 'standing' and duration > self.config.standing_reminder:
+            events.append("TTS: You have been standing for a while. You can take a seat now.")
+            self.last_posture_alert = timestamp
+        
         return events
+    
+    def _check_distraction(self, scene_state, timestamp: float) -> List[str]:
+        """Check for distractions in focus mode."""
+        events = []
+        
+        if not scene_state.focus_mode:
+            return events
+        
+        # Check for cell phone
+        current_visible = set()
+        for label, data in scene_state.objects.items():
+            if timestamp - data['last_seen'] < 1.0:
+                current_visible.add(label)
+        
+        if 'cell phone' in current_visible:
+            if timestamp - self.last_focus_alert > self.config.focus_cooldown:
+                events.append("TTS: I see your phone. Put it away and stay focused!")
+                self.last_focus_alert = timestamp
+        
+        return events
+    
+    def _check_hydration(self, scene_state, timestamp: float) -> List[str]:
+        """Check hydration and send water reminders."""
+        events = []
+        
+        # Track bottle visibility
+        bottle_visible = False
+        for label, data in scene_state.objects.items():
+            if 'bottle' in label.lower():
+                if timestamp - data['last_seen'] < 2.0:
+                    bottle_visible = True
+                    # Bottle was interacted with (picked up recently)
+                    if timestamp - self.last_bottle_seen > 10.0:
+                        self.bottle_interactions += 1
+                    self.last_bottle_seen = timestamp
+                    break
+        
+        # If no bottle seen for a while and person is present
+        if scene_state.human['present'] and not bottle_visible:
+            time_since_bottle = timestamp - self.last_bottle_seen if self.last_bottle_seen > 0 else 0
+            
+            # Only remind if we've seen the bottle before (user has one)
+            if self.last_bottle_seen > 0:
+                if time_since_bottle > self.config.hydration_cooldown:
+                    if timestamp - self.last_hydration_alert > self.config.hydration_cooldown:
+                        events.append("TTS: Don't forget to drink some water! Stay hydrated.")
+                        self.last_hydration_alert = timestamp
+        
+        return events
+    
+    def _check_proximity(self, scene_state, timestamp: float) -> List[str]:
+        """Check if user is too close to screen."""
+        events = []
+        
+        if not scene_state.human['present']:
+            return events
+        
+        kp = scene_state.human.get('keypoints', {})
+        width = scene_state.width
+        
+        proximity_score = 0.0
+        
+        # Method 1: Shoulder width
+        if 'LEFT_SHOULDER' in kp and 'RIGHT_SHOULDER' in kp:
+            ls = kp['LEFT_SHOULDER']
+            rs = kp['RIGHT_SHOULDER']
+            dist = ((ls[0] - rs[0])**2 + (ls[1] - rs[1])**2)**0.5
+            proximity_score = dist / width
+        
+        # Method 2: Ear width (backup)
+        elif 'LEFT_EAR' in kp and 'RIGHT_EAR' in kp:
+            le = kp['LEFT_EAR']
+            re = kp['RIGHT_EAR']
+            dist = ((le[0] - re[0])**2 + (le[1] - re[1])**2)**0.5
+            proximity_score = (dist / width) * 2.5
+        
+        # Check threshold
+        if proximity_score > self.config.proximity_threshold:
+            if timestamp - self.last_proximity_alert > self.config.proximity_cooldown:
+                events.append("TTS: You are too close to the screen. Please move back a bit.")
+                self.last_proximity_alert = timestamp
+        
+        return events
+    
+    def _check_greeting(self, scene_state, timestamp: float) -> List[str]:
+        """Check if we should greet a recognized user."""
+        events = []
+        
+        identity = scene_state.human.get('identity')
+        
+        if identity:
+            # New person or different person
+            if identity != self.last_greeted_name:
+                events.append(f"TTS: Hello {identity}! Welcome back.")
+                self.last_greeted_name = identity
+                self.last_greeted_time = timestamp
+            
+            # Re-greet after long absence
+            elif timestamp - self.last_greeted_time > self.config.greeting_reset_time:
+                if not scene_state.human['present']:
+                    # Person just returned
+                    events.append(f"TTS: Welcome back, {identity}!")
+                    self.last_greeted_time = timestamp
+        
+        else:
+            # Reset if no one present for a while
+            if not scene_state.human['present']:
+                if timestamp - scene_state.human.get('last_seen', 0) > 5.0:
+                    self.last_greeted_name = None
+        
+        return events
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get rule engine statistics."""
+        return {
+            'objects_tracked': len(self.prev_objects),
+            'current_pose': self.prev_pose_state,
+            'bottle_interactions': self.bottle_interactions,
+            'last_greeted': self.last_greeted_name
+        }
+    
+    def reset(self):
+        """Reset all tracking state."""
+        self.prev_objects = set()
+        self.prev_pose_state = 'unknown'
+        self.last_proximity_alert = 0
+        self.last_focus_alert = 0
+        self.last_hydration_alert = 0
+        self.last_posture_alert = 0
+        self.last_greeted_name = None
+        self.last_greeted_time = 0
+        self.last_bottle_seen = 0
+        self.bottle_interactions = 0
+
+
+# Quick test
+if __name__ == "__main__":
+    # Test with custom config
+    config = {
+        'sitting_reminder': 60,  # 1 minute for testing
+        'hydration_cooldown': 30,  # 30 seconds for testing
+        'focus_cooldown': 5
+    }
+    
+    engine = RulesEngine(config)
+    print(f"Rules engine initialized with config: {engine.config.__dict__}")
+    print(f"Stats: {engine.get_stats()}")
