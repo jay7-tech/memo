@@ -45,7 +45,7 @@ class RulesConfig:
         # Thresholds
         self.proximity_threshold = config.get('proximity_threshold', 0.55)
         self.object_visibility_timeout = config.get('object_visibility_timeout', 0.5)
-        self.greeting_reset_time = config.get('greeting_reset_time', 300.0)  # 5 minutes
+        self.greeting_reset_time = config.get('greeting_reset_time', 1800.0)  # 30 minutes
         
         # Feature toggles
         self.enable_hydration = config.get('enable_hydration', True)
@@ -292,40 +292,58 @@ class RulesEngine:
         return events
     
     def _check_greeting(self, scene_state, timestamp: float) -> List[str]:
-        """Check if we should greet a recognized user."""
+        """
+        GREETING LOGIC (Anti-Spam Edition):
+        1. Only greet if person was NOT present and is NOW present (Arrival).
+        2. Only greet if we haven't greeted ANYONE in the last hour.
+        3. Never greet generic "User" identity.
+        """
         events = []
         
+        present = scene_state.human.get('present', False)
         identity = scene_state.human.get('identity')
         
-        if identity:
-            # New person or different person
-            if identity != self.last_greeted_name:
-                # Use AI personality for dynamic greeting
-                if self.personality:
-                    greeting = self.personality.greeting(identity)
-                else:
-                    greeting = f"Hello {identity}! Welcome back."
-                events.append(f"TTS: {greeting}")
-                self.last_greeted_name = identity
-                self.last_greeted_time = timestamp
-            
-            # Re-greet after long absence
-            elif timestamp - self.last_greeted_time > self.config.greeting_reset_time:
-                if not scene_state.human['present']:
-                    # Person just returned
+        # Track presence transitions
+        was_present = getattr(self, '_was_present', False)
+        self._was_present = present
+        
+        # Reset cooldown if no one has been seen for 2 hours (fresh start)
+        if not present and (timestamp - scene_state.human.get('last_seen', 0) > 7200):
+            self.last_greeted_time = 0
+            self.last_greeted_name = None
+
+        # ARIVAL TRIGGER: Just arrived (was not here, now is here)
+        if present and not was_present:
+            # We don't greet immediately because face rec takes a few frames
+            # We'll set a flag to greet as soon as identify is found
+            self._pending_greeting = True
+            self._arrival_time = timestamp
+            return events
+
+        # Check if we have a pending greeting from a recent arrival
+        if getattr(self, '_pending_greeting', False):
+            # Timeout pending greeting if face not recognized within 10 seconds of arrival
+            if timestamp - self._arrival_time > 10.0:
+                self._pending_greeting = False
+                return events
+
+            # If identity found and not generic 'User'
+            if identity and identity.lower() != 'user':
+                # GLOBAL COOLDOWN: 1 hour between ANY greetings
+                if timestamp - self.last_greeted_time > 3600.0:
                     if self.personality:
                         greeting = self.personality.greeting(identity)
                     else:
-                        greeting = f"Welcome back, {identity}!"
+                        greeting = f"Hey {identity}!"
+                    
                     events.append(f"TTS: {greeting}")
                     self.last_greeted_time = timestamp
-        
-        else:
-            # Reset if no one present for a while
-            if not scene_state.human['present']:
-                if timestamp - scene_state.human.get('last_seen', 0) > 5.0:
-                    self.last_greeted_name = None
-        
+                    self.last_greeted_name = identity
+                    self._pending_greeting = False # Done
+                else:
+                    # Already greeted someone recently, cancel this one
+                    self._pending_greeting = False
+                    
         return events
     
     def get_stats(self) -> Dict[str, Any]:

@@ -104,21 +104,35 @@ class TTSEngine:
             finally:
                 self._speaking = False
     
+    def _clean_text(self, text: str) -> str:
+        """Clean text for speech by removing emojis and symbols."""
+        import re
+        # Remove emojis
+        text = text.encode('ascii', 'ignore').decode('ascii')
+        # Remove multiple spaces/newlines
+        text = re.sub(r'\s+', ' ', text).strip()
+        # Ensure it ends with a punctuation for better intonation
+        if text and text[-1] not in '.!?':
+            text += '.'
+        return text
+
     def _speak_sapi(self, text: str):
-        """Speak using Windows SAPI with natural voice."""
+        """Speak using Windows SAPI with natural voice and text cleaning."""
         try:
+            # Clean text (remove emojis/symbols that the voice tries to "read")
+            speech_text = self._clean_text(text)
+            if not speech_text:
+                return
+
             # Escape quotes for VBS
-            safe_text = text.replace('"', '""').replace("'", "''")
+            safe_text = speech_text.replace('"', '""').replace("'", "''")
             
             # VBS script with voice selection and rate control
-            # Rate: -10 (slowest) to 10 (fastest), 0 is default
-            # We use 1-2 for slightly faster, more natural speech
             vbs_content = f'''
 Set speech = CreateObject("SAPI.SpVoice")
 
 ' Try to find a natural-sounding voice
 For Each voice In speech.GetVoices
-    ' Prefer Zira (female, natural) or David (male, clearer)
     If InStr(voice.GetDescription, "Zira") > 0 Then
         Set speech.Voice = voice
         Exit For
@@ -130,11 +144,16 @@ For Each voice In speech.GetVoices
     End If
 Next
 
-' Set rate: slightly faster for casual feel (1 = a bit faster)
-speech.Rate = 1
+' Rate settings for more natural flow
+speech.Rate = 1 
+speech.Volume = {int(self.volume * 100)}
 
-' Speak the text
-speech.Speak "{safe_text}"
+' Natural phrasing: Add small pauses at commas/periods
+text = "{safe_text}"
+text = Replace(text, ",", ", ")
+text = Replace(text, ".", ". ")
+
+speech.Speak text
 '''
             # Write temp VBS file
             vbs_path = os.path.join(os.environ.get('TEMP', '.'), 'memo_speak.vbs')

@@ -147,8 +147,8 @@ class MEMOApp:
             print(f">> MEMO: {response}")
             speak(response)
         else:
-            # Pass to query handler for LLM response
-            response = self.query_handler.handle_query(text, self.scene_state)
+            # Pass to query handler (uses AI personality for complex questions)
+            response = self.query_handler.handle_query(text, self.scene_state, personality=self.personality)
             if response:
                 print(f">> MEMO: {response}")
                 speak(response)

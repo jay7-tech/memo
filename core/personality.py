@@ -99,7 +99,7 @@ class AIPersonality:
             try:
                 import google.generativeai as genai
                 genai.configure(api_key=self.gemini_key)
-                self._gemini_model = genai.GenerativeModel('gemini-1.5-flash')
+                self._gemini_model = genai.GenerativeModel('models/gemini-2.0-flash')
                 print("[AI] ✓ Gemini connected")
                 return
             except Exception as e:

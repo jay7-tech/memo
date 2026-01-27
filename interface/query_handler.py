@@ -60,13 +60,14 @@ class QueryHandler:
             'someone': 'person'
         }
     
-    def handle_query(self, query_text: str, scene_state) -> Optional[str]:
+    def handle_query(self, query_text: str, scene_state, personality=None) -> Optional[str]:
         """
         Process a natural language query.
         
         Args:
             query_text: User's query text
             scene_state: Current scene state object
+            personality: Optional personality module for AI responses
         
         Returns:
             Response string or None if not understood
@@ -77,7 +78,7 @@ class QueryHandler:
         # Handle pronouns (it, that, the object)
         query = self._resolve_pronouns(query)
         
-        # Try each query type
+        # Try local pattern handlers first (for fast specific scene info)
         handlers = [
             self._handle_location,
             self._handle_presence,
@@ -92,6 +93,11 @@ class QueryHandler:
             if result:
                 return result
         
+        # Fallback to AI Brain (Gemini) for any other questions
+        if personality:
+            # Tell the AI to answer the specific question based on its knowledge
+            return personality.generate(query, scene_state, response_type="chat")
+            
         return None
     
     def _resolve_pronouns(self, query: str) -> str:
