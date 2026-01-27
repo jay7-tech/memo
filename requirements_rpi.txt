@@ -1,38 +1,55 @@
 # =============================================
-# MEMO - Raspberry Pi Requirements
+# MEMO - Raspberry Pi 4 Requirements
 # =============================================
-# Install with: pip install -r requirements_rpi.txt
 # 
-# IMPORTANT: Install PyTorch separately FIRST!
-# See: INSTALL_RPI.md for full instructions
+# These packages are tested on Raspberry Pi 4 (4GB+)
+# with Raspberry Pi OS 64-bit (Bookworm)
+#
+# INSTALL ORDER:
+# 1. System packages: sudo apt install -y python3-opencv python3-pyaudio
+# 2. PyTorch (special): pip install torch --index-url https://download.pytorch.org/whl/cpu
+# 3. This file: pip install -r requirements_rpi.txt
+#
 # =============================================
 
-# Computer Vision (Raspberry Pi compatible)
-opencv-python-headless>=4.8.0   # Headless version for Pi
-numpy>=1.24.0
-# ultralytics - Install from source (see INSTALL_RPI.md)
-# torch/torchvision - Install separately (see INSTALL_RPI.md)
-# facenet-pytorch - May not work on Pi, use alternative
-# mediapipe - ARM support limited, may need alternatives
+# ---------------------------------------------
+# CORE - Fast install from piwheels
+# ---------------------------------------------
+numpy>=1.24.0,<2.0.0          # Use numpy 1.x for compatibility
+psutil>=5.9.0                  # System monitoring
 
-# Audio & Speech  
-pyttsx3                 # Text-to-Speech (Offline)
-SpeechRecognition       # Speech-to-Text
-# pyaudio - Install via apt: sudo apt install python3-pyaudio
-vosk>=0.3.45            # Better offline ASR (has ARM wheels)
+# ---------------------------------------------
+# COMPUTER VISION - Use pre-built wheels
+# ---------------------------------------------
+# opencv-python-headless      # SKIP - Install via: sudo apt install python3-opencv
+ultralytics>=8.0.0             # YOLOv8 - has ARM wheels
 
-# Dashboard & API
-flask                   # Web Dashboard
-flask-socketio>=5.3.0   # WebSocket for real-time updates
-python-socketio>=5.10.0
-requests                # HTTP Requests
-werkzeug                # Flask utility
+# ---------------------------------------------
+# AUDIO & SPEECH
+# ---------------------------------------------
+pyttsx3>=2.90                  # TTS - pure Python, works on Pi
+SpeechRecognition>=3.10.0      # STT - includes Google API
+# pyaudio                      # SKIP - Install via: sudo apt install python3-pyaudio
+vosk>=0.3.45                   # Offline STT - has ARM wheels!
 
-# Utilities
-colorlog>=6.8.0         # Colored console logging
-pyyaml>=6.0             # Configuration management
-psutil>=5.9.0           # System stats monitoring
+# ---------------------------------------------
+# WEB DASHBOARD
+# ---------------------------------------------
+flask>=3.0.0                   # Web framework
+flask-socketio>=5.3.0          # WebSocket support
+python-socketio>=5.10.0        # Socket.IO client
+Werkzeug>=3.0.0                # Flask utilities
+requests>=2.31.0               # HTTP client
 
-# Raspberry Pi Specific
-picamera2               # Pi Camera support (if using Pi Camera)
-gpiozero                # GPIO control (optional)
+# ---------------------------------------------
+# UTILITIES
+# ---------------------------------------------
+colorlog>=6.8.0                # Colored logging
+pyyaml>=6.0                    # Config files
+
+# ---------------------------------------------
+# OPTIONAL - May not work on all Pi setups
+# ---------------------------------------------
+# facenet-pytorch              # SKIP on Pi - needs torch first
+# mediapipe                    # SKIP - Limited ARM support
+# openwakeword                 # SKIP - May have issues

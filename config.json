@@ -4,7 +4,7 @@
     "width": 640,
     "height": 480,
     "rotation": 0,
-    "fps_target": 15
+    "fps_target": 30
   },
   "perception": {
     "yolo_model": "yolov8n.pt",
@@ -12,10 +12,13 @@
     "face_threshold": 0.6,
     "object_confidence": 0.5,
     "phone_confidence": 0.75,
-    "frame_skip": 3,
+    "frame_skip": 2,
+    "detection_interval": 2.0,
+    "face_recognition_interval": 1.5,
     "enable_emotion": false,
     "enable_gestures": true,
-    "enable_motion": true
+    "enable_motion": true,
+    "enable_face_rec": true
   },
   "voice": {
     "enable_voice_input": true,
@@ -25,7 +28,7 @@
       "hello memo"
     ],
     "wake_word_threshold": 0.5,
-    "tts_rate": 150,
+    "tts_rate": 175,
     "tts_volume": 1.0,
     "language": "en-US"
   },
@@ -34,24 +37,21 @@
     "host": "0.0.0.0",
     "port": 5000,
     "debug": false,
-    "enable_auth": false,
-    "password": null
+    "update_interval": 15
   },
-  "hardware": {
-    "enable_servos": false,
-    "enable_leds": false,
-    "enable_sensors": false,
-    "servo_i2c_address": 64,
-    "led_pin": 18,
-    "led_count": 16
+  "performance": {
+    "adaptive_skip": true,
+    "cpu_threshold": 80,
+    "memory_threshold": 85,
+    "target_fps": 30,
+    "pi_mode_fps": 10
   },
   "system": {
     "focus_mode_default": false,
     "greeting_enabled": true,
     "personality_mode": "helpful",
-    "attention_tracking": false,
-    "conversation_memory": false,
-    "logging_level": "INFO",
-    "log_to_file": true
+    "tts_cooldown": 5.0,
+    "save_on_exit": true,
+    "logging_level": "INFO"
   }
 }

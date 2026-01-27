@@ -1,0 +1,57 @@
+{
+    "camera": {
+        "source": 0,
+        "width": 640,
+        "height": 480,
+        "rotation": 0,
+        "fps_target": 15
+    },
+    "perception": {
+        "yolo_model": "yolov8n.pt",
+        "pose_model": "yolov8n-pose.pt",
+        "face_threshold": 0.5,
+        "object_confidence": 0.5,
+        "phone_confidence": 0.70,
+        "frame_skip": 5,
+        "detection_interval": 5.0,
+        "face_recognition_interval": 3.0,
+        "enable_emotion": false,
+        "enable_gestures": false,
+        "enable_motion": false,
+        "enable_face_rec": true
+    },
+    "voice": {
+        "enable_voice_input": true,
+        "enable_wake_word": false,
+        "wake_words": [
+            "hey memo"
+        ],
+        "wake_word_threshold": 0.5,
+        "tts_rate": 150,
+        "tts_volume": 1.0,
+        "language": "en-US"
+    },
+    "dashboard": {
+        "enabled": true,
+        "host": "0.0.0.0",
+        "port": 5000,
+        "debug": false,
+        "update_interval": 30
+    },
+    "performance": {
+        "adaptive_skip": true,
+        "cpu_threshold": 70,
+        "memory_threshold": 80,
+        "target_fps": 10,
+        "pi_mode_fps": 10,
+        "force_pi_mode": true
+    },
+    "system": {
+        "focus_mode_default": false,
+        "greeting_enabled": true,
+        "personality_mode": "helpful",
+        "tts_cooldown": 7.0,
+        "save_on_exit": true,
+        "logging_level": "WARNING"
+    }
+}
