@@ -53,5 +53,11 @@
     "tts_cooldown": 5.0,
     "save_on_exit": true,
     "logging_level": "INFO"
+  },
+  "ai": {
+    "backend": "gemini",
+    "gemini_api_key": "",
+    "ollama_model": "llama3.2",
+    "ollama_url": "http://localhost:11434"
   }
 }

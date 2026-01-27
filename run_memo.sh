@@ -17,11 +17,5 @@ if grep -q "Raspberry Pi\|BCM" /proc/cpuinfo 2>/dev/null; then
     export MEMO_CONFIG="config_rpi.json"
 fi
 
-# Run optimized version if available
-if [ -f "main_optimized.py" ]; then
-    echo "Starting MEMO (Optimized)..."
-    python main_optimized.py "$@"
-else
-    echo "Starting MEMO (Standard)..."
-    python main.py "$@"
-fi
+echo "Starting MEMO..."
+python main.py "$@"

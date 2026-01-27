@@ -62,14 +62,16 @@ class RulesEngine:
     notifications, and other actions.
     """
     
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None, personality=None):
         """
         Initialize the RulesEngine.
         
         Args:
             config: Optional configuration dictionary
+            personality: Optional AIPersonality instance for dynamic responses
         """
         self.config = RulesConfig(config)
+        self.personality = personality  # For dynamic responses
         
         # State tracking
         self.prev_objects: Set[str] = set()
@@ -95,6 +97,10 @@ class RulesEngine:
         self.rep_stage: Optional[str] = None
         self.prev_wrist_y: Optional[float] = None
         self.rep_joint = 'RIGHT_WRIST'
+    
+    def set_personality(self, personality):
+        """Set or update the personality module."""
+        self.personality = personality
     
     def check_rules(self, scene_state, timestamp: float) -> List[str]:
         """
@@ -181,11 +187,19 @@ class RulesEngine:
             return events
         
         if current_pose == 'sitting' and duration > self.config.sitting_reminder:
-            events.append("TTS: You have been sitting for a while. Time to stretch and move around!")
+            if self.personality:
+                msg = self.personality.posture_reminder('sitting')
+            else:
+                msg = "You have been sitting for a while. Time to stretch and move around!"
+            events.append(f"TTS: {msg}")
             self.last_posture_alert = timestamp
             
         elif current_pose == 'standing' and duration > self.config.standing_reminder:
-            events.append("TTS: You have been standing for a while. You can take a seat now.")
+            if self.personality:
+                msg = self.personality.posture_reminder('standing')
+            else:
+                msg = "You have been standing for a while. You can take a seat now."
+            events.append(f"TTS: {msg}")
             self.last_posture_alert = timestamp
         
         return events
@@ -268,7 +282,11 @@ class RulesEngine:
         # Check threshold
         if proximity_score > self.config.proximity_threshold:
             if timestamp - self.last_proximity_alert > self.config.proximity_cooldown:
-                events.append("TTS: You are too close to the screen. Please move back a bit.")
+                if self.personality:
+                    msg = self.personality.proximity_alert()
+                else:
+                    msg = "You are too close to the screen. Please move back a bit."
+                events.append(f"TTS: {msg}")
                 self.last_proximity_alert = timestamp
         
         return events
@@ -282,7 +300,12 @@ class RulesEngine:
         if identity:
             # New person or different person
             if identity != self.last_greeted_name:
-                events.append(f"TTS: Hello {identity}! Welcome back.")
+                # Use AI personality for dynamic greeting
+                if self.personality:
+                    greeting = self.personality.greeting(identity)
+                else:
+                    greeting = f"Hello {identity}! Welcome back."
+                events.append(f"TTS: {greeting}")
                 self.last_greeted_name = identity
                 self.last_greeted_time = timestamp
             
@@ -290,7 +313,11 @@ class RulesEngine:
             elif timestamp - self.last_greeted_time > self.config.greeting_reset_time:
                 if not scene_state.human['present']:
                     # Person just returned
-                    events.append(f"TTS: Welcome back, {identity}!")
+                    if self.personality:
+                        greeting = self.personality.greeting(identity)
+                    else:
+                        greeting = f"Welcome back, {identity}!"
+                    events.append(f"TTS: {greeting}")
                     self.last_greeted_time = timestamp
         
         else:

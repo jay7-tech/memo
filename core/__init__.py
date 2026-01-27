@@ -10,6 +10,13 @@ from .engine import (
     get_perf_monitor
 )
 
+from .personality import (
+    AIPersonality,
+    Conversation,
+    init_personality,
+    get_personality
+)
+
 __all__ = [
     'EventBus',
     'EventType', 
@@ -18,5 +25,9 @@ __all__ = [
     'PerceptionPipeline',
     'CommandProcessor',
     'get_event_bus',
-    'get_perf_monitor'
+    'get_perf_monitor',
+    'AIPersonality',
+    'Conversation',
+    'init_personality',
+    'get_personality'
 ]

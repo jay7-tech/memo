@@ -1,20 +1,12 @@
 """
-MEMO - Text-to-Speech Module (Optimized)
-=========================================
-High-performance TTS with engine reuse and multiple backends.
+MEMO - Text-to-Speech Module (Windows-Optimized)
+=================================================
+Uses Windows SAPI directly for reliable audio output.
 
-Features:
-    - Single engine instance (no recreation overhead)
-    - Thread-safe queue-based processing
-    - Multiple backend support (pyttsx3, PowerShell, espeak)
-    - Non-blocking and blocking speech modes
-    - Raspberry Pi compatible
-
-Backends (in order of preference):
-    1. pyttsx3 - Fast, offline, cross-platform
-    2. espeak - Linux/Pi native
-    3. PowerShell SAPI - Windows built-in
-    4. Print-only - Console fallback
+Backends:
+    1. Windows SAPI (via PowerShell) - Most reliable on Windows
+    2. espeak - Linux/Pi
+    3. pyttsx3 - Fallback
 """
 
 import queue
@@ -22,101 +14,54 @@ import threading
 import subprocess
 import sys
 import time
+import os
 from typing import Optional
 
 
 class TTSEngine:
     """
-    High-performance Text-to-Speech engine.
+    Reliable Text-to-Speech engine.
     
-    Uses a persistent engine instance to avoid initialization overhead.
-    Speech requests are queued and processed in background.
+    Uses Windows SAPI directly for better reliability with threading.
     """
     
     def __init__(self, rate: int = 175, volume: float = 1.0):
-        """
-        Initialize TTS engine.
-        
-        Args:
-            rate: Speech rate (words per minute)
-            volume: Volume level (0.0 to 1.0)
-        """
         self.rate = rate
         self.volume = volume
         
         self.queue = queue.Queue()
         self.running = True
         self.worker_thread = None
+        self._speaking = False
         
-        # Engine instance (reused)
-        self._engine = None
-        self._engine_lock = threading.Lock()
-        self._backend = None
+        # Lock for thread safety
+        self._lock = threading.Lock()
         
-        # Initialize backend
-        self._init_backend()
+        # Detect platform and backend
+        self._backend = self._detect_backend()
+        print(f"[TTS] ✓ Using {self._backend} engine")
     
-    def _init_backend(self):
-        """Initialize the best available TTS backend."""
-        
-        # Try pyttsx3 first
-        if self._try_pyttsx3():
-            return
-        
-        # Try espeak (Linux/Pi)
-        if self._try_espeak():
-            return
-        
-        # Try PowerShell (Windows)
+    def _detect_backend(self) -> str:
+        """Detect the best TTS backend."""
         if sys.platform == 'win32':
-            self._backend = 'powershell'
-            print("[TTS] Using PowerShell SAPI")
-            return
+            return 'sapi'  # Windows SAPI is most reliable
         
-        # Fallback to print
-        self._backend = 'print'
-        print("[TTS] No TTS engine available, using print mode")
-    
-    def _try_pyttsx3(self) -> bool:
-        """Try to initialize pyttsx3."""
+        # Check for espeak on Linux/Pi
         try:
-            import pyttsx3
-            
-            self._engine = pyttsx3.init()
-            self._engine.setProperty('rate', self.rate)
-            self._engine.setProperty('volume', self.volume)
-            
-            # Try to use a natural voice
-            voices = self._engine.getProperty('voices')
-            for voice in voices:
-                name_lower = voice.name.lower()
-                if any(v in name_lower for v in ['zira', 'david', 'hazel', 'english']):
-                    self._engine.setProperty('voice', voice.id)
-                    break
-            
-            self._backend = 'pyttsx3'
-            print("[TTS] ✓ Using pyttsx3 engine")
-            return True
-            
-        except Exception as e:
-            print(f"[TTS] pyttsx3 not available: {e}")
-            return False
-    
-    def _try_espeak(self) -> bool:
-        """Try to use espeak (Linux/Pi)."""
-        try:
-            result = subprocess.run(
-                ['espeak', '--version'],
-                capture_output=True,
-                timeout=2
-            )
+            result = subprocess.run(['espeak', '--version'], capture_output=True, timeout=2)
             if result.returncode == 0:
-                self._backend = 'espeak'
-                print("[TTS] ✓ Using espeak")
-                return True
+                return 'espeak'
         except:
             pass
-        return False
+        
+        # Try pyttsx3
+        try:
+            import pyttsx3
+            return 'pyttsx3'
+        except:
+            pass
+        
+        return 'print'
     
     def start(self):
         """Start the TTS worker thread."""
@@ -128,11 +73,11 @@ class TTSEngine:
         """Background worker that processes the speech queue."""
         while self.running:
             try:
-                text = self.queue.get(timeout=1.0)
+                text = self.queue.get(timeout=0.5)
                 if text is None:
                     break
                 
-                self._speak_sync(text)
+                self._speak_text(text)
                 self.queue.task_done()
                 
             except queue.Empty:
@@ -140,125 +85,103 @@ class TTSEngine:
             except Exception as e:
                 print(f"[TTS Error] {e}")
     
-    def _speak_sync(self, text: str):
-        """Speak text synchronously using the selected backend."""
+    def _speak_text(self, text: str):
+        """Speak text using the selected backend."""
         if not text:
             return
         
-        with self._engine_lock:
-            if self._backend == 'pyttsx3':
-                self._speak_pyttsx3(text)
-            elif self._backend == 'espeak':
-                self._speak_espeak(text)
-            elif self._backend == 'powershell':
-                self._speak_powershell(text)
-            else:
-                print(f"🔊 [MEMO says]: {text}")
+        with self._lock:
+            self._speaking = True
+            try:
+                if self._backend == 'sapi':
+                    self._speak_sapi(text)
+                elif self._backend == 'espeak':
+                    self._speak_espeak(text)
+                elif self._backend == 'pyttsx3':
+                    self._speak_pyttsx3(text)
+                else:
+                    print(f"🔊 [MEMO]: {text}")
+            finally:
+                self._speaking = False
     
-    def _speak_pyttsx3(self, text: str):
-        """Speak using pyttsx3 (reuses engine)."""
+    def _speak_sapi(self, text: str):
+        """Speak using Windows SAPI (most reliable)."""
         try:
-            # Reuse existing engine
-            self._engine.say(text)
-            self._engine.runAndWait()
-        except RuntimeError as e:
-            if "run loop already started" in str(e):
-                # Engine busy, wait and retry
-                time.sleep(0.1)
-                try:
-                    self._engine.say(text)
-                    self._engine.runAndWait()
-                except:
-                    self._speak_fallback(text)
-            else:
-                self._speak_fallback(text)
+            # Escape single quotes
+            safe_text = text.replace("'", "''")
+            
+            # Create a VBS script (more reliable than PowerShell for SAPI)
+            vbs_content = f'''
+CreateObject("SAPI.SpVoice").Speak "{safe_text.replace('"', '""')}"
+'''
+            # Write temp VBS file
+            vbs_path = os.path.join(os.environ.get('TEMP', '.'), 'memo_speak.vbs')
+            with open(vbs_path, 'w') as f:
+                f.write(vbs_content)
+            
+            # Run VBS
+            subprocess.run(
+                ['cscript', '//nologo', vbs_path],
+                capture_output=True,
+                timeout=30,
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+            
+        except subprocess.TimeoutExpired:
+            print(f"[TTS] Timeout speaking: {text[:30]}...")
         except Exception as e:
-            print(f"[TTS pyttsx3 error] {e}")
-            self._speak_fallback(text)
+            print(f"[TTS SAPI error] {e}")
+            # Fallback to print
+            print(f"🔊 [MEMO]: {text}")
     
     def _speak_espeak(self, text: str):
         """Speak using espeak (Linux/Pi)."""
         try:
-            safe_text = text.replace('"', '\\"')
             subprocess.run(
-                ['espeak', '-s', str(self.rate), safe_text],
+                ['espeak', '-s', str(self.rate), text],
                 capture_output=True,
                 timeout=30
             )
         except Exception as e:
             print(f"[TTS espeak error] {e}")
-            print(f"🔊 [MEMO says]: {text}")
+            print(f"🔊 [MEMO]: {text}")
     
-    def _speak_powershell(self, text: str):
-        """Speak using Windows PowerShell SAPI."""
+    def _speak_pyttsx3(self, text: str):
+        """Speak using pyttsx3."""
         try:
-            safe_text = text.replace("'", "''").replace('"', '`"')
-            cmd = f"Add-Type -AssemblyName System.Speech; " \
-                  f"$synth = New-Object System.Speech.Synthesis.SpeechSynthesizer; " \
-                  f"$synth.Rate = 2; " \
-                  f"$synth.Speak('{safe_text}')"
-            
-            subprocess.run(
-                ["powershell", "-NoProfile", "-Command", cmd],
-                capture_output=True,
-                timeout=30
-            )
-        except subprocess.TimeoutExpired:
-            print(f"[TTS] Speech timeout: {text[:30]}...")
+            import pyttsx3
+            engine = pyttsx3.init()
+            engine.setProperty('rate', self.rate)
+            engine.say(text)
+            engine.runAndWait()
+            engine.stop()
         except Exception as e:
-            print(f"[TTS PowerShell error] {e}")
-            print(f"🔊 [MEMO says]: {text}")
-    
-    def _speak_fallback(self, text: str):
-        """Fallback to espeak or print."""
-        if sys.platform != 'win32':
-            try:
-                subprocess.run(['espeak', text], capture_output=True, timeout=10)
-                return
-            except:
-                pass
-        print(f"🔊 [MEMO says]: {text}")
+            print(f"[TTS pyttsx3 error] {e}")
+            print(f"🔊 [MEMO]: {text}")
     
     def speak(self, text: str):
-        """
-        Queue text to be spoken (non-blocking).
-        
-        Args:
-            text: Text to speak
-        """
+        """Queue text to be spoken (non-blocking)."""
         if text:
             print(f"🔊 Speaking: {text}")
             self.queue.put(text)
     
     def speak_now(self, text: str):
-        """
-        Speak text immediately (blocking).
-        
-        Args:
-            text: Text to speak immediately
-        """
+        """Speak text immediately (blocking)."""
         if text:
             print(f"🔊 Speaking: {text}")
-            self._speak_sync(text)
+            self._speak_text(text)
     
     def stop(self):
         """Stop the TTS engine."""
         self.running = False
-        self.queue.put(None)  # Signal worker to stop
+        self.queue.put(None)
         
         if self.worker_thread:
             self.worker_thread.join(timeout=2.0)
-        
-        # Cleanup pyttsx3 engine
-        if self._engine and self._backend == 'pyttsx3':
-            try:
-                self._engine.stop()
-            except:
-                pass
     
     def is_busy(self) -> bool:
         """Check if TTS is currently speaking."""
-        return not self.queue.empty()
+        return self._speaking or not self.queue.empty()
 
 
 # Global instance
@@ -266,16 +189,7 @@ _tts_engine: Optional[TTSEngine] = None
 
 
 def init_tts(rate: int = 175, volume: float = 1.0) -> TTSEngine:
-    """
-    Initialize the global TTS engine.
-    
-    Args:
-        rate: Speech rate
-        volume: Volume level
-    
-    Returns:
-        TTSEngine instance
-    """
+    """Initialize the global TTS engine."""
     global _tts_engine
     _tts_engine = TTSEngine(rate=rate, volume=volume)
     _tts_engine.start()
@@ -288,7 +202,7 @@ def speak(text: str):
     if _tts_engine:
         _tts_engine.speak(text)
     else:
-        print(f"🔊 [MEMO says]: {text}")
+        print(f"🔊 [MEMO]: {text}")
 
 
 def speak_now(text: str):
@@ -297,7 +211,7 @@ def speak_now(text: str):
     if _tts_engine:
         _tts_engine.speak_now(text)
     else:
-        print(f"🔊 [MEMO says]: {text}")
+        print(f"🔊 [MEMO]: {text}")
 
 
 def stop_tts():
@@ -318,19 +232,13 @@ if __name__ == "__main__":
     
     engine = init_tts()
     
-    # Test queued speech
-    speak("Hello! I am MEMO, your desktop companion.")
-    speak("This message is queued.")
+    speak_now("Hello! Testing voice output.")
+    speak_now("Focus mode enabled.")
+    speak_now("Voice input active.")
     
-    # Test immediate speech
-    speak_now("This message is spoken immediately.")
-    
-    # Wait for queue to complete
-    time.sleep(5)
-    
-    # Test multiple rapid requests (should not recreate engine)
-    for i in range(3):
-        speak(f"Rapid message number {i + 1}.")
+    print("Queued speech test...")
+    speak("This is message one.")
+    speak("This is message two.")
     
     time.sleep(8)
     

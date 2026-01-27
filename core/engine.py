@@ -304,37 +304,22 @@ class PerceptionPipeline:
 
 class CommandProcessor:
     """
-    Centralized command processing with pattern matching.
+    Centralized command processing with fuzzy pattern matching.
     
     Features:
         - Voice and text command handling
-        - Fuzzy matching for commands
+        - Fuzzy matching for natural speech variations
         - Command history
         - Extensible command registry
     """
     
     def __init__(self, event_bus: EventBus):
         self.event_bus = event_bus
-        self.commands: Dict[str, Callable] = {}
         self.history: List[str] = []
         self.max_history = 50
         
-        # Register default commands
-        self._register_defaults()
-    
-    def _register_defaults(self):
-        """Register built-in commands."""
-        self.register('focus on', self._cmd_focus_on)
-        self.register('focus off', self._cmd_focus_off)
-        self.register('register', self._cmd_register)
-        self.register('selfie', self._cmd_selfie)
-        self.register('photo', self._cmd_selfie)
-        self.register('where is', self._cmd_where_is)
-        self.register('what do you see', self._cmd_what_see)
-    
-    def register(self, pattern: str, handler: Callable):
-        """Register a command pattern and handler."""
-        self.commands[pattern.lower()] = handler
+        # Callback for quit
+        self.on_quit = None
     
     def process(self, text: str, context: Dict[str, Any] = None) -> Optional[str]:
         """
@@ -352,12 +337,89 @@ class CommandProcessor:
         if len(self.history) > self.max_history:
             self.history.pop(0)
         
-        # Exact match first
-        for pattern, handler in self.commands.items():
-            if pattern in text_lower:
-                return handler(text, context)
+        # === QUIT / EXIT ===
+        quit_patterns = ['quit', 'exit', 'bye', 'goodbye', 'close', 'stop', 'shut down', 'shutdown']
+        for pattern in quit_patterns:
+            if pattern in text_lower and 'focus' not in text_lower:
+                if self.on_quit:
+                    self.on_quit()
+                return "Goodbye!"
         
-        # No match - return None for pass-through to LLM
+        # === FOCUS MODE ON ===
+        focus_on_patterns = [
+            'focus on', 'focus mode on', 'enable focus', 'start focus',
+            'focus enable', 'turn on focus', 'activate focus',
+            'focus mode enable', 'distraction on', 'watch me'
+        ]
+        for pattern in focus_on_patterns:
+            if pattern in text_lower:
+                return self._cmd_focus_on(text, context)
+        
+        # === FOCUS MODE OFF ===
+        focus_off_patterns = [
+            'focus off', 'focus mode off', 'disable focus', 'stop focus',
+            'focus disable', 'turn off focus', 'deactivate focus',
+            'focus mode disable', 'focus mode of',  # Common misheard
+            'off focus', 'no focus', 'end focus', 'focus end',
+            'distraction off', 'stop watching'
+        ]
+        for pattern in focus_off_patterns:
+            if pattern in text_lower:
+                return self._cmd_focus_off(text, context)
+        
+        # Check for "focus" + negative word anywhere
+        if 'focus' in text_lower:
+            negative_words = ['off', 'disable', 'stop', 'end', 'no', 'deactivate', 'of']
+            for neg in negative_words:
+                if neg in text_lower:
+                    return self._cmd_focus_off(text, context)
+        
+        # === SELFIE / PHOTO ===
+        selfie_patterns = [
+            'selfie', 'take selfie', 'take a selfie', 'photo', 'take photo',
+            'take a photo', 'picture', 'take picture', 'take a picture',
+            'capture', 'snap', 'cheese'
+        ]
+        for pattern in selfie_patterns:
+            if pattern in text_lower:
+                return self._cmd_selfie(text, context)
+        
+        # === REGISTER FACE ===
+        register_patterns = [
+            'register', 'remember me', 'learn my face', 'save my face',
+            'add me', 'add my face', 'recognize me', 'learn me'
+        ]
+        for pattern in register_patterns:
+            if pattern in text_lower:
+                return self._cmd_register(text, context)
+        
+        # === VOICE CONTROL ===
+        if 'voice' in text_lower and 'on' in text_lower:
+            return "Voice is already active since you're speaking to me!"
+        if 'voice' in text_lower and ('off' in text_lower or 'stop' in text_lower):
+            return "To stop voice, press the V key or type 'voice off'."
+        
+        # === WHERE IS ===
+        if 'where' in text_lower:
+            return self._cmd_where_is(text, context)
+        
+        # === WHAT DO YOU SEE ===
+        see_patterns = ['what do you see', 'what can you see', 'what see', 'describe']
+        for pattern in see_patterns:
+            if pattern in text_lower:
+                return self._cmd_what_see(text, context)
+        
+        # === STATUS ===
+        status_patterns = ['status', 'how are you', 'what is happening', "what's happening"]
+        for pattern in status_patterns:
+            if pattern in text_lower:
+                return self._cmd_status(text, context)
+        
+        # === WHO AM I ===
+        if 'who am i' in text_lower or 'who i am' in text_lower:
+            return self._cmd_who_am_i(text, context)
+        
+        # No match - return None for pass-through to query handler
         return None
     
     def _cmd_focus_on(self, text: str, context: Dict) -> str:
@@ -376,15 +438,19 @@ class CommandProcessor:
     
     def _cmd_register(self, text: str, context: Dict) -> str:
         # Extract name if provided
-        name = text.lower().replace('register', '').replace('me', '').strip()
-        if not name:
+        text_clean = text.lower()
+        for word in ['register', 'remember', 'learn', 'save', 'add', 'my', 'face', 'me', 'as']:
+            text_clean = text_clean.replace(word, '')
+        name = text_clean.strip()
+        
+        if not name or len(name) < 2:
             name = "User"
         
         self.event_bus.publish(Event(
             EventType.SYSTEM_ALERT,
-            {'action': 'register_face', 'name': name}
+            {'action': 'register_face', 'name': name.title()}
         ))
-        return f"Look at the camera, {name}. Registering your face..."
+        return f"Look at the camera, {name.title()}. Registering your face..."
     
     def _cmd_selfie(self, text: str, context: Dict) -> str:
         self.event_bus.publish(Event(
@@ -399,7 +465,20 @@ class CommandProcessor:
         
         scene = context['scene_state']
         # Extract object name
-        obj_name = text.lower().replace('where is', '').replace('the', '').strip()
+        obj_name = text.lower()
+        for word in ['where', 'is', 'the', 'my', 'a', 'an', 'located', 'find']:
+            obj_name = obj_name.replace(word, '')
+        obj_name = obj_name.strip()
+        
+        if not obj_name:
+            return "What object are you looking for?"
+        
+        # Check synonyms
+        synonyms = {
+            'phone': 'cell phone', 'mobile': 'cell phone',
+            'water': 'bottle', 'drink': 'bottle'
+        }
+        obj_name = synonyms.get(obj_name, obj_name)
         
         obj_state = scene.get_object_state(obj_name)
         if obj_state:
@@ -434,6 +513,35 @@ class CommandProcessor:
             return "I see you!"
         
         return prefix + ", ".join(objects) + "."
+    
+    def _cmd_status(self, text: str, context: Dict) -> str:
+        if not context or 'scene_state' not in context:
+            return "I'm doing well! Systems are running."
+        
+        scene = context['scene_state']
+        parts = []
+        
+        if scene.focus_mode:
+            parts.append("Focus mode is on")
+        else:
+            parts.append("Focus mode is off")
+        
+        if scene.human.get('identity'):
+            parts.append(f"I see {scene.human['identity']}")
+        
+        return ". ".join(parts) + "."
+    
+    def _cmd_who_am_i(self, text: str, context: Dict) -> str:
+        if not context or 'scene_state' not in context:
+            return "I can't see you right now."
+        
+        scene = context['scene_state']
+        identity = scene.human.get('identity')
+        
+        if identity:
+            return f"You are {identity}!"
+        else:
+            return "I can see you, but I don't recognize you yet. Say 'remember me' to register."
 
 
 # Global instances for easy access
