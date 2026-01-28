@@ -106,7 +106,20 @@ class MEMOApp:
         elif "--show" in sys.argv:
             self.show_display = True
             
+        # Display settings
+        self.show_display = not self.perf_monitor.is_raspberry_pi
+        
+        # Check command line for headless override
+        if "--headless" in sys.argv:
+            self.show_display = False
+        elif "--show" in sys.argv:
+            self.show_display = True
+            
         print(f"[MEMO] Initialized | Pi Mode: {self.perf_monitor.is_raspberry_pi} | Display: {self.show_display}")
+        
+        if not self.show_display:
+            print("[System] Running in headless mode. Controlling via terminal and dashboard.")
+            threading.Thread(target=self._terminal_input_loop, daemon=True).start()
     
     def _load_config(self, config_path: str) -> Dict[str, Any]:
         """Load configuration from JSON file."""
@@ -509,7 +522,7 @@ class MEMOApp:
             frame = self._draw_overlay(frame, perception_result)
             
             # Update dashboard (throttled)
-            if self.dashboard and self.frame_count % 15 == 0:
+            if self.dashboard and self.frame_count % 5 == 0:
                 try:
                     preview = cv2.resize(frame, (480, 270))
                     self.dashboard.update_frame(preview)

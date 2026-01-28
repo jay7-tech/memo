@@ -136,10 +136,15 @@ def index():
                     <span class="label" style="margin-bottom: 5px;">Visual Memory:</span> 
                     <span class="value" id="objects" style="font-size: 0.9em; color: #888;">...</span>
                 </div>
+
+                <h2 style="margin-top: 30px;">Event Logs</h2>
+                <div id="logs" style="background: #000; height: 150px; overflow-y: scroll; font-family: monospace; font-size: 0.8em; padding: 10px; border: 1px solid #333; color: #0f0; text-align: left;">
+                    Initializing system logs...
+                </div>
                 
                 <div class="controls">
                      <button onclick="toggleFocus()">TOGGLE FOCUS SHIELD</button>
-                     <p style="margin-top: 15px; font-size: 0.8em; color: #444;">DASHBOARD V1.0</p>
+                     <p style="margin-top: 15px; font-size: 0.8em; color: #444;">DASHBOARD V1.1 (Low Latency)</p>
                 </div>
             </div>
         </div>
