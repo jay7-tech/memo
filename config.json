@@ -56,9 +56,9 @@
     "logging_level": "INFO"
   },
   "ai": {
-    "backend": "gemini",
+    "backend": "ollama",
     "gemini_api_key": "",
-    "ollama_model": "phi:latest",
+    "ollama_model": "phi3:latest",
     "ollama_url": "http://localhost:11434"
   }
 }
