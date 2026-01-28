@@ -108,10 +108,10 @@ class PerformanceMonitor:
         self.frame_times: List[float] = []
         self.max_samples = 30
         
-        # Adaptive parameters
-        self.frame_skip = 3 if self.is_raspberry_pi else 1
+        # Adaptive parameters - More aggressive on Pi to save CPU for AI
+        self.frame_skip = 5 if self.is_raspberry_pi else 1
         self.detection_interval = 5.0 if self.is_raspberry_pi else 2.0
-        self.face_rec_interval = 3.0 if self.is_raspberry_pi else 1.0
+        self.face_rec_interval = 10.0 if self.is_raspberry_pi else 1.0
         
         # Resource thresholds
         self.cpu_threshold = 80  # Reduce processing if CPU > 80%

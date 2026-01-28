@@ -108,9 +108,8 @@ class ObjectDetector:
               to avoid false positives with computer mouse.
             - General objects use 0.5 confidence threshold.
         """
-        # Run inference with stream=True for efficiency if needed, mostly explicit device
-        # Using imgsz=480 for speedup (default 640 is slower on CPU)
-        results = self.model(frame, verbose=False, device=self.device, imgsz=480)
+        # Using imgsz=320 for significant speedup on Pi (default 640 is way too slow)
+        results = self.model(frame, verbose=False, device=self.device, imgsz=320)
         detections = []
         
         for result in results:

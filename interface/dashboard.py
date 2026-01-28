@@ -49,7 +49,7 @@ def generate():
         
         yield(b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + 
               bytearray(encodedImage) + b'\r\n')
-        time.sleep(0.001) # Near-zero sleep for maximum stream speed
+        time.sleep(0.05) # Target ~20 FPS to save CPU on Pi
 
 @app.route("/")
 def index():

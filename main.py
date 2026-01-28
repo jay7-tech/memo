@@ -164,12 +164,18 @@ class MEMOApp:
         if response:
             print(f">> MEMO: {response}")
             speak(response)
+            # Log to dashboard
+            from interface.dashboard import add_log
+            add_log(response, "ai")
         else:
             # Pass to query handler (uses AI personality for complex questions)
             response = self.query_handler.handle_query(text, self.scene_state, personality=self.personality)
             if response:
                 print(f">> MEMO: {response}")
                 speak(response)
+                # Log to dashboard
+                from interface.dashboard import add_log
+                add_log(response, "ai")
     
     def _on_distraction(self, event: Event):
         """Handle distraction detection."""

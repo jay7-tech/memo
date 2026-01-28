@@ -42,7 +42,7 @@ class PoseEstimator:
         }
         or None if no person/pose detected.
         """
-        results = self.model(frame, verbose=False, device=self.device, imgsz=480)
+        results = self.model(frame, verbose=False, device=self.device, imgsz=320)
         
         # We only care about the *primary* person (highest confidence or first)
         # YOLO pose results structure:

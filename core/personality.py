@@ -271,7 +271,9 @@ class AIPersonality:
     def _generate_ollama(self, prompt: str) -> str:
         try:
             import requests
-            print(f"[AI] Sending to Ollama ({self.ollama_model})...")
+            from interface.dashboard import add_log
+            add_log(f"Brain is thinking about: {prompt[:30]}...", "ai")
+            
             response = requests.post(
                 f"{self.ollama_url}/api/generate",
                 json={
@@ -280,7 +282,7 @@ class AIPersonality:
                     "stream": False,
                     "options": {"temperature": 0.9, "num_predict": 100}
                 },
-                timeout=45
+                timeout=120
             )
             print(f"[AI] Ollama Status: {response.status_code}")
             if response.status_code == 200:
