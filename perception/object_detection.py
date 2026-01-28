@@ -129,7 +129,7 @@ class ObjectDetector:
                 # Since we want to detect cell phone distraction, 
                 # we must be VERY sure.
                 if label == 'cell phone':
-                    min_conf = 0.60 # Was 0.75 - Lowered to improve recall
+                    min_conf = 0.70 # Increased to avoid false positives (mouse/etc)
                 elif label == 'mouse':
                     # User said mouse is detected as phone.
                     # If YOLO says "mouse", let it pass as mouse.

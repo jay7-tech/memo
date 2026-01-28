@@ -312,7 +312,8 @@ class FaceRecognizer:
             return best_match
         else:
             if best_match:
-                print(f"[FaceRec] Unknown (Best: {best_match} @ {best_similarity:.2f})")
+                pass
+                # print(f"[FaceRec] Unknown (Best: {best_match} @ {best_similarity:.2f})")
     
     def list_users(self) -> List[str]:
         """Get list of registered users."""

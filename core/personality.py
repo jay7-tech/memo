@@ -108,8 +108,14 @@ class AIPersonality:
                 from google import genai
                 client = genai.Client(api_key=self.gemini_key)
                 
-                # Model candidates to try
-                candidates = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.0-pro', 'gemini-pro']
+                # Model candidates to try (Fastest first)
+                candidates = [
+                    'gemini-2.0-flash', 
+                    'models/gemini-2.0-flash', 
+                    'gemini-1.5-flash', 
+                    'models/gemini-1.5-flash',
+                    'gemini-1.5-pro'
+                ]
                 last_error = None
                 
                 for model_name in candidates:
@@ -122,6 +128,7 @@ class AIPersonality:
                         print(f"[AI] ✓ Brain: Gemini ({model_name}) connected.")
                         return
                     except Exception as e:
+                        print(f"[AI] Debug: {model_name} failed: {e}")
                         last_error = e
                         continue
                 
@@ -264,20 +271,32 @@ class AIPersonality:
     def _generate_ollama(self, prompt: str) -> str:
         try:
             import requests
+            print(f"[AI] Sending to Ollama ({self.ollama_model})...")
             response = requests.post(
                 f"{self.ollama_url}/api/generate",
                 json={
                     "model": self.ollama_model,
                     "prompt": prompt,
                     "stream": False,
-                    "options": {"temperature": 0.9, "num_predict": 50}
+                    "options": {"temperature": 0.9, "num_predict": 100}
                 },
-                timeout=30
+                timeout=45
             )
+            print(f"[AI] Ollama Status: {response.status_code}")
             if response.status_code == 200:
-                text = response.json().get('response', '').strip()
+                data = response.json()
+                # print(f"[AI] DEBUG Raw data keys: {data.keys()}") 
+                text = data.get('response', '').strip()
+                
+                if not text and 'done' in data and data['done'] is True:
+                    print("[AI] Ollama returned empty response (but done=True).")
+                
                 if text:
                     return text
+                else:
+                    print(f"[AI] Ollama returned empty text. Raw: {data}")
+            else:
+                print(f"[AI] Ollama Failed: {response.text}")
         except Exception as e:
             print(f"[AI] Ollama Error: {e}")
         return self._generate_fallback(prompt)

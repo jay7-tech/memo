@@ -1,0 +1,32 @@
+# MEMO - Raspberry Pi 5 Requirements
+# ====================================
+
+# Core AI & Vision (Headless for Pi)
+opencv-python-headless>=4.8.0 
+ultralytics>=8.0.0
+numpy>=1.24.0
+facenet-pytorch
+mediapipe>=0.10.0
+
+# Audio
+SpeechRecognition
+pyaudio
+openwakeword>=0.6.0
+vosk>=0.3.45
+
+# Web/Dashboard
+flask
+flask-socketio>=5.3.0
+python-socketio>=5.10.0
+requests
+werkzeug
+
+# Utils
+colorlog
+pyyaml
+psutil
+python-dotenv
+
+# LLM Backends
+google-genai
+ollama

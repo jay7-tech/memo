@@ -105,13 +105,18 @@ class TTSEngine:
                 self._speaking = False
     
     def _clean_text(self, text: str) -> str:
-        """Clean text for speech by removing emojis and symbols."""
+        """Clean text for speech by removing hashtags and emojis."""
         import re
         # Remove emojis
         text = text.encode('ascii', 'ignore').decode('ascii')
+        
+        # Remove hashtags (e.g. #vibes #cool)
+        text = re.sub(r'#\w+', '', text)
+        
         # Remove multiple spaces/newlines
         text = re.sub(r'\s+', ' ', text).strip()
-        # Ensure it ends with a punctuation for better intonation
+        
+        # Ensure it ends with a punctuation
         if text and text[-1] not in '.!?':
             text += '.'
         return text

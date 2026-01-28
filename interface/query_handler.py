@@ -78,7 +78,10 @@ class QueryHandler:
         # Handle pronouns (it, that, the object)
         query = self._resolve_pronouns(query)
         
-        # Try local pattern handlers first (for fast specific scene info)
+        # 2. Handle specific question types
+        detected_labels = [d['label'] for d in scene_state.detections]
+        print(f"[Query] User asked: '{query}' | Visible objects: {detected_labels}")
+
         handlers = [
             self._handle_location,
             self._handle_presence,
