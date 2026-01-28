@@ -1,6 +1,7 @@
 """
 MEMO - Optimized Main Application
 ==================================
+VERSION: 1.2.0 (Headless Fix applied)
 High-performance desktop companion with adaptive processing.
 
 Features:
