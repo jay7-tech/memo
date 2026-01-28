@@ -6,7 +6,7 @@ opencv-python-headless>=4.8.0
 ultralytics>=8.0.0
 numpy>=1.24.0
 facenet-pytorch
-mediapipe>=0.10.0
+# mediapipe>=0.10.0 # Not compatible with Python 3.13 yet on Pi
 
 # Audio
 SpeechRecognition
