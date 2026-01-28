@@ -97,7 +97,16 @@ class MEMOApp:
         self.last_tts_time = 0
         self.verbose_logging = False  # Default to quiet mode for easier typing
         
-        print(f"[MEMO] Initialized | Pi Mode: {self.perf_monitor.is_raspberry_pi}")
+        # Display settings
+        self.show_display = not self.perf_monitor.is_raspberry_pi
+        
+        # Check command line for headless override
+        if "--headless" in sys.argv:
+            self.show_display = False
+        elif "--show" in sys.argv:
+            self.show_display = True
+            
+        print(f"[MEMO] Initialized | Pi Mode: {self.perf_monitor.is_raspberry_pi} | Display: {self.show_display}")
     
     def _load_config(self, config_path: str) -> Dict[str, Any]:
         """Load configuration from JSON file."""
@@ -508,37 +517,42 @@ class MEMOApp:
                     pass
             
             # Display
-            cv2.imshow("MEMO Vision", frame)
-            
-            # Handle keyboard
-            key = cv2.waitKey(1) & 0xFF
-            if key == ord('q'):
-                self.running = False
-            elif key == ord('f'):
-                new_state = not self.scene_state.focus_mode
-                self.event_bus.publish(Event(
-                    EventType.FOCUS_MODE_CHANGED,
-                    {'enabled': new_state}
-                ))
-                # speak handled in _on_focus_change
-            elif key == ord('s'):
-                self.scene_state.selfie_trigger = True
-                speak_now("Smile!")
-            elif key == ord('v') and self.voice_input:
-                new_state = not self.voice_input.is_listening_active
-                self.voice_input.set_active(new_state)
-                if new_state:
-                    print(">> SYSTEM: Voice ENABLED")
-                    speak_now("Voice enabled.")
-                else:
-                    print(">> SYSTEM: Voice DISABLED")
-                    speak_now("Voice disabled.")
+            if self.show_display:
+                cv2.imshow("MEMO Vision", frame)
+                
+                # Handle keyboard (Only works if display window has focus)
+                key = cv2.waitKey(1) & 0xFF
+                if key == ord('q'):
+                    self.running = False
+                elif key == ord('f'):
+                    new_state = not self.scene_state.focus_mode
+                    self.event_bus.publish(Event(
+                        EventType.FOCUS_MODE_CHANGED,
+                        {'enabled': new_state}
+                    ))
+                elif key == ord('s'):
+                    self.scene_state.selfie_trigger = True
+                    speak_now("Smile!")
+                elif key == ord('v') and self.voice_input:
+                    new_state = not self.voice_input.is_listening_active
+                    self.voice_input.set_active(new_state)
+                    if new_state:
+                        print(">> SYSTEM: Voice ENABLED")
+                        speak_now("Voice enabled.")
+                    else:
+                        print(">> SYSTEM: Voice DISABLED")
+                        speak_now("Voice disabled.")
+            else:
+                # Still check if we should quit via console or other events
+                # Just a tiny sleep to keep CPU sane
+                time.sleep(0.01)
         
         # Cleanup
         print("\n[MEMO] Shutting down...")
         self.scene_state.save_memory()
         cam.release()
-        cv2.destroyAllWindows()
+        if self.show_display:
+            cv2.destroyAllWindows()
         stop_tts()
         self.event_bus.stop()
         print("[MEMO] Goodbye!")
