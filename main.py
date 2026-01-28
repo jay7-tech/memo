@@ -21,6 +21,9 @@ Usage:
 """
 
 import os
+from dotenv import load_dotenv
+load_dotenv() # Load variables from .env
+
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
 import cv2

@@ -89,42 +89,62 @@ class AIPersonality:
         self.conversation = Conversation()
         
         self._gemini_model = None
+        self._gemini_client = None
         self._init_backend()
         
         print(f"[AI] ✓ Personality initialized with {self.backend} backend")
     
     def _init_backend(self):
         """Initialize the AI backend with a robust model search and fallback."""
-        # Try Gemini first
+        self._gemini_client = None
+        self.active_model = 'gemini-1.5-flash' # Default
+        
+        # Try Gemini
         if self.backend == 'gemini' and self.gemini_key:
+            print(f"[AI] Initializing Gemini...")
+            
+            # 1. Try New Google GenAI SDK
+            try:
+                from google import genai
+                client = genai.Client(api_key=self.gemini_key)
+                
+                # Model candidates to try
+                candidates = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.0-pro', 'gemini-pro']
+                last_error = None
+                
+                for model_name in candidates:
+                    try:
+                        client.models.generate_content(model=model_name, contents='Start')
+                        # If successful:
+                        self._gemini_client = client
+                        self.active_model = model_name
+                        self.backend = 'gemini_new'
+                        print(f"[AI] ✓ Brain: Gemini ({model_name}) connected.")
+                        return
+                    except Exception as e:
+                        last_error = e
+                        continue
+                
+                print(f"[AI] New SDK installed but no working model found. Last error: {last_error}")
+                
+            except ImportError:
+                print("[AI] Note: 'google-genai' package not installed. Skipping new SDK.")
+            except Exception as e:
+                print(f"[AI] New SDK Init failed: {e}")
+
+            # 2. Try Legacy SDK
             try:
                 import google.generativeai as genai
                 genai.configure(api_key=self.gemini_key)
-                
-                # Prioritize gemini-1.5-flash as it's the most stable free-tier model
-                prospective_models = [
-                    'models/gemini-1.5-flash',
-                    'models/gemini-pro',
-                    'gemini-1.5-flash'
-                ]
-                
-                print("[AI] Testing Gemini connection...")
-                for m_name in prospective_models:
-                    try:
-                        temp_model = genai.GenerativeModel(m_name)
-                        # Quick check
-                        temp_model.generate_content("hi", generation_config={"max_output_tokens": 1})
-                        self._gemini_model = temp_model
-                        self.backend = 'gemini'
-                        print(f"[AI] ✓ Brain: Gemini ({m_name}) connected.")
-                        return
-                    except Exception as e:
-                        if "429" in str(e):
-                            print(f"[AI] ! Gemini {m_name} Quota Exceeded. Trying Ollama...")
-                            break # Fall through to Ollama check
-                        continue
+                # Prioritize gemini-1.5-flash
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                model.generate_content("Start")
+                self._gemini_model = model
+                self.backend = 'gemini'
+                print("[AI] ✓ Brain: Gemini (Legacy SDK) connected.")
+                return
             except Exception as e:
-                print(f"[AI] Gemini setup error: {e}")
+                print(f"[AI] Legacy SDK Init failed: {e}")
         
         # Fallback: Try Ollama
         try:
@@ -190,7 +210,9 @@ class AIPersonality:
             full_prompt = f"{system_prompt}\n\nUser: {prompt}\n\nRespond naturally as MEMO."
         
         try:
-            if self.backend == 'gemini' and self._gemini_model:
+            if self.backend == 'gemini_new' and self._gemini_client:
+                response = self._generate_gemini_new(full_prompt)
+            elif self.backend == 'gemini' and self._gemini_model:
                 response = self._generate_gemini(full_prompt)
             elif self.backend == 'ollama':
                 response = self._generate_ollama(full_prompt)
@@ -204,6 +226,18 @@ class AIPersonality:
         except Exception as e:
             return self._generate_fallback(prompt)
     
+    def _generate_gemini_new(self, prompt: str) -> str:
+        if not self._gemini_client:
+             return self._generate_fallback(prompt)
+        try:
+             response = self._gemini_client.models.generate_content(
+                 model=self.active_model, contents=prompt
+             )
+             return response.text.strip()
+        except Exception as e:
+             print(f"[AI] Gemini New Error: {e}")
+             return self._generate_fallback(prompt)
+
     def _generate_gemini(self, prompt: str) -> str:
         if not self._gemini_model:
             return self._generate_fallback(prompt)
@@ -236,14 +270,16 @@ class AIPersonality:
                     "model": self.ollama_model,
                     "prompt": prompt,
                     "stream": False,
-                    "options": {"temperature": 0.9, "num_predict": 30}
+                    "options": {"temperature": 0.9, "num_predict": 50}
                 },
-                timeout=10
+                timeout=30
             )
             if response.status_code == 200:
-                return response.json().get('response', '').strip()
+                text = response.json().get('response', '').strip()
+                if text:
+                    return text
         except Exception as e:
-            pass
+            print(f"[AI] Ollama Error: {e}")
         return self._generate_fallback(prompt)
     
     def _generate_fallback(self, prompt: str) -> str:
@@ -283,7 +319,7 @@ class AIPersonality:
     
     def greeting(self, name: str) -> str:
         self.user_name = name
-        return f"Yo {name}! �"
+        return f"Yo {name}! 👊"
     
     def focus_on(self) -> str:
         return random.choice([

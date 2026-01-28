@@ -25,3 +25,9 @@ werkzeug                # Flask utility
 colorlog>=6.8.0         # Colored console logging
 pyyaml>=6.0             # Configuration management
 psutil>=5.9.0           # System stats monitoring
+python-dotenv           # Load environment variables
+
+# AI & LLM
+google-generativeai     # Gemini (Legacy)
+google-genai            # Gemini (New SDK)
+ollama                  # Local LLM Interface
