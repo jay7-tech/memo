@@ -36,7 +36,9 @@ def generate():
         # Yield the output frame in the byte format
         yield(b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + 
               bytearray(encodedImage) + b'\r\n')
-        # time.sleep(0.1) # Removed artificial delay for max FPS
+        time.sleep(0.005) # Ultra low latency
+
+    print("[Dashboard] Stream generator started (Low Latency)")
 
 @app.route("/")
 def index():
