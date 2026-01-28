@@ -79,7 +79,8 @@ class QueryHandler:
         query = self._resolve_pronouns(query)
         
         # 2. Handle specific question types
-        detected_labels = [d['label'] for d in scene_state.detections]
+        now = time.time()
+        detected_labels = [label for label, data in scene_state.objects.items() if now - data.get('last_seen', 0) < 2.0]
         print(f"[Query] User asked: '{query}' | Visible objects: {detected_labels}")
 
         handlers = [

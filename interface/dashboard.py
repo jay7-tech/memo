@@ -42,14 +42,14 @@ def generate():
                 continue
             
             # Use lower quality for higher FPS over network
-            # Encode with 70% quality to reduce bandwidth
-            (flag, encodedImage) = cv2.imencode(".jpg", output_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+            # Encode with 50% quality to significantly reduce network load on Pi
+            (flag, encodedImage) = cv2.imencode(".jpg", output_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 50])
             if not flag:
                 continue
         
         yield(b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + 
               bytearray(encodedImage) + b'\r\n')
-        time.sleep(0.005)
+        time.sleep(0.001) # Near-zero sleep for maximum stream speed
 
 @app.route("/")
 def index():
@@ -64,7 +64,7 @@ def index():
         <style>
             :root {
                 --bg: #050608;
-                --card-bg: rgba(16, 18, 23, 0.8);
+                --card-bg: rgba(16, 18, 23, 0.9);
                 --accent: #00f2ff;
                 --accent-glow: rgba(0, 242, 255, 0.4);
                 --text: #e0e6ed;
@@ -82,37 +82,35 @@ def index():
                 margin: 0; 
                 padding: 0;
                 overflow-x: hidden;
-                min-height: 100vh;
             }
 
             .header {
-                padding: 20px 40px;
+                padding: 15px 40px;
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
                 border-bottom: 1px solid var(--border);
                 backdrop-filter: blur(10px);
-                position: sticky;
-                top: 0;
-                z-index: 100;
+                position: sticky; top: 0; z-index: 100;
+                background: rgba(5, 6, 8, 0.8);
             }
 
             .logo {
-                font-size: 1.5rem;
+                font-size: 1.2rem;
                 font-weight: 600;
                 letter-spacing: 2px;
                 color: var(--accent);
                 display: flex;
                 align-items: center;
-                gap: 15px;
+                gap: 12px;
             }
 
             .logo-dot {
-                width: 12px;
-                height: 12px;
+                width: 10px;
+                height: 10px;
                 background: var(--accent);
                 border-radius: 50%;
-                box-shadow: 0 0 15px var(--accent);
+                box-shadow: 0 0 10px var(--accent);
                 animation: pulse 2s infinite;
             }
 
@@ -124,14 +122,14 @@ def index():
 
             .main-grid {
                 display: grid;
-                grid-template-columns: 1fr 380px;
-                gap: 25px;
-                padding: 25px;
-                max-width: 1600px;
+                grid-template-columns: 1fr 350px;
+                gap: 20px;
+                padding: 20px;
+                max-width: 1400px;
                 margin: 0 auto;
             }
 
-            @media (max-width: 1100px) {
+            @media (max-width: 1000px) {
                 .main-grid { grid-template-columns: 1fr; }
             }
 
@@ -139,110 +137,59 @@ def index():
                 background: var(--card-bg);
                 backdrop-filter: blur(12px);
                 border: 1px solid var(--border);
-                border-radius: 16px;
-                padding: 20px;
-                box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+                border-radius: 12px;
+                padding: 15px;
             }
 
             .video-container {
                 position: relative;
-                border-radius: 12px;
+                border-radius: 10px;
                 overflow: hidden;
                 border: 1px solid var(--border);
                 background: #000;
                 aspect-ratio: 16/9;
+                box-shadow: 0 0 20px rgba(0,0,0,0.5);
             }
 
             .video-container img {
-                width: 100%;
-                height: 100%;
-                object-fit: contain;
+                width: 100%; height: 100%; object-fit: contain;
             }
-
-            .hud-overlay {
-                position: absolute;
-                top: 0; left: 0; width: 100%; height: 100%;
-                pointer-events: none;
-                border: 1px solid rgba(0, 242, 255, 0.1);
-                box-sizing: border-box;
-            }
-
-            .scanline {
-                width: 100%;
-                height: 2px;
-                background: rgba(0, 242, 255, 0.1);
-                position: absolute;
-                top: -2px;
-                animation: scan 4s linear infinite;
-            }
-
-            @keyframes scan {
-                0% { top: 0%; }
-                100% { top: 100%; }
-            }
-
-            .side-panel {
-                display: flex;
-                flex-direction: column;
-                gap: 20px;
-            }
-
-            .stat-group {
-                display: flex;
-                flex-direction: column;
-                gap: 12px;
-            }
-
-            .stat-row {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 12px;
-                background: rgba(255,255,255,0.03);
-                border-radius: 8px;
-            }
-
-            .stat-label { color: #888; font-size: 0.9rem; }
-            .stat-value { font-weight: 500; font-family: 'JetBrains Mono', monospace; }
-            .stat-value.active { color: var(--accent); }
-            .stat-value.focus { color: var(--danger); text-shadow: 0 0 10px var(--danger); }
 
             .terminal {
                 background: #000;
-                border: 1px solid rgba(0,242,255,0.2);
+                border: 1px solid rgba(0,242,255,0.1);
                 border-radius: 8px;
-                height: 300px;
+                height: 250px;
                 overflow-y: auto;
-                padding: 15px;
+                padding: 12px;
                 font-family: 'JetBrains Mono', monospace;
-                font-size: 0.85rem;
-                display: flex;
-                flex-direction: column;
-                gap: 8px;
+                font-size: 0.8rem;
+                line-height: 1.4;
             }
 
-            .log-entry { display: flex; gap: 10px; }
-            .log-time { color: #555; }
-            .log-type-ai { color: #a855f7; }
-            .log-type-info { color: #22c55e; }
-            .log-type-alert { color: var(--danger); }
+            .log-entry { margin-bottom: 5px; }
+            .log-time { color: #444; margin-right: 8px; }
+            .log-type-ai { color: #bb86fc; font-weight: 600; }
+            .log-type-info { color: #03dac6; }
+            .log-type-alert { color: #ff0266; animation: blink 1s infinite; }
+
+            @keyframes blink { 50% { opacity: 0.5; } }
 
             .input-box {
-                margin-top: 15px;
+                margin-top: 10px;
                 display: flex;
-                gap: 10px;
+                gap: 8px;
             }
 
             input {
                 flex: 1;
                 background: rgba(255,255,255,0.05);
                 border: 1px solid var(--border);
-                border-radius: 8px;
-                padding: 12px;
+                border-radius: 6px;
+                padding: 10px 15px;
                 color: #fff;
-                font-family: inherit;
                 outline: none;
-                transition: border-color 0.3s;
+                font-size: 0.9rem;
             }
 
             input:focus { border-color: var(--accent); }
@@ -251,95 +198,76 @@ def index():
                 background: var(--accent);
                 color: #000;
                 border: none;
-                border-radius: 8px;
-                padding: 10px 20px;
+                border-radius: 6px;
+                padding: 8px 16px;
                 font-weight: 600;
                 cursor: pointer;
-                transition: transform 0.2s, box-shadow 0.2s;
             }
 
-            button:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 4px 15px var(--accent-glow);
+            .stat-row {
+                display: flex; justify-content: space-between;
+                padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.03);
             }
-
-            .pill {
-                padding: 4px 10px;
-                border-radius: 20px;
-                font-size: 0.8rem;
-                background: rgba(0, 242, 255, 0.1);
-                color: var(--accent);
-                border: 1px solid var(--accent-glow);
-            }
+            .stat-label { color: #666; font-size: 0.85rem; }
+            .stat-value { font-family: 'JetBrains Mono'; font-size: 0.9rem; }
         </style>
     </head>
     <body>
         <div class="header">
             <div class="logo">
                 <div class="logo-dot"></div>
-                MEMO <span style="font-weight: 300; opacity: 0.6;">NEURAL HUD</span>
+                MEMO <span style="opacity: 0.5; font-weight: 300;">V1.2</span>
             </div>
-            <div id="system-stats" style="display: flex; gap: 20px; font-size: 0.9rem; color: #666;">
-                <span>CPU: <span class="stat-value" id="cpu-val">0%</span></span>
-                <span>FPS: <span class="stat-value" id="fps-val">0.0</span></span>
+            <div id="telemetry" style="display: flex; gap: 20px; font-size: 0.8rem; color: #444;">
+                <span>FPS: <span id="fps-val" style="color: #888;">0.0</span></span>
+                <span>CPU: <span id="cpu-val" style="color: #888;">0%</span></span>
             </div>
         </div>
 
         <div class="main-grid">
-            <div class="side-panel">
+            <div style="display: flex; flex-direction: column; gap: 20px;">
                 <div class="video-container">
                     <img src="/video_feed">
-                    <div class="hud-overlay">
-                        <div class="scanline"></div>
-                    </div>
                 </div>
                 
                 <div class="glass-card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <h3 style="margin: 0; font-weight: 600;">System Console</h3>
-                        <span class="pill">REAL-TIME</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h4 style="margin: 0; text-transform: uppercase; letter-spacing: 1px;">Neural Command Link</h4>
+                        <span style="font-size: 0.7rem; color: #444;">TYPE HERE TO CONTROL ROBOT</span>
                     </div>
-                    <div class="terminal" id="terminal">
-                        <div class="log-entry">
-                            <span class="log-time">[System]</span>
-                            <span class="log-msg">Neural interface synchronized. Waiting for telemetry...</span>
-                        </div>
-                    </div>
+                    <div class="terminal" id="terminal"></div>
                     <form class="input-box" id="cmd-form">
-                        <input type="text" id="cmd-input" placeholder="Enter command (e.g. 'focus on', 'where is bottle')..." autocomplete="off">
+                        <input type="text" id="cmd-input" placeholder="Type a command (e.g. 'where is bottle')..." autocomplete="off">
                         <button type="submit">SEND</button>
                     </form>
                 </div>
             </div>
 
-            <div class="side-panel">
+            <div style="display: flex; flex-direction: column; gap: 20px;">
                 <div class="glass-card">
-                    <h3 style="margin-top: 0; margin-bottom: 20px; font-weight: 600;">Neural Telemetry</h3>
-                    <div class="stat-group">
-                        <div class="stat-row">
-                            <span class="stat-label">System State</span>
-                            <span class="stat-value active" id="identity">WAITING...</span>
-                        </div>
-                        <div class="stat-row">
-                            <span class="stat-label">Focus Shield</span>
-                            <span class="stat-value" id="focus-st">DISABLED</span>
-                        </div>
-                        <div class="stat-row">
-                            <span class="stat-label">Entities Observed</span>
-                            <span class="stat-value" id="objects">None</span>
-                        </div>
+                    <h4 style="margin-top: 0; margin-bottom: 15px;">Telemetry</h4>
+                    <div class="stat-row">
+                        <span class="stat-label">Identity</span>
+                        <span class="stat-value" id="identity" style="color: var(--accent);">IDLE</span>
                     </div>
-                    <div style="margin-top: 25px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <button onclick="sendCmd('focus on')" style="background: rgba(255, 51, 102, 0.1); color: #ff3366; border: 1px solid rgba(255, 51, 102, 0.2);">FOCUS ON</button>
-                        <button onclick="sendCmd('focus off')" style="background: rgba(255, 255, 255, 0.05); color: #fff; border: 1px solid var(--border);">FOCUS OFF</button>
+                    <div class="stat-row">
+                        <span class="stat-label">Pose</span>
+                        <span class="stat-value" id="pose-st">Scanning...</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Focus Shield</span>
+                        <span class="stat-value" id="focus-st">OFF</span>
                     </div>
                 </div>
 
                 <div class="glass-card">
-                    <h3 style="margin-top: 0; margin-bottom: 15px; font-weight: 600;">Memory Bank</h3>
-                    <div style="font-size: 0.9rem; color: #888; line-height: 1.6;" id="objects-detail">
-                        Scanning environment for persistent objects...
-                    </div>
+                    <h4 style="margin-top: 0; margin-bottom: 10px;">Entities</h4>
+                    <div id="objects-list" style="font-size: 0.85rem; color: #888;">Scanning...</div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <button onclick="sendCmd('focus on')" style="background: rgba(255, 255, 255, 0.05); color: #fff; border: 1px solid var(--border);">FOCUS ON</button>
+                    <button onclick="sendCmd('focus off')" style="background: rgba(255, 255, 255, 0.05); color: #fff; border: 1px solid var(--border);">FOCUS OFF</button>
                 </div>
             </div>
         </div>
@@ -349,28 +277,24 @@ def index():
             const terminal = document.getElementById('terminal');
 
             socket.on('stats_update', function(data) {
-                document.getElementById('cpu-val').innerText = data.cpu + '%';
                 document.getElementById('fps-val').innerText = data.fps;
+                document.getElementById('cpu-val').innerText = data.cpu + '%';
                 
                 document.getElementById('identity').innerText = data.identity || (data.human_present ? "UNIDENTIFIED" : "IDLE");
-                document.getElementById('identity').style.color = data.human_present ? "#00f2ff" : "#555";
+                document.getElementById('focus-st').innerText = data.focus_mode ? "ACTIVE" : "OFF";
+                document.getElementById('focus-st').style.color = data.focus_mode ? "#ff3366" : "#666";
                 
-                const focusSt = document.getElementById('focus-st');
-                focusSt.innerText = data.focus_mode ? "SHIELD ACTIVE" : "DISABLED";
-                focusSt.className = "stat-value " + (data.focus_mode ? "focus" : "");
-                
-                document.getElementById('objects').innerText = data.objects.length;
-                document.getElementById('objects-detail').innerText = data.objects.length ? "Detecting: " + data.objects.join(", ") : "No significant entities found.";
+                if(data.objects && data.objects.length) {
+                    document.getElementById('objects-list').innerText = data.objects.join(", ");
+                } else {
+                    document.getElementById('objects-list').innerText = "None detected";
+                }
             });
 
             socket.on('new_log', function(entry) {
                 const div = document.createElement('div');
                 div.className = 'log-entry';
-                div.innerHTML = `
-                    <span class="log-time">[${entry.time}]</span>
-                    <span class="log-type-${entry.type}">${entry.type.toUpperCase()}:</span>
-                    <span class="log-msg">${entry.msg}</span>
-                `;
+                div.innerHTML = `<span class="log-time">[${entry.time}]</span><span class="log-type-${entry.type}">${entry.type.toUpperCase()}:</span> <span>${entry.msg}</span>`;
                 terminal.appendChild(div);
                 terminal.scrollTop = terminal.scrollHeight;
             });
@@ -404,10 +328,8 @@ def video_feed():
 def api_command():
     cmd = request.json.get('command')
     if cmd and scene_state_ref:
-        # We can't directly process here, so we push to event bus via a global handler setup in main.py
-        # For now, we'll use a queue or shared flag
         scene_state_ref.pending_commands.put(cmd)
-        add_log(f"Received command: {cmd}", "info")
+        add_log(f"WEB_CMD: {cmd}", "info")
         return jsonify({"status": "queued"})
     return jsonify({"status": "error"})
 
@@ -416,28 +338,22 @@ def start_server():
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.ERROR)
     
-    # Run a background thread to broadcast stats via SocketIO
     def stats_broadcaster():
         while True:
             if scene_state_ref:
                 from core import get_perf_monitor
                 perf = get_perf_monitor()
                 stats = perf.get_stats()
-                
-                data = {
+                socketio.emit('stats_update', {
                     'human_present': scene_state_ref.human['present'],
                     'identity': scene_state_ref.human['identity'],
                     'focus_mode': scene_state_ref.focus_mode,
                     'objects': list(scene_state_ref.objects.keys()),
                     'cpu': stats['cpu'],
-                    'fps': stats['fps'],
-                    'memory': stats['memory']
-                }
-                socketio.emit('stats_update', data)
-            time.sleep(0.5) # Update stats twice a second (low overhead)
+                    'fps': stats['fps']
+                })
+            time.sleep(0.5)
             
     threading.Thread(target=stats_broadcaster, daemon=True).start()
-    
-    print(">> SYSTEM: Neural Dashboard live at http://localhost:5000")
     socketio.run(app, host="0.0.0.0", port=5000, debug=False, use_reloader=False, allow_unsafe_werkzeug=True)
 

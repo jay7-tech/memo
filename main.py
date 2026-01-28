@@ -545,6 +545,7 @@ class MEMOApp:
             # Update dashboard (throttled)
             if self.dashboard and self.frame_count % 5 == 0:
                 try:
+                    # Resize to optimized preview size for dashboard
                     preview = cv2.resize(frame, (480, 270))
                     self.dashboard.update_frame(preview)
                 except:
