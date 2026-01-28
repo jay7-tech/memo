@@ -67,8 +67,14 @@ class ObjectDetector:
         Note:
             For Raspberry Pi 4B, use 'yolov8n.pt' or TFLite version.
         """
+        import torch
+        # Check for GPU
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        print(f"[INFO] ObjectDetector initialized on {self.device}")
+
         # Load lightweight YOLO model
         self.model = YOLO(model_name)
+        self.model.to(self.device)
     
     def detect(self, frame):
         """
@@ -98,11 +104,13 @@ class ObjectDetector:
             ...                   (int(x+w), int(y+h)), (0,255,0), 2)
         
         Note:
-            - Cell phone detection uses higher confidence threshold (0.75)
+            - Cell phone detection uses higher confidence threshold (0.60)
               to avoid false positives with computer mouse.
             - General objects use 0.5 confidence threshold.
         """
-        results = self.model(frame, verbose=False)
+        # Run inference with stream=True for efficiency if needed, mostly explicit device
+        # Using imgsz=480 for speedup (default 640 is slower on CPU)
+        results = self.model(frame, verbose=False, device=self.device, imgsz=480)
         detections = []
         
         for result in results:
@@ -121,7 +129,7 @@ class ObjectDetector:
                 # Since we want to detect cell phone distraction, 
                 # we must be VERY sure.
                 if label == 'cell phone':
-                    min_conf = 0.75 # Very strict
+                    min_conf = 0.60 # Was 0.75 - Lowered to improve recall
                 elif label == 'mouse':
                     # User said mouse is detected as phone.
                     # If YOLO says "mouse", let it pass as mouse.

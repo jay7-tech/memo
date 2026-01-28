@@ -43,7 +43,7 @@ class FaceRecognizer:
     
     def __init__(
         self,
-        threshold: float = 0.6,
+        threshold: float = 0.75, # Strict threshold
         users_file: str = "face_users.json",
         embeddings_dir: str = "face_embeddings"
     ):
@@ -308,9 +308,11 @@ class FaceRecognizer:
         
         # Return match if above threshold
         if best_similarity >= self.threshold:
+            print(f"[FaceRec] Match: {best_match} ({best_similarity:.2f})")
             return best_match
-        
-        return None
+        else:
+            if best_match:
+                print(f"[FaceRec] Unknown (Best: {best_match} @ {best_similarity:.2f})")
     
     def list_users(self) -> List[str]:
         """Get list of registered users."""

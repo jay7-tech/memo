@@ -268,9 +268,9 @@ class PerceptionPipeline:
                 self._init_face_rec()
                 if self._face_rec and result['pose']:
                     identity = self._recognize_face(frame, result['pose'])
-                    if identity:
-                        self._last_identity = identity
-                        result['identity'] = identity
+                    # Update identity (even if None, to clear stale ID)
+                    self._last_identity = identity
+                    result['identity'] = identity
         
         return result
     

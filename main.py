@@ -92,6 +92,7 @@ class MEMOApp:
         # Stats
         self.frame_count = 0
         self.last_tts_time = 0
+        self.verbose_logging = False  # Default to quiet mode for easier typing
         
         print(f"[MEMO] Initialized | Pi Mode: {self.perf_monitor.is_raspberry_pi}")
     
@@ -229,9 +230,8 @@ class MEMOApp:
         # Update state
         self.scene_state.update(detections, pose_data, timestamp, w, h)
         
-        # Update identity if recognized
-        if identity:
-            self.scene_state.human['identity'] = identity
+        # Update identity (sync with perception)
+        self.scene_state.human['identity'] = identity
         
         # Check rules
         events = self.rules_engine.check_rules(self.scene_state, timestamp)
@@ -240,7 +240,10 @@ class MEMOApp:
                 text_to_say = event_text.replace("TTS:", "").strip()
                 speak(text_to_say)
                 self.last_tts_time = time.time()
-            print(f"[EVENT] {event_text}")
+            
+            # Only print events if verbose logging is enabled
+            if self.verbose_logging:
+                print(f"[EVENT] {event_text}")
     
     def _handle_triggers(self, clean_frame):
         """Handle special triggers like selfie and registration."""
@@ -326,9 +329,10 @@ class MEMOApp:
         """Handle console input in background thread."""
         print("\n=== MEMO Commands ===")
         print("  focus on/off  - Toggle distraction detection")
-        print("  register <name> - Register your face")
+        print("  register <name> - Register your face (or type 'r')")
         print("  where is <obj> - Find object location")
         print("  voice on/off  - Toggle voice input")
+        print("  logs on/off   - Toggle event logging")
         print("  quit          - Exit")
         print("=====================\n")
         
@@ -353,6 +357,31 @@ class MEMOApp:
                     self.voice_input.set_active(False)
                     print(">> SYSTEM: Voice input DISABLED")
                     speak_now("Voice input stopped.")
+                
+                elif cmd_lower == 'logs on':
+                    self.verbose_logging = True
+                    print(">> SYSTEM: Verbose logging ENABLED")
+                    
+                elif cmd_lower == 'logs off':
+                    self.verbose_logging = False
+                    print(">> SYSTEM: Verbose logging DISABLED")
+                    
+                elif cmd_lower == 'r' or cmd_lower == 'register':
+                    # Interactive registration helper
+                    self.verbose_logging = False # Ensure silence
+                    print("\n>> INTERACTIVE REGISTRATION")
+                    print(">> Please type the name to register:")
+                    try:
+                        name = input(">> Name: ").strip()
+                        if name:
+                            self.event_bus.publish(Event(
+                                EventType.SYSTEM_ALERT,
+                                {'action': 'register_face', 'name': name}
+                            ))
+                            print(f">> SYSTEM: Triggering registration for '{name}'...")
+                            print(">> Look at the camera!")
+                    except:
+                        pass
                 
                 else:
                     # Process as command

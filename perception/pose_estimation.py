@@ -4,7 +4,12 @@ import numpy as np
 
 class PoseEstimator:
     def __init__(self, model_name='yolov8n-pose.pt'):
+        import torch
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        print(f"[INFO] PoseEstimator initialized on {self.device}")
+        
         self.model = YOLO(model_name)
+        self.model.to(self.device)
         
         # COCO Keypoint Index Mapping to nice names (consistent with Logic I wrote)
         self.keypoint_names = {
@@ -37,7 +42,7 @@ class PoseEstimator:
         }
         or None if no person/pose detected.
         """
-        results = self.model(frame, verbose=False)
+        results = self.model(frame, verbose=False, device=self.device, imgsz=480)
         
         # We only care about the *primary* person (highest confidence or first)
         # YOLO pose results structure:
@@ -77,7 +82,7 @@ class PoseEstimator:
         valid_points = 0
         for idx, (x, y) in enumerate(kpts):
             # YOLO returns 0,0 for missing points sometimes, or check conf
-            if confs is not None and confs[idx] < 0.5:
+            if confs is not None and confs[idx] < 0.3: # Was 0.5 - Lowered for stability
                 continue
             if x == 0 and y == 0:
                 continue
