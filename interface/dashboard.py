@@ -25,7 +25,7 @@ def generate():
         with lock:
             if output_frame is None:
                 # wait a bit
-                time.sleep(0.1)
+                time.sleep(0.01) # Reduced from 0.1
                 continue
             
             # Encode
@@ -36,7 +36,7 @@ def generate():
         # Yield the output frame in the byte format
         yield(b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + 
               bytearray(encodedImage) + b'\r\n')
-        time.sleep(0.1) # low FPS stream (10fps max)
+        # time.sleep(0.1) # Removed artificial delay for max FPS
 
 @app.route("/")
 def index():
