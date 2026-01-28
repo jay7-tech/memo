@@ -1,18 +1,32 @@
-from flask import Flask, render_template_string, Response, jsonify
+from flask import Flask, render_template_string, Response, jsonify, request
+from flask_socketio import SocketIO, emit
 import cv2
 import threading
 import time
+import os
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'memo_secret'
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # Shared state
 output_frame = None
 lock = threading.Lock()
 scene_state_ref = None
+logs_queue = []
 
 def set_scene_state(state):
     global scene_state_ref
     scene_state_ref = state
+
+def add_log(message, type="info"):
+    global logs_queue
+    timestamp = time.strftime("%H:%M:%S")
+    log_entry = {"time": timestamp, "msg": message, "type": type}
+    logs_queue.append(log_entry)
+    if len(logs_queue) > 50:
+        logs_queue.pop(0)
+    socketio.emit('new_log', log_entry)
 
 def update_frame(frame):
     global output_frame
@@ -24,130 +38,360 @@ def generate():
     while True:
         with lock:
             if output_frame is None:
-                # wait a bit
-                time.sleep(0.01) # Reduced from 0.1
+                time.sleep(0.01)
                 continue
             
-            # Encode
-            (flag, encodedImage) = cv2.imencode(".jpg", output_frame)
+            # Use lower quality for higher FPS over network
+            # Encode with 70% quality to reduce bandwidth
+            (flag, encodedImage) = cv2.imencode(".jpg", output_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
             if not flag:
                 continue
         
-        # Yield the output frame in the byte format
         yield(b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + 
               bytearray(encodedImage) + b'\r\n')
-        time.sleep(0.005) # Ultra low latency
-
-    print("[Dashboard] Stream generator started (Low Latency)")
+        time.sleep(0.005)
 
 @app.route("/")
 def index():
     return render_template_string("""
+    <!DOCTYPE html>
     <html>
     <head>
-        <title>MEMO Intelligence Dashboard</title>
+        <title>MEMO Neural Interface</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+        <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=JetBrains+Mono&display=swap" rel="stylesheet">
         <style>
-            body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #eee; text-align: center; margin: 0; padding: 20px; }
-            h1 { color: #00ffcc; text-transform: uppercase; letter-spacing: 4px; font-weight: 300; margin-bottom: 30px; }
-            .container { display: flex; flex-wrap: wrap; justify-content: center; gap: 30px; }
-            .video-box { 
-                border: 1px solid #333; 
-                box-shadow: 0 0 30px rgba(0, 255, 204, 0.1); 
-                border-radius: 8px;
+            :root {
+                --bg: #050608;
+                --card-bg: rgba(16, 18, 23, 0.8);
+                --accent: #00f2ff;
+                --accent-glow: rgba(0, 242, 255, 0.4);
+                --text: #e0e6ed;
+                --danger: #ff3366;
+                --border: rgba(255, 255, 255, 0.08);
+            }
+
+            body { 
+                font-family: 'Outfit', sans-serif; 
+                background: var(--bg); 
+                background-image: 
+                    radial-gradient(circle at 20% 20%, rgba(0, 242, 255, 0.05) 0%, transparent 40%),
+                    radial-gradient(circle at 80% 80%, rgba(255, 51, 102, 0.05) 0%, transparent 40%);
+                color: var(--text); 
+                margin: 0; 
+                padding: 0;
+                overflow-x: hidden;
+                min-height: 100vh;
+            }
+
+            .header {
+                padding: 20px 40px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                border-bottom: 1px solid var(--border);
+                backdrop-filter: blur(10px);
+                position: sticky;
+                top: 0;
+                z-index: 100;
+            }
+
+            .logo {
+                font-size: 1.5rem;
+                font-weight: 600;
+                letter-spacing: 2px;
+                color: var(--accent);
+                display: flex;
+                align-items: center;
+                gap: 15px;
+            }
+
+            .logo-dot {
+                width: 12px;
+                height: 12px;
+                background: var(--accent);
+                border-radius: 50%;
+                box-shadow: 0 0 15px var(--accent);
+                animation: pulse 2s infinite;
+            }
+
+            @keyframes pulse {
+                0% { opacity: 1; transform: scale(1); }
+                50% { opacity: 0.5; transform: scale(1.2); }
+                100% { opacity: 1; transform: scale(1); }
+            }
+
+            .main-grid {
+                display: grid;
+                grid-template-columns: 1fr 380px;
+                gap: 25px;
+                padding: 25px;
+                max-width: 1600px;
+                margin: 0 auto;
+            }
+
+            @media (max-width: 1100px) {
+                .main-grid { grid-template-columns: 1fr; }
+            }
+
+            .glass-card {
+                background: var(--card-bg);
+                backdrop-filter: blur(12px);
+                border: 1px solid var(--border);
+                border-radius: 16px;
+                padding: 20px;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+            }
+
+            .video-container {
+                position: relative;
+                border-radius: 12px;
                 overflow: hidden;
-                width: 640px;
-                max-width: 100%;
+                border: 1px solid var(--border);
+                background: #000;
+                aspect-ratio: 16/9;
             }
-            img { width: 100%; display: block; }
-            .stats { 
-                background: #111; 
-                padding: 30px; 
-                border-radius: 12px; 
-                text-align: left; 
-                min-width: 300px;
-                border: 1px solid #222;
+
+            .video-container img {
+                width: 100%;
+                height: 100%;
+                object-fit: contain;
             }
-            h2 { border-bottom: 2px solid #333; padding-bottom: 10px; margin-top: 0; color: #aaa; font-size: 1.2em; }
-            .stat-item { margin: 15px 0; font-size: 1.1em; display: flex; justify-content: space-between; }
-            .label { color: #666; }
-            .value { color: #fff; font-weight: bold; font-family: 'Courier New', monospace; }
-            .controls { margin-top: 30px; text-align: center; }
-            button { 
-                background: linear-gradient(135deg, #111, #222); 
-                color: #00ffcc; 
-                border: 1px solid #444; 
-                padding: 12px 24px; 
-                cursor: pointer; 
-                border-radius: 4px;
-                font-size: 1em;
-                transition: all 0.3s ease;
+
+            .hud-overlay {
+                position: absolute;
+                top: 0; left: 0; width: 100%; height: 100%;
+                pointer-events: none;
+                border: 1px solid rgba(0, 242, 255, 0.1);
+                box-sizing: border-box;
             }
-            button:hover { 
-                background: #00ffcc; 
+
+            .scanline {
+                width: 100%;
+                height: 2px;
+                background: rgba(0, 242, 255, 0.1);
+                position: absolute;
+                top: -2px;
+                animation: scan 4s linear infinite;
+            }
+
+            @keyframes scan {
+                0% { top: 0%; }
+                100% { top: 100%; }
+            }
+
+            .side-panel {
+                display: flex;
+                flex-direction: column;
+                gap: 20px;
+            }
+
+            .stat-group {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .stat-row {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 12px;
+                background: rgba(255,255,255,0.03);
+                border-radius: 8px;
+            }
+
+            .stat-label { color: #888; font-size: 0.9rem; }
+            .stat-value { font-weight: 500; font-family: 'JetBrains Mono', monospace; }
+            .stat-value.active { color: var(--accent); }
+            .stat-value.focus { color: var(--danger); text-shadow: 0 0 10px var(--danger); }
+
+            .terminal {
+                background: #000;
+                border: 1px solid rgba(0,242,255,0.2);
+                border-radius: 8px;
+                height: 300px;
+                overflow-y: auto;
+                padding: 15px;
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 0.85rem;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .log-entry { display: flex; gap: 10px; }
+            .log-time { color: #555; }
+            .log-type-ai { color: #a855f7; }
+            .log-type-info { color: #22c55e; }
+            .log-type-alert { color: var(--danger); }
+
+            .input-box {
+                margin-top: 15px;
+                display: flex;
+                gap: 10px;
+            }
+
+            input {
+                flex: 1;
+                background: rgba(255,255,255,0.05);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 12px;
+                color: #fff;
+                font-family: inherit;
+                outline: none;
+                transition: border-color 0.3s;
+            }
+
+            input:focus { border-color: var(--accent); }
+
+            button {
+                background: var(--accent);
                 color: #000;
-                box-shadow: 0 0 15px rgba(0,255,204,0.5);
+                border: none;
+                border-radius: 8px;
+                padding: 10px 20px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: transform 0.2s, box-shadow 0.2s;
             }
-            
-            #status-dot {
-                display: inline-block; width: 10px; height: 10px; background: #333; border-radius: 50%; margin-right: 8px;
+
+            button:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 15px var(--accent-glow);
             }
-            .active { background: #0f0 !important; box-shadow: 0 0 8px #0f0; }
+
+            .pill {
+                padding: 4px 10px;
+                border-radius: 20px;
+                font-size: 0.8rem;
+                background: rgba(0, 242, 255, 0.1);
+                color: var(--accent);
+                border: 1px solid var(--accent-glow);
+            }
         </style>
-        <script>
-            function fetchStats() {
-                fetch('/api/stats')
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('human-present').innerText = data.human_present ? "DETECTED" : "ABSENT";
-                    document.getElementById('human-dot').className = data.human_present ? "active" : "";
-                    
-                    document.getElementById('identity').innerText = data.identity || "Unknown";
-                    
-                    document.getElementById('focus-mode').innerText = data.focus_mode ? "ACTIVE" : "INACTIVE";
-                    document.getElementById('focus-mode').style.color = data.focus_mode ? "#ff3366" : "#666";
-                    
-                    // Format objects
-                    let objs = data.objects;
-                    if(objs.length === 0) objs = ["None"];
-                    document.getElementById('objects').innerText = objs.join(", ");
-                });
-            }
-            setInterval(fetchStats, 1000);
-            
-            function toggleFocus() { fetch('/api/toggle/focus'); }
-        </script>
     </head>
     <body>
-        <h1>MEMO Interface</h1>
-        <div class="container">
-            <div class="video-box">
-                <img src="/video_feed">
+        <div class="header">
+            <div class="logo">
+                <div class="logo-dot"></div>
+                MEMO <span style="font-weight: 300; opacity: 0.6;">NEURAL HUD</span>
             </div>
-            <div class="stats">
-                <h2>Intelligence Data</h2>
-                <div class="stat-item">
-                    <span class="label">Presence:</span> 
-                    <span><span id="human-dot" id="status-dot"></span><span class="value" id="human-present">...</span></span>
-                </div>
-                <div class="stat-item"><span class="label">Identity:</span> <span class="value" id="identity">...</span></div>
-                <div class="stat-item"><span class="label">Focus System:</span> <span class="value" id="focus-mode">...</span></div>
-                <div class="stat-item" style="flex-direction: column; align-items: flex-start;">
-                    <span class="label" style="margin-bottom: 5px;">Visual Memory:</span> 
-                    <span class="value" id="objects" style="font-size: 0.9em; color: #888;">...</span>
-                </div>
+            <div id="system-stats" style="display: flex; gap: 20px; font-size: 0.9rem; color: #666;">
+                <span>CPU: <span class="stat-value" id="cpu-val">0%</span></span>
+                <span>FPS: <span class="stat-value" id="fps-val">0.0</span></span>
+            </div>
+        </div>
 
-                <h2 style="margin-top: 30px;">Event Logs</h2>
-                <div id="logs" style="background: #000; height: 150px; overflow-y: scroll; font-family: monospace; font-size: 0.8em; padding: 10px; border: 1px solid #333; color: #0f0; text-align: left;">
-                    Initializing system logs...
+        <div class="main-grid">
+            <div class="side-panel">
+                <div class="video-container">
+                    <img src="/video_feed">
+                    <div class="hud-overlay">
+                        <div class="scanline"></div>
+                    </div>
                 </div>
                 
-                <div class="controls">
-                     <button onclick="toggleFocus()">TOGGLE FOCUS SHIELD</button>
-                     <p style="margin-top: 15px; font-size: 0.8em; color: #444;">DASHBOARD V1.1 (Low Latency)</p>
+                <div class="glass-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="margin: 0; font-weight: 600;">System Console</h3>
+                        <span class="pill">REAL-TIME</span>
+                    </div>
+                    <div class="terminal" id="terminal">
+                        <div class="log-entry">
+                            <span class="log-time">[System]</span>
+                            <span class="log-msg">Neural interface synchronized. Waiting for telemetry...</span>
+                        </div>
+                    </div>
+                    <form class="input-box" id="cmd-form">
+                        <input type="text" id="cmd-input" placeholder="Enter command (e.g. 'focus on', 'where is bottle')..." autocomplete="off">
+                        <button type="submit">SEND</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="side-panel">
+                <div class="glass-card">
+                    <h3 style="margin-top: 0; margin-bottom: 20px; font-weight: 600;">Neural Telemetry</h3>
+                    <div class="stat-group">
+                        <div class="stat-row">
+                            <span class="stat-label">System State</span>
+                            <span class="stat-value active" id="identity">WAITING...</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Focus Shield</span>
+                            <span class="stat-value" id="focus-st">DISABLED</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Entities Observed</span>
+                            <span class="stat-value" id="objects">None</span>
+                        </div>
+                    </div>
+                    <div style="margin-top: 25px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <button onclick="sendCmd('focus on')" style="background: rgba(255, 51, 102, 0.1); color: #ff3366; border: 1px solid rgba(255, 51, 102, 0.2);">FOCUS ON</button>
+                        <button onclick="sendCmd('focus off')" style="background: rgba(255, 255, 255, 0.05); color: #fff; border: 1px solid var(--border);">FOCUS OFF</button>
+                    </div>
+                </div>
+
+                <div class="glass-card">
+                    <h3 style="margin-top: 0; margin-bottom: 15px; font-weight: 600;">Memory Bank</h3>
+                    <div style="font-size: 0.9rem; color: #888; line-height: 1.6;" id="objects-detail">
+                        Scanning environment for persistent objects...
+                    </div>
                 </div>
             </div>
         </div>
+
+        <script>
+            const socket = io();
+            const terminal = document.getElementById('terminal');
+
+            socket.on('stats_update', function(data) {
+                document.getElementById('cpu-val').innerText = data.cpu + '%';
+                document.getElementById('fps-val').innerText = data.fps;
+                
+                document.getElementById('identity').innerText = data.identity || (data.human_present ? "UNIDENTIFIED" : "IDLE");
+                document.getElementById('identity').style.color = data.human_present ? "#00f2ff" : "#555";
+                
+                const focusSt = document.getElementById('focus-st');
+                focusSt.innerText = data.focus_mode ? "SHIELD ACTIVE" : "DISABLED";
+                focusSt.className = "stat-value " + (data.focus_mode ? "focus" : "");
+                
+                document.getElementById('objects').innerText = data.objects.length;
+                document.getElementById('objects-detail').innerText = data.objects.length ? "Detecting: " + data.objects.join(", ") : "No significant entities found.";
+            });
+
+            socket.on('new_log', function(entry) {
+                const div = document.createElement('div');
+                div.className = 'log-entry';
+                div.innerHTML = `
+                    <span class="log-time">[${entry.time}]</span>
+                    <span class="log-type-${entry.type}">${entry.type.toUpperCase()}:</span>
+                    <span class="log-msg">${entry.msg}</span>
+                `;
+                terminal.appendChild(div);
+                terminal.scrollTop = terminal.scrollHeight;
+            });
+
+            function sendCmd(text) {
+                fetch('/api/command', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({command: text})
+                });
+            }
+
+            document.getElementById('cmd-form').onsubmit = function(e) {
+                e.preventDefault();
+                const input = document.getElementById('cmd-input');
+                if(input.value) {
+                    sendCmd(input.value);
+                    input.value = '';
+                }
+            };
+        </script>
     </body>
     </html>
     """)
@@ -156,34 +400,44 @@ def index():
 def video_feed():
     return Response(generate(), mimetype = "multipart/x-mixed-replace; boundary=frame")
 
-@app.route("/api/stats")
-def api_stats():
-    if scene_state_ref:
-        # Extract serializable data
-        # We need to map keys carefully
-        data = {
-            'human_present': scene_state_ref.human['present'],
-            'identity': scene_state_ref.human['identity'],
-            'focus_mode': scene_state_ref.focus_mode,
-            'objects': list(scene_state_ref.objects.keys())
-        }
-        return jsonify(data)
-    return jsonify({})
-
-@app.route("/api/toggle/focus")
-def toggle_focus():
-    if scene_state_ref:
-        scene_state_ref.focus_mode = not scene_state_ref.focus_mode
-        return jsonify({"status": "success", "new_state": scene_state_ref.focus_mode})
+@app.route("/api/command", methods=['POST'])
+def api_command():
+    cmd = request.json.get('command')
+    if cmd and scene_state_ref:
+        # We can't directly process here, so we push to event bus via a global handler setup in main.py
+        # For now, we'll use a queue or shared flag
+        scene_state_ref.pending_commands.put(cmd)
+        add_log(f"Received command: {cmd}", "info")
+        return jsonify({"status": "queued"})
     return jsonify({"status": "error"})
 
 def start_server():
-    # Run slightly quiet
     import logging
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.ERROR)
-    print(">> SYSTEM: Dashboard running at http://localhost:5000")
-    try:
-        app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)
-    except Exception as e:
-        print(f"Dashboard Error: {e}")
+    
+    # Run a background thread to broadcast stats via SocketIO
+    def stats_broadcaster():
+        while True:
+            if scene_state_ref:
+                from core import get_perf_monitor
+                perf = get_perf_monitor()
+                stats = perf.get_stats()
+                
+                data = {
+                    'human_present': scene_state_ref.human['present'],
+                    'identity': scene_state_ref.human['identity'],
+                    'focus_mode': scene_state_ref.focus_mode,
+                    'objects': list(scene_state_ref.objects.keys()),
+                    'cpu': stats['cpu'],
+                    'fps': stats['fps'],
+                    'memory': stats['memory']
+                }
+                socketio.emit('stats_update', data)
+            time.sleep(0.5) # Update stats twice a second (low overhead)
+            
+    threading.Thread(target=stats_broadcaster, daemon=True).start()
+    
+    print(">> SYSTEM: Neural Dashboard live at http://localhost:5000")
+    socketio.run(app, host="0.0.0.0", port=5000, debug=False, use_reloader=False, allow_unsafe_werkzeug=True)
+

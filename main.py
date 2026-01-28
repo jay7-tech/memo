@@ -106,15 +106,6 @@ class MEMOApp:
         elif "--show" in sys.argv:
             self.show_display = True
             
-        # Display settings
-        self.show_display = not self.perf_monitor.is_raspberry_pi
-        
-        # Check command line for headless override
-        if "--headless" in sys.argv:
-            self.show_display = False
-        elif "--show" in sys.argv:
-            self.show_display = True
-            
         print(f"[MEMO] Initialized | Pi Mode: {self.perf_monitor.is_raspberry_pi} | Display: {self.show_display}")
         
         if not self.show_display:
@@ -184,6 +175,10 @@ class MEMOApp:
         if self.scene_state.focus_mode:
             obj = event.data.get('object', 'distraction')
             if time.time() - self.last_tts_time > 5.0:
+                # Log to dashboard
+                from interface.dashboard import add_log
+                add_log(f"DISTRACTION ALERT: {obj}", "alert")
+                
                 # Use AI for witty distraction alert
                 if 'phone' in obj.lower():
                     speak(self.personality.phone_alert())
@@ -255,6 +250,11 @@ class MEMOApp:
         # Update state
         self.scene_state.update(detections, pose_data, timestamp, w, h)
         
+        # Check for new presence/absence for logging
+        if identity and identity != self.scene_state.human.get('identity'):
+             from interface.dashboard import add_log
+             add_log(f"Identity confirmed: {identity}", "info")
+             
         # Update identity (sync with perception)
         self.scene_state.human['identity'] = identity
         
@@ -265,10 +265,30 @@ class MEMOApp:
                 text_to_say = event_text.replace("TTS:", "").strip()
                 speak(text_to_say)
                 self.last_tts_time = time.time()
+                # Log to dashboard
+                from interface.dashboard import add_log
+                add_log(f"Spoke: {text_to_say}", "ai")
             
             # Only print events if verbose logging is enabled
             if self.verbose_logging:
                 print(f"[EVENT] {event_text}")
+                
+        # Check for dashboard commands
+        self._check_dashboard_commands()
+
+    def _check_dashboard_commands(self):
+        """Process commands sent from the web dashboard."""
+        while not self.scene_state.pending_commands.empty():
+            try:
+                cmd = self.scene_state.pending_commands.get_nowait()
+                print(f">> DASHBOARD CMD: {cmd}")
+                self.event_bus.publish(Event(
+                    EventType.VOICE_COMMAND,
+                    {'text': cmd}
+                ))
+            except:
+                break
+
     
     def _handle_triggers(self, clean_frame):
         """Handle special triggers like selfie and registration."""
@@ -350,7 +370,7 @@ class MEMOApp:
         
         return frame
     
-    def _input_loop(self):
+    def _terminal_input_loop(self):
         """Handle console input in background thread."""
         print("\n=== MEMO Commands ===")
         print("  focus on/off  - Toggle distraction detection")
@@ -481,9 +501,9 @@ class MEMOApp:
         # Initialize dashboard
         self._init_dashboard()
         
-        # Start input thread
-        input_thread = threading.Thread(target=self._input_loop, daemon=True)
-        input_thread.start()
+        # Start input thread (if not already started in headless mode)
+        if self.show_display:
+            threading.Thread(target=self._terminal_input_loop, daemon=True).start()
         
         print("\n[MEMO] System ready!")
         print(f"[MEMO] Dashboard: http://localhost:5000")

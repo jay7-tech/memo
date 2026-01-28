@@ -84,6 +84,10 @@ class SceneState:
         
         self.selfie_trigger = False # Flag for snapshot
         
+        # Dashboard communication
+        import queue
+        self.pending_commands = queue.Queue()
+        
         self.width = 640 
         
         self.load_memory()
