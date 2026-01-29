@@ -122,10 +122,14 @@ def setup():
     print("\n====================================")
     print("           REPAIR COMPLETE          ")
     print("====================================")
-    print("Recommended Next Steps:")
-    print("1. Reboot your Pi: sudo reboot")
-    print("2. Make sure Ollama is running: ollama serve")
-    print("3. Run MEMO: python main.py")
+    print("\n[5/5] Setup Complete!")
+    print("\nIMPORTANT: Please run these commands if you still have issues:")
+    print("  1. Test Audio:  paplay /usr/sounds/alsa/Front_Center.wav")
+    print("  2. Test AI:     ollama run phi:latest 'hello'")
+    
+    print("\nTo start MEMO:")
+    print(f"  {sys.executable} main.py")
+    print("Make sure Ollama is running: ollama serve")
 
 if __name__ == "__main__":
     setup()
