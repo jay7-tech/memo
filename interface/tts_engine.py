@@ -229,6 +229,18 @@ speech.Speak text
             # Construct command: echo "text" | piper ... | aplay
             # Clean text for shell
             safe_text = text.replace('"', '\\"')
+            
+            # Determine audio player: try 'paplay' (PulseAudio) first, then 'aplay' (ALSA)
+            # PulseAudio is better for desktop environments; ALSA for headless.
+            player = "aplay -r 22050 -f S16_LE -t raw -"
+            
+            # Simple check if pulseaudio is running (optional, or just try-catch)
+            # For now, we'll stick to aplay but suppress stderr to avoid log spam if it works but complains.
+            # If the user has PulseAudio, 'aplay' usually routes through a plugin anyway.
+            
+            # cmd = f'echo "{safe_text}" | {piper_bin} --model {model_path} --output_raw | apLay -r 22050 -f S16_LE -t raw -' 
+            # We will try to rely on system configuration for aplay.
+            
             cmd = f'echo "{safe_text}" | {piper_bin} --model {model_path} --output_raw | aplay -r 22050 -f S16_LE -t raw -'
             
             subprocess.run(
