@@ -36,9 +36,9 @@ def setup():
         "liblapack-dev", 
         "libatlas-base-dev",
         "libportaudio2",
+        "portaudio19-dev",    # CRITICAL: Needed to compile PyAudio in venv
         "libasound-dev",
         "espeak",
-        "python3-pyaudio",
         # Image library dependencies for Pillow build
         "libjpeg-dev",
         "zlib1g-dev", 
@@ -58,13 +58,16 @@ def setup():
     # 2b. Install Pillow explicitly (Latest version often fixes build issues on new Python)
     print("Installing Pillow...")
     run_cmd(f"{sys.executable} -m pip install --upgrade Pillow")
+
+    # 2c. Install PyAudio explicitly (Needs portaudio19-dev from above)
+    print("Installing PyAudio (Voice Engine)...")
+    run_cmd(f"{sys.executable} -m pip install pyaudio")
     
-    # 2c. Install facenet-pytorch NO DEPS (to avoid Pillow version conflict)
-    # We manage dependencies manually to ensure compatibility
+    # 2d. Install facenet-pytorch NO DEPS (to avoid Pillow version conflict)
     print("Installing FaceNet & Utilities...")
     run_cmd(f"{sys.executable} -m pip install facenet-pytorch --no-deps")
     
-    # 2d. Install other libs
+    # 2e. Install other libs
     libs = [
         "ultralytics",
         "SpeechRecognition", 
