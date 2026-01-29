@@ -34,26 +34,40 @@ def setup():
     deps = [
         "libopenblas-dev",
         "liblapack-dev", 
-        "libatlas-base-dev",  # For numpy/torch optimization
-        "libportaudio2",      # For PyAudio (Microphone)
-        "libasound-dev",      # For Audio
-        "espeak",             # For fallback TTS
-        "python3-pyaudio"     # System package for PyAudio is often more reliable on Pi
+        "libatlas-base-dev",
+        "libportaudio2",
+        "libasound-dev",
+        "espeak",
+        "python3-pyaudio",
+        # Image library dependencies for Pillow build
+        "libjpeg-dev",
+        "zlib1g-dev", 
+        "libfreetype6-dev", 
+        "liblcms2-dev", 
+        "libopenjp2-7-dev", 
+        "libtiff-dev"
     ]
     run_cmd(f"sudo apt-get update && sudo apt-get install -y {' '.join(deps)}")
 
     # 2. Python Dependencies
     print("\n[2/5] Installing Python Libraries...")
     
-    # Install PyTorch (CPU version) - Critical for Face Recognition
-    # Using default pip install for aarch64 usually grabs the right wheel now
+    # 2a. Install PyTorch
     run_cmd(f"{sys.executable} -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu")
+
+    # 2b. Install Pillow explicitly (Latest version often fixes build issues on new Python)
+    print("Installing Pillow...")
+    run_cmd(f"{sys.executable} -m pip install --upgrade Pillow")
     
-    # Install other missing core libs
+    # 2c. Install facenet-pytorch NO DEPS (to avoid Pillow version conflict)
+    # We manage dependencies manually to ensure compatibility
+    print("Installing FaceNet & Utilities...")
+    run_cmd(f"{sys.executable} -m pip install facenet-pytorch --no-deps")
+    
+    # 2d. Install other libs
     libs = [
-        "facenet-pytorch",   # Face Rec
-        "ultralytics",       # YOLO/Pose
-        "SpeechRecognition", # Voice Input
+        "ultralytics",
+        "SpeechRecognition", 
         "requests",
         "flask",
         "flask-socketio",
