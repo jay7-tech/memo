@@ -372,12 +372,14 @@ def index():
                     </div>
                 </div>
 
+                <!-- Entity Detection Hidden
                 <div class="telemetry-card glass">
                     <h4>ENTITY DETECTION</h4>
                     <div id="objects-list" style="margin-top: 10px; min-height: 60px;">
                         <span style="color: var(--text-dim); font-size: 0.8rem;">No subjects in proximity.</span>
                     </div>
                 </div>
+                -->
 
                 <!-- Quick Action Shortcuts -->
                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
