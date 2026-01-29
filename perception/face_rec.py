@@ -312,12 +312,11 @@ class FaceRecognizer:
         
         # Return match if above threshold
         if best_similarity >= self.threshold:
-            # print(f"[FaceRec] Match: {best_match} ({best_similarity:.2f})")
+            print(f"[FaceRec] Match: {best_match} ({best_similarity:.2f})")
             return best_match
         else:
             if best_match:
-                pass
-                # print(f"[FaceRec] Unknown (Best: {best_match} @ {best_similarity:.2f})")
+                print(f"[FaceRec] Unknown (Best: {best_match} @ {best_similarity:.2f})")
     
     def list_users(self) -> List[str]:
         """Get list of registered users."""

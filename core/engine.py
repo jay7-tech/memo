@@ -228,7 +228,8 @@ class PerceptionPipeline:
         if self._face_rec is None:
             try:
                 from perception.face_rec import FaceRecognizer
-                self._face_rec = FaceRecognizer()
+                threshold = self.config.get('face_threshold', 0.6)
+                self._face_rec = FaceRecognizer(threshold=threshold)
                 print("[Perception] Face recognition initialized")
             except Exception as e:
                 print(f"[Perception] Face rec unavailable: {e}")
