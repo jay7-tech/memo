@@ -157,7 +157,7 @@ class AIPersonality:
         # Fallback: Try Ollama
         try:
             import requests
-            resp = requests.get(f"{self.ollama_url}/api/tags", timeout=2)
+            resp = requests.get(f"{self.ollama_url}/api/tags", timeout=5)
             if resp.status_code == 200:
                 # Check if our configured model exists, or pick one from the list
                 models = [m['name'] for m in resp.json().get('models', [])]
@@ -310,7 +310,7 @@ class AIPersonality:
                     "stop": ["User:", "System:", "\n\n"]  # STOP TOKENS CRITICAL FOR PHI
                 }
             }
-            response = requests.post(f"{self.ollama_url}/api/generate", json=payload, timeout=5)
+            response = requests.post(f"{self.ollama_url}/api/generate", json=payload, timeout=30)
 
             print(f"[AI] Ollama Status: {response.status_code}")
             if response.status_code == 200:
