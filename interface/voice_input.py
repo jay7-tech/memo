@@ -156,6 +156,13 @@ class VoiceListener:
                 continue
             
             try:
+                # OPTIMIZATION: Skip audio processing if TTS is speaking
+                from interface.tts_engine import get_tts_engine
+                tts = get_tts_engine()
+                if tts and tts.is_busy():
+                    time.sleep(0.1)
+                    continue
+                    
                 data = self.audio_stream.read(4096, exception_on_overflow=False)
                 
                 if self.vosk_recognizer.AcceptWaveform(data):

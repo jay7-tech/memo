@@ -88,15 +88,21 @@ class MEMOApp:
         self.voice_input = None
         
         # Dashboard
-        self.dashboard = None
+        self.dashboard = self.config.get('enable_dashboard', True)
+        self.dashboard_thread = None
         
-        # Register event handlers
+        # Register event handlers (CRITICAL: Required for commands to work!)
         self._setup_event_handlers()
+        
+        # Terminal Input Thread
+        self.terminal_thread = threading.Thread(target=self._terminal_input_loop, daemon=True)
+        self.terminal_thread.start()
         
         # Stats
         self.frame_count = 0
         self.last_tts_time = 0
-        self.verbose_logging = False  # Default to quiet mode for easier typing
+        self.verbose_logging = False
+        self.is_prompting = False # Flag to silence logs during user input
         
         # Display settings
         self.show_display = not self.perf_monitor.is_raspberry_pi
@@ -111,7 +117,6 @@ class MEMOApp:
         
         if not self.show_display:
             print("[System] Running in headless mode. Controlling via terminal and dashboard.")
-            threading.Thread(target=self._terminal_input_loop, daemon=True).start()
     
     def _load_config(self, config_path: str) -> Dict[str, Any]:
         """Load configuration from JSON file."""
@@ -137,9 +142,9 @@ class MEMOApp:
         print(f">> SYSTEM: Focus Mode {status.upper()}")
         # Use AI personality for varied response
         if enabled:
-            speak_now(self.personality.focus_on())
+            speak(self.personality.focus_on())
         else:
-            speak_now(self.personality.focus_off())
+            speak(self.personality.focus_off())
     
     def _on_system_alert(self, event: Event):
         """Handle system alerts."""
@@ -152,6 +157,13 @@ class MEMOApp:
             
         elif action == 'selfie':
             self.scene_state.selfie_trigger = True
+            
+        elif action == 'toggle_voice':
+            if self.voice_input:
+                new_state = not self.voice_input.is_listening_active
+                self.voice_input.set_active(new_state)
+                status = "ENABLED" if new_state else "DISABLED"
+                speak(f"Voice {status}")
     
     def _on_voice_command(self, event: Event):
         """Handle voice commands."""
@@ -257,6 +269,11 @@ class MEMOApp:
         # Update state
         self.scene_state.update(detections, pose_data, timestamp, w, h)
         
+        # Throttled object logging (Silenced during prompting)
+        visible_labels = [d['label'] for d in detections]
+        if not self.is_prompting and self.frame_count % 30 == 0 and visible_labels:
+            print(f"[Vision] Detecting: {visible_labels}")
+        
         # Check for new presence/absence for logging
         if identity and identity != self.scene_state.human.get('identity'):
              from interface.dashboard import add_log
@@ -297,10 +314,15 @@ class MEMOApp:
                 break
 
     
-    def _handle_triggers(self, clean_frame):
+    def _handle_triggers(self, frame):
         """Handle special triggers like selfie and registration."""
+        if frame is None:
+            return
+
         # Registration trigger
         if self.scene_state.register_trigger:
+            # Create a clean copy if needed
+            clean_frame = frame.copy()
             pose_data = self.perception._last_pose
             if pose_data and 'keypoints' in pose_data:
                 kp = pose_data['keypoints']
@@ -325,6 +347,7 @@ class MEMOApp:
         
         # Selfie trigger
         if self.scene_state.selfie_trigger:
+            clean_frame = frame.copy()
             timestamp_str = time.strftime("%Y%m%d-%H%M%S")
             filename = f"selfie_{timestamp_str}.jpg"
             cv2.imwrite(filename, clean_frame)
@@ -419,19 +442,23 @@ class MEMOApp:
                     print(">> SYSTEM: Verbose logging DISABLED")
                     
                 elif cmd_lower == 'r' or cmd_lower == 'register':
-                    # Interactive registration helper
-                    self.verbose_logging = False # Ensure silence
                     print("\n>> INTERACTIVE REGISTRATION")
-                    print(">> Please type the name to register:")
+                    # Prompt directly in the terminal thread
                     try:
-                        name = input(">> Name: ").strip()
+                        self.is_prompting = True
+                        name = input(">> Enter Name: ").strip()
+                        self.is_prompting = False
+                        
                         if name:
                             self.event_bus.publish(Event(
                                 EventType.SYSTEM_ALERT,
                                 {'action': 'register_face', 'name': name}
                             ))
                             print(f">> SYSTEM: Triggering registration for '{name}'...")
-                            print(">> Look at the camera!")
+                        else:
+                            print(">> Registration cancelled (no name).")
+                    except EOFError:
+                        break
                     except:
                         pass
                 
@@ -458,6 +485,25 @@ class MEMOApp:
             except Exception as e:
                 print(f"[Input] Error: {e}")
     
+    def _terminal_input_loop(self):
+        """Allow typing commands directly in the terminal."""
+        while self.running:
+            try:
+                self.is_prompting = True
+                text = input().strip()
+                self.is_prompting = False
+                
+                if text:
+                    print(f"[Terminal] Transmitting: '{text}'")
+                    self.event_bus.publish(Event(EventType.VOICE_COMMAND, {'text': text}))
+                    # Give a tiny window for the transmission log to be seen
+                    time.sleep(0.1)
+            except EOFError:
+                break
+            except Exception as e:
+                print(f"[Terminal] Input error: {e}")
+                time.sleep(1)
+
     def run(self, source=0, rotation=0):
         """
         Main application loop.
@@ -468,7 +514,7 @@ class MEMOApp:
         """
         # Initialize TTS
         init_tts()
-        speak_now(self.personality.startup_message())
+        speak(self.personality.startup_message())
         
         # Initialize camera
         try:
@@ -508,10 +554,9 @@ class MEMOApp:
         # Initialize dashboard
         self._init_dashboard()
         
-        # Start input thread (if not already started in headless mode)
-        if self.show_display:
-            threading.Thread(target=self._terminal_input_loop, daemon=True).start()
-        
+        if not self.running:
+            return
+
         print("\n[MEMO] System ready!")
         print(f"[MEMO] Dashboard: http://localhost:5000")
         print("[MEMO] Press 'q' in window or type 'quit' to exit\n")
@@ -533,20 +578,19 @@ class MEMOApp:
                 scale = 720 / h
                 frame = cv2.resize(frame, (int(w * scale), 720))
             
-            # Keep clean copy for selfie
-            clean_frame = frame.copy()
-            
             # Process frame
             perception_result = self._process_frame(frame)
             
             # Update state
             self._update_state(frame, perception_result)
             
-            # Handle triggers
-            self._handle_triggers(clean_frame)
+            # Handle triggers (Pass frame directly, it's still clean here)
+            self._handle_triggers(frame)
             
-            # Draw overlay
-            frame = self._draw_overlay(frame, perception_result)
+            # Draw overlay only if needed (for display or dashboard update)
+            should_draw = self.show_display or (self.dashboard and self.frame_count % 5 == 0)
+            if should_draw:
+                frame = self._draw_overlay(frame, perception_result)
             
             # Update dashboard (throttled)
             if self.dashboard and self.frame_count % 5 == 0:
@@ -573,16 +617,11 @@ class MEMOApp:
                     ))
                 elif key == ord('s'):
                     self.scene_state.selfie_trigger = True
-                    speak_now("Smile!")
                 elif key == ord('v') and self.voice_input:
                     new_state = not self.voice_input.is_listening_active
                     self.voice_input.set_active(new_state)
-                    if new_state:
-                        print(">> SYSTEM: Voice ENABLED")
-                        speak_now("Voice enabled.")
-                    else:
-                        print(">> SYSTEM: Voice DISABLED")
-                        speak_now("Voice disabled.")
+                    status = "ENABLED" if new_state else "DISABLED"
+                    speak(f"Voice {status}")
             else:
                 # Still check if we should quit via console or other events
                 # Just a tiny sleep to keep CPU sane
@@ -615,7 +654,12 @@ def main():
             pass
     
     app = MEMOApp()
-    app.run(source=source, rotation=rotation)
+    try:
+        app.run(source=source, rotation=rotation)
+    except KeyboardInterrupt:
+        pass  # Clean exit on Ctrl+C
+    except Exception as e:
+        print(f"\n[MEMO] Error: {e}")
 
 
 if __name__ == "__main__":

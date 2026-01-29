@@ -37,6 +37,9 @@ class TTSEngine:
         # Lock for thread safety
         self._lock = threading.Lock()
         
+        # Persistent engines
+        self._pyttsx3_engine = None
+        
         # Detect platform and backend
         self._backend = self._detect_backend()
         print(f"[TTS] ✓ Using {self._backend} engine")
@@ -44,20 +47,17 @@ class TTSEngine:
     def _detect_backend(self) -> str:
         """Detect the best TTS backend."""
         if sys.platform == 'win32':
-            return 'sapi'  # Windows SAPI is most reliable
-        
+            try:
+                import comtypes.client
+                return 'sapi_direct'
+            except ImportError:
+                return 'sapi'  # Fallback to VBS method
+                
         # Check for espeak on Linux/Pi
         try:
             result = subprocess.run(['espeak', '--version'], capture_output=True, timeout=2)
             if result.returncode == 0:
                 return 'espeak'
-        except:
-            pass
-        
-        # Try pyttsx3
-        try:
-            import pyttsx3
-            return 'pyttsx3'
         except:
             pass
         
@@ -71,6 +71,13 @@ class TTSEngine:
     
     def _worker(self):
         """Background worker that processes the speech queue."""
+        # Initialize COM for this thread
+        try:
+            import comtypes
+            comtypes.CoInitialize()
+        except:
+            pass
+            
         while self.running:
             try:
                 text = self.queue.get(timeout=0.5)
@@ -97,34 +104,42 @@ class TTSEngine:
                     self._speak_sapi(text)
                 elif self._backend == 'espeak':
                     self._speak_espeak(text)
-                elif self._backend == 'pyttsx3':
-                    self._speak_pyttsx3(text)
+                elif self._backend == 'sapi_direct':
+                    self._speak_sapi_direct(text)
                 else:
                     print(f"🔊 [MEMO]: {text}")
             finally:
                 self._speaking = False
     
     def _clean_text(self, text: str) -> str:
-        """Clean text for speech by removing hashtags and emojis."""
+        """Clean text for speech by removing hashtags and emojis for the engine."""
+        # Convert to string
+        text = str(text)
+
+        # Strip prefixes like "MEMO: " or "SYSTEM: "
         import re
-        # Remove emojis
-        text = text.encode('ascii', 'ignore').decode('ascii')
+        text = re.sub(r'^(MEMO|SYSTEM):\s*', '', text, flags=re.IGNORECASE)
         
-        # Remove hashtags (e.g. #vibes #cool)
-        text = re.sub(r'#\w+', '', text)
+        # Strip internal labels like "TTS:"
+        text = text.replace("TTS:", "").strip()
         
-        # Remove multiple spaces/newlines
-        text = re.sub(r'\s+', ' ', text).strip()
+        # Strip emojis for the voice engine
+        clean = re.sub(r'[^\x00-\x7F]+', ' ', text)
         
-        # Ensure it ends with a punctuation
-        if text and text[-1] not in '.!?':
-            text += '.'
-        return text
+        # Remove hashtags
+        clean = re.sub(r'#\w+', '', clean)
+        
+        # Remove multiple spaces
+        clean = re.sub(r'\s+', ' ', clean).strip()
+        
+        if clean and clean[-1] not in '.!?':
+            clean += '.'
+        return clean
 
     def _speak_sapi(self, text: str):
         """Speak using Windows SAPI with natural voice and text cleaning."""
         try:
-            # Clean text (remove emojis/symbols that the voice tries to "read")
+            # Clean text JUST for the engine
             speech_text = self._clean_text(text)
             if not speech_text:
                 return
@@ -192,18 +207,40 @@ speech.Speak text
             print(f"[TTS espeak error] {e}")
             print(f"🔊 [MEMO]: {text}")
     
-    def _speak_pyttsx3(self, text: str):
-        """Speak using pyttsx3."""
+    def _speak_sapi_direct(self, text: str):
+        """Speak using direct SAPI COM interface (Reliable & Fast)."""
         try:
-            import pyttsx3
-            engine = pyttsx3.init()
-            engine.setProperty('rate', self.rate)
-            engine.say(text)
-            engine.runAndWait()
-            engine.stop()
+            import comtypes.client
+            
+            # Initialize COM object (Thread-local)
+            if not hasattr(self, '_sapi_speaker'):
+                print("[TTS] Initializing SAPI COM...")
+                self._sapi_speaker = comtypes.client.CreateObject("SAPI.SpVoice")
+                
+                # Select Zira voice
+                voices = self._sapi_speaker.GetVoices()
+                for i in range(voices.Count):
+                    voice = voices.Item(i)
+                    if "Zira" in voice.GetDescription() or "Eva" in voice.GetDescription():
+                        self._sapi_speaker.Voice = voice
+                        break
+                        
+                self._sapi_speaker.Rate = 1  # Moderate speed
+                self._sapi_speaker.Volume = 100
+                
+            # Clean text
+            speech_text = self._clean_text(text)
+            if not speech_text:
+                return
+            
+            # Speak (SVSFlagsAsync = 1) -> Actually, we want synchronous here 
+            # because we are in a background worker thread.
+            self._sapi_speaker.Speak(speech_text)
+            
         except Exception as e:
-            print(f"[TTS pyttsx3 error] {e}")
-            print(f"🔊 [MEMO]: {text}")
+            print(f"[TTS SAPI Direct error] {e}")
+            # Fallback
+            self._speak_sapi(text)
     
     def speak(self, text: str):
         """Queue text to be spoken (non-blocking)."""

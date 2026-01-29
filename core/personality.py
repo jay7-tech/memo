@@ -90,6 +90,7 @@ class AIPersonality:
         
         self._gemini_model = None
         self._gemini_client = None
+        self._generate_lock = threading.Lock()
         self._init_backend()
         
         print(f"[AI] ✓ Personality initialized with {self.backend} backend")
@@ -206,17 +207,22 @@ class AIPersonality:
         
         return "\n".join(parts)
     
+        
     def generate(self, prompt: str, scene_state=None, response_type: str = "quick") -> str:
-        """Generate an AI response."""
-        context = self._build_context(scene_state)
-        system_prompt = MEMO_PERSONALITY.format(context=context)
-        
-        if response_type == "quick":
-            full_prompt = f"{system_prompt}\n\nUser: {prompt}\n\nRespond in under 10 words, be playful and casual. DONT greet the user."
-        else:
-            full_prompt = f"{system_prompt}\n\nUser: {prompt}\n\nRespond naturally as MEMO."
-        
+        """Generate an AI response (Thread-safe and throttled)."""
+        # PREVENTION: Don't overload the Pi with multiple LLM calls
+        if not self._generate_lock.acquire(blocking=False):
+            return "Just a sec, thinking..."
+            
         try:
+            context = self._build_context(scene_state)
+            system_prompt = MEMO_PERSONALITY.format(context=context)
+            
+            if response_type == "quick":
+                full_prompt = f"{system_prompt}\n\nUser: {prompt}\n\nRespond in under 10 words, be playful and casual. DONT greet the user."
+            else:
+                full_prompt = f"{system_prompt}\n\nUser: {prompt}\n\nRespond naturally as MEMO."
+            
             if self.backend == 'gemini_new' and self._gemini_client:
                 response = self._generate_gemini_new(full_prompt)
             elif self.backend == 'gemini' and self._gemini_model:
@@ -230,8 +236,8 @@ class AIPersonality:
             self.conversation.add("assistant", response)
             return response
             
-        except Exception as e:
-            return self._generate_fallback(prompt)
+        finally:
+            self._generate_lock.release()
     
     def _generate_gemini_new(self, prompt: str) -> str:
         if not self._gemini_client:
@@ -245,6 +251,26 @@ class AIPersonality:
              print(f"[AI] Gemini New Error: {e}")
              return self._generate_fallback(prompt)
 
+    
+    def _generate_prompt(self, prompt_text: str, context: Optional[Dict[str, Any]] = None) -> str:
+        """Create a context-aware system prompt."""
+        time_context = self._get_time_context()
+        context_str = self._format_context(context)
+        
+        system_instruction = (
+            f"You are MEMO, a witty, helpful, and concise AI companion. "
+            f"Current time: {time_context}. "
+            f"User context: {context_str}. "
+            f"RULES: 1. Be concise (1-2 sentences). 2. Be helpful. 3. STOP generating after your answer."
+        )
+
+        prompt = (
+            f"{system_instruction}\n\n"
+            f"User: {prompt_text}\n"
+            f"MEMO:"
+        )
+        return prompt
+    
     def _generate_gemini(self, prompt: str) -> str:
         if not self._gemini_model:
             return self._generate_fallback(prompt)
@@ -253,8 +279,9 @@ class AIPersonality:
             response = self._gemini_model.generate_content(
                 prompt,
                 generation_config={
-                    'temperature': 0.9,
+                    'temperature': 0.7,
                     'max_output_tokens': 50,
+                    'stop_sequences': ["User:", "System:", "\n\n"]
                 }
             )
             return response.text.strip()
@@ -274,20 +301,20 @@ class AIPersonality:
             from interface.dashboard import add_log
             add_log(f"Brain is thinking about: {prompt[:30]}...", "ai")
             
-            response = requests.post(
-                f"{self.ollama_url}/api/generate",
-                json={
-                    "model": self.ollama_model,
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {"temperature": 0.9, "num_predict": 100}
-                },
-                timeout=120
-            )
+            payload = {
+                "model": self.ollama_model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": 0.7,
+                    "stop": ["User:", "System:", "\n\n"]  # STOP TOKENS CRITICAL FOR PHI
+                }
+            }
+            response = requests.post(f"{self.ollama_url}/api/generate", json=payload, timeout=5)
+
             print(f"[AI] Ollama Status: {response.status_code}")
             if response.status_code == 200:
                 data = response.json()
-                # print(f"[AI] DEBUG Raw data keys: {data.keys()}") 
                 text = data.get('response', '').strip()
                 
                 if not text and 'done' in data and data['done'] is True:

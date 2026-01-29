@@ -56,6 +56,10 @@ class EventBus:
         self._event_queue = queue.PriorityQueue()
         self._lock = threading.RLock()
         self._running = True
+        
+        # Use a thread pool to manage callback execution without overhead of spawning threads
+        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
+        
         self._worker = threading.Thread(target=self._process_events, daemon=True)
         self._worker.start()
     
@@ -77,17 +81,25 @@ class EventBus:
                 _, _, event = self._event_queue.get(timeout=0.1)
                 with self._lock:
                     callbacks = self._subscribers.get(event.type, [])
+                
+                # Execute each callback in the thread pool
                 for callback in callbacks:
-                    try:
-                        callback(event)
-                    except Exception as e:
-                        print(f"[EventBus] Callback error: {e}")
+                    self._executor.submit(self._safe_execute, callback, event)
+                    
             except queue.Empty:
                 continue
+    
+    def _safe_execute(self, callback: Callable, event: Event):
+        """Safely execute a callback."""
+        try:
+            callback(event)
+        except Exception as e:
+            print(f"[EventBus] Callback error: {e}")
     
     def stop(self):
         """Stop the event bus."""
         self._running = False
+        self._executor.shutdown(wait=False)
         self._worker.join(timeout=1.0)
 
 
@@ -95,27 +107,24 @@ class PerformanceMonitor:
     """
     Monitors system resources and adapts processing accordingly.
     
-    Features:
-        - CPU/Memory monitoring
-        - FPS tracking
-        - Adaptive frame skipping
-        - Raspberry Pi detection
+    Optimized for RPi 5:
+    - Higher thresholds and better adaptive logic
     """
     
     def __init__(self):
         self.is_raspberry_pi = self._detect_raspberry_pi()
-        self.target_fps = 10 if self.is_raspberry_pi else 30
+        self.target_fps = 25 if self.is_raspberry_pi else 30
         self.frame_times: List[float] = []
         self.max_samples = 30
         
-        # Adaptive parameters - More aggressive on Pi to save CPU for AI
-        self.frame_skip = 5 if self.is_raspberry_pi else 1
-        self.detection_interval = 5.0 if self.is_raspberry_pi else 2.0
-        self.face_rec_interval = 10.0 if self.is_raspberry_pi else 1.0
+        # Adaptive parameters - Balanced for Pi 5 power
+        self.frame_skip = 3 if self.is_raspberry_pi else 1
+        self.detection_interval = 2.0  # Seconds between heavy detections if skipping
+        self.face_rec_interval = 5.0
         
-        # Resource thresholds
-        self.cpu_threshold = 80  # Reduce processing if CPU > 80%
-        self.memory_threshold = 85
+        # Resource thresholds (Pi 5 can handle more heat)
+        self.cpu_threshold = 75  # Start skipping if CPU > 75%
+        self.memory_threshold = 90
     
     def _detect_raspberry_pi(self) -> bool:
         """Detect if running on Raspberry Pi."""
@@ -166,15 +175,16 @@ class PerformanceMonitor:
         }
 
 
+import concurrent.futures
+
 class PerceptionPipeline:
     """
     Unified perception pipeline for efficient inference.
     
-    Features:
-        - Single-pass object + pose detection
-        - Async face recognition
-        - Result caching
-        - Warmup on init
+    Optimized for RPi 5:
+    - Parallel execution via ThreadPoolExecutor
+    - Asynchronous face recognition
+    - Result caching and lazy initialization
     """
     
     def __init__(self, config: Dict[str, Any] = None):
@@ -190,6 +200,9 @@ class PerceptionPipeline:
         self._detector = None
         self._pose_estimator = None
         self._face_rec = None
+        
+        # Parallel executor (Separate threads for Detection, Pose, and Face)
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
         
         # Timing
         self._last_detection_time = 0
@@ -236,44 +249,70 @@ class PerceptionPipeline:
     
     def process(self, frame, run_detection=True, run_pose=True, run_face=False) -> Dict[str, Any]:
         """
-        Process a frame through the perception pipeline.
-        
-        Args:
-            frame: BGR image from OpenCV
-            run_detection: Run object detection
-            run_pose: Run pose estimation
-            run_face: Run face recognition
-        
-        Returns:
-            Dict with 'detections', 'pose', 'identity' keys
+        Process a frame through the perception pipeline in parallel.
         """
-        result = {
+        futures = {}
+        
+        # Start tasks in parallel
+        if run_detection:
+            self._init_detector()
+            futures['detections'] = self.executor.submit(self._detector.detect, frame)
+            
+        if run_pose:
+            self._init_pose()
+            futures['pose'] = self.executor.submit(self._pose_estimator.estimate, frame)
+            
+        if run_face and self._face_rec is not False:
+            self._init_face_rec()
+            if self._face_rec:
+                # Face recognition depends on pose results, but we can attempt it 
+                # on the *previous* frame's pose or run it as a follow-on.
+                # Here we submit it as a task that will wait if needed.
+                # Optimization: Face rec is expensive, run only if person is present.
+                futures['identity'] = self.executor.submit(self._async_face_rec, frame)
+
+        # Gather results with timeouts
+        results = {
             'detections': self._last_detections,
             'pose': self._last_pose,
             'identity': self._last_identity
         }
         
-        with self._lock:
-            if run_detection:
-                self._init_detector()
-                self._last_detections = self._detector.detect(frame)
-                result['detections'] = self._last_detections
+        try:
+            # Each result call is protected by a small timeout
+            if 'detections' in futures:
+                try:
+                    results['detections'] = futures['detections'].result(timeout=0.1)
+                    self._last_detections = results['detections']
+                except concurrent.futures.TimeoutError:
+                    pass
+                
+            if 'pose' in futures:
+                try:
+                    results['pose'] = futures['pose'].result(timeout=0.1)
+                    self._last_pose = results['pose']
+                except concurrent.futures.TimeoutError:
+                    pass
+                
+            if 'identity' in futures:
+                try:
+                    results['identity'] = futures['identity'].result(timeout=0.01)
+                    self._last_identity = results['identity']
+                except concurrent.futures.TimeoutError:
+                    pass
+                    
+        except Exception as e:
+            # Outer catch for unexpected implementation errors
+            print(f"[Perception] Pipeline error: {e}")
             
-            if run_pose:
-                self._init_pose()
-                self._last_pose = self._pose_estimator.estimate(frame)
-                result['pose'] = self._last_pose
-            
-            if run_face and self._face_rec is not False:
-                self._init_face_rec()
-                if self._face_rec and result['pose']:
-                    identity = self._recognize_face(frame, result['pose'])
-                    # Update identity (even if None, to clear stale ID)
-                    self._last_identity = identity
-                    result['identity'] = identity
-        
-        return result
+        return results
     
+    def _async_face_rec(self, frame) -> Optional[str]:
+        """Helper for parallel face recognition."""
+        if self._last_pose:
+            return self._recognize_face(frame, self._last_pose)
+        return None
+
     def _recognize_face(self, frame, pose_data) -> Optional[str]:
         """Extract face from pose keypoints and recognize."""
         if not pose_data or 'keypoints' not in pose_data:
@@ -299,7 +338,9 @@ class PerceptionPipeline:
         x = int(nose[0]) - face_w // 2
         y = int(nose[1]) - face_h // 2
         
-        return self._face_rec.recognize(frame, [x, y, face_w, face_h])
+        if self._face_rec:
+            return self._face_rec.recognize(frame, [x, y, face_w, face_h])
+        return None
 
 
 class CommandProcessor:
@@ -336,11 +377,25 @@ class CommandProcessor:
         self.history.append(text)
         if len(self.history) > self.max_history:
             self.history.pop(0)
-        
+            
+        # === SHORTHAND COMMANDS (Now available via terminal/dashboard) ===
+        if text_lower == 's':
+            return self._cmd_selfie(text, context)
+        elif text_lower == 'f':
+            enabled = not (context['scene_state'].focus_mode if context else False)
+            return self._cmd_focus_on(text, context) if enabled else self._cmd_focus_off(text, context)
+        elif text_lower == 'v':
+            # This is a bit tricky as main.py manages the voice_input instance.
+            # We'll publish a system alert so main.py can handle the toggle.
+            self.event_bus.publish(Event(EventType.SYSTEM_ALERT, {'action': 'toggle_voice'}))
+            return "Toggling voice input..."
+        elif text_lower == 'r':
+            return self._cmd_register("register User", context)
+
         # === QUIT / EXIT ===
-        quit_patterns = ['quit', 'exit', 'bye', 'goodbye', 'close', 'stop', 'shut down', 'shutdown']
+        quit_patterns = ['quit', 'exit', 'bye', 'goodbye', 'close', 'stop', 'shut down', 'shutdown', 'q']
         for pattern in quit_patterns:
-            if pattern in text_lower and 'focus' not in text_lower:
+            if text_lower == 'q' or (pattern in text_lower and 'focus' not in text_lower):
                 if self.on_quit:
                     self.on_quit()
                 return "Goodbye!"

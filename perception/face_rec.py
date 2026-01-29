@@ -218,7 +218,11 @@ class FaceRecognizer:
         if self.model is None:
             print("[FaceRec] Model not available")
             return False
-        
+            
+        if frame is None:
+            print("[FaceRec] Cannot register face: No frame provided")
+            return False
+            
         # Extract face crop
         x, y, w, h = map(int, bbox)
         h_img, w_img = frame.shape[:2]
@@ -308,7 +312,7 @@ class FaceRecognizer:
         
         # Return match if above threshold
         if best_similarity >= self.threshold:
-            print(f"[FaceRec] Match: {best_match} ({best_similarity:.2f})")
+            # print(f"[FaceRec] Match: {best_match} ({best_similarity:.2f})")
             return best_match
         else:
             if best_match:
