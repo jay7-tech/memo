@@ -53,6 +53,10 @@ class TTSEngine:
             except ImportError:
                 return 'sapi'  # Fallback to VBS method
                 
+        # Check for piper (High quality for Linux/Pi)
+        if os.path.exists("./piper/piper") or os.path.exists("/usr/local/bin/piper"):
+            return 'piper'
+            
         # Check for espeak on Linux/Pi
         try:
             result = subprocess.run(['espeak', '--version'], capture_output=True, timeout=2)
@@ -104,6 +108,8 @@ class TTSEngine:
                     self._speak_sapi(text)
                 elif self._backend == 'espeak':
                     self._speak_espeak(text)
+                elif self._backend == 'piper':
+                    self._speak_piper(text)
                 elif self._backend == 'sapi_direct':
                     self._speak_sapi_direct(text)
                 else:
@@ -206,6 +212,35 @@ speech.Speak text
         except Exception as e:
             print(f"[TTS espeak error] {e}")
             print(f"🔊 [MEMO]: {text}")
+
+    def _speak_piper(self, text: str):
+        """Speak using Piper TTS (High Quality for Pi)."""
+        try:
+            # Paths
+            piper_bin = "./piper/piper" if os.path.exists("./piper/piper") else "piper"
+            model_path = "./piper/models/en_US-lessac-medium.onnx"
+            
+            if not os.path.exists(model_path) and piper_bin == "./piper/piper":
+                # Fallback to espeak if model missing
+                print("[TTS] Piper model missing, falling back to espeak")
+                self._speak_espeak(text)
+                return
+
+            # Construct command: echo "text" | piper ... | aplay
+            # Clean text for shell
+            safe_text = text.replace('"', '\\"')
+            cmd = f'echo "{safe_text}" | {piper_bin} --model {model_path} --output_raw | aplay -r 22050 -f S16_LE -t raw -'
+            
+            subprocess.run(
+                cmd,
+                shell=True,
+                timeout=30,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+        except Exception as e:
+            print(f"[TTS Piper error] {e}")
+            self._speak_espeak(text)
     
     def _speak_sapi_direct(self, text: str):
         """Speak using direct SAPI COM interface (Reliable & Fast)."""
