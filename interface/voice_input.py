@@ -131,12 +131,20 @@ class VoiceListener:
         try:
             print("[Voice] Calibrating microphone for Google API...")
             with self.microphone as source:
-                self.recognizer.adjust_for_ambient_noise(source, duration=1)
+                # Tune for longer listening and better accuracy
+                self.recognizer.pause_threshold = 1.5  # Allow 1.5s silence before cutting off
+                self.recognizer.energy_threshold = 300 # Baseline sensitivity
+                self.recognizer.dynamic_energy_threshold = True
+                self.recognizer.non_speaking_duration = 0.5
+                self.recognizer.phrase_threshold = 0.3 # Minimum seconds of speaking to consider valid
+                
+                self.recognizer.adjust_for_ambient_noise(source, duration=1.5)
             
             # Background listener for Google
             self.stop_listening = self.recognizer.listen_in_background(
                 self.microphone,
-                self._google_callback
+                self._google_callback,
+                phrase_time_limit=15 # Allow up to 15s of speech
             )
             print("[Voice] ✓ Google Speech API ready (requires internet)")
             
