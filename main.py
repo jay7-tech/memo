@@ -665,6 +665,9 @@ def main():
         try:
             sys.exit(0)
         except SystemExit:
+            # Fix terminal echo on Linux/Pi if it got broken
+            if os.name != 'nt':
+                os.system('stty sane')
             os._exit(0)
 
 
