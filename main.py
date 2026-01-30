@@ -271,8 +271,8 @@ class MEMOApp:
         
         # Throttled object logging (Silenced during prompting)
         visible_labels = [d['label'] for d in detections]
-        if not self.is_prompting and self.frame_count % 30 == 0 and visible_labels:
-            print(f"[Vision] Detecting: {visible_labels}")
+        # if not self.is_prompting and self.frame_count % 30 == 0 and visible_labels:
+        #     print(f"[Vision] Detecting: {visible_labels}")
         
         # Check for new presence/absence for logging
         if identity and identity != self.scene_state.human.get('identity'):

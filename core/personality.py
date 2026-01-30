@@ -214,9 +214,9 @@ class AIPersonality:
             system_prompt = MEMO_PERSONALITY.format(context=context)
             
             if response_type == "quick":
-                full_prompt = f"{system_prompt}\n\nUser: {prompt}\n\nRespond in under 10 words, be playful and casual. DONT greet the user."
+                full_prompt = f"{system_prompt}\n\nUser: {prompt}\n\n(Instruction: Short answer, <10 words)\nMEMO:"
             else:
-                full_prompt = f"{system_prompt}\n\nUser: {prompt}\n\nRespond naturally as MEMO."
+                full_prompt = f"{system_prompt}\n\nUser: {prompt}\n\nMEMO:"
             
             if self.backend == 'gemini_new' and self._gemini_client:
                 response = self._generate_gemini_new(full_prompt)
@@ -314,6 +314,10 @@ class AIPersonality:
             if response.status_code == 200:
                 data = response.json()
                 text = data.get('response', '').strip()
+                
+                # Clean up "MEMO:" prefix if model generates it
+                if text.startswith("MEMO:"):
+                    text = text.replace("MEMO:", "", 1).strip()
                 
                 if not text and 'done' in data and data['done'] is True:
                     print("[AI] Ollama returned empty response (but done=True).")
