@@ -317,8 +317,12 @@ class AIPersonality:
             else:
                 return f"Brain freeze! (Error {response.status_code})"
                 
+        except Exception as e:
+            print(f"[AI Error] {e}")
+            from interface.dashboard import add_log
+            add_log(f"AI Error: {e}", "error")
+            return self._generate_fallback(prompt)
 
-    
     def _sanitize_response(self, text: str, user_prompt: str) -> str:
         """Clean up TinyLlama's hallucinations and repetitions."""
         # 1. Remove self-identification spam
