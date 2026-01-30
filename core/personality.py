@@ -16,15 +16,17 @@ from typing import Optional, Dict, List, Any
 import threading
 
 
-# MEMO's personality prompt - V4.7 MINIMALIST FEW-SHOT
-MEMO_PERSONALITY = """Q: Tell me a fact
-A: Honey never spoils.
-Q: Tell me a joke
-A: Why did the robot cross the road? To get to the other battery!
-Q: Who is Musk?
-A: Elon Musk is CEO of Tesla and SpaceX.
-Q: Who are you?
-A: I am MEMO, your AI companion.
+# MEMO's personality prompt - V5.5 BRACKETED
+MEMO_PERSONALITY = """You are MEMO, a witty AI. Respond to the user naturally. Do not respond like a robot. keep the answer short and witty. dont add expressions in brackets
+Current Context:
+{context}
+
+[User]: Tell me a fact
+[MEMO]: Honey never spoils. It can stay edible for thousands of years!
+[User]: Tell me a joke
+[MEMO]: Why did the robot cross the road? To get to the other battery!
+[User]: Who are you?
+[MEMO]: I am MEMO, your AI buddy. I'm here to vibe and help out!
 """
 
 
@@ -209,8 +211,9 @@ class AIPersonality:
                 full_prompt = f"{system_prompt}\n\nQ: {prompt}\nA:"
                 response = self._generate_gemini(full_prompt)
             elif self.backend == 'ollama':
-                # Pass clean prompt to Ollama handler
-                response = self._generate_ollama(prompt)
+                # V5.5: Bracketed labels are safer from accidental stops
+                full_prompt = f"{system_prompt}\n{history_str}[User]: {prompt}\n[MEMO]: "
+                response = self._generate_ollama(full_prompt)
             else:
                 response = self._generate_fallback(prompt)
             
@@ -285,21 +288,17 @@ class AIPersonality:
             # Use /api/generate for completion style (Better for Answer Triggers)
             base_url = self.ollama_url.replace("/api/generate", "").replace("/api/chat", "").rstrip("/")
             
-            # COMPLETION PROMPT (V4.3) - Strict Q&A
-            prompt_template = (
-                f"{MEMO_PERSONALITY}\n"
-                f"Q: {prompt}\n"
-                f"A: "
-            )
+            # V5.0: Prompt is already built in generate()
+            prompt_template = prompt
             
             payload = {
                 "model": self.ollama_model,
                 "prompt": prompt_template,
                 "stream": False,
                 "options": {
-                    "temperature": 0.3, # Increased slightly for more creative jokes/facts
-                    "num_predict": 100, # Increased for full responses
-                    "stop": ["Q:", "A:", "User:", "MEMO:", "Answer directly"] 
+                    "temperature": 0.7, 
+                    "num_predict": 250, 
+                    "stop": ["[User]:", "\n[User]:"] 
                 }
             }
             
@@ -309,6 +308,11 @@ class AIPersonality:
             if response.status_code == 200:
                 data = response.json()
                 text = data.get('response', '').strip()
+                # Simplified cleaning (V5.6)
+                for label in ["[MEMO]:", "MEMO:", "[User]:", "[MEMO]"]:
+                    if text.startswith(label):
+                        text = text[len(label):].strip()
+                
                 return self._sanitize_response(text, prompt)
             else:
                 return f"Brain freeze! (Error {response.status_code})"
@@ -320,74 +324,22 @@ class AIPersonality:
             return self._generate_fallback(prompt)
 
     def _sanitize_response(self, text: str, user_prompt: str) -> str:
-        """Technical Database Sanitizer (V3.4)."""
+        """Maximum Compatibility Sanitizer (V5.4)."""
         if not text: return ""
 
-        # 1. Aggressive Meta-talk Killer
-        fluff_starts = [
-            "sure", "yes", "okay", "i can", "i would", "here is", "the answer",
-            "memo:", "a:", "q:", "certainly", "happy to", "i'm happy", "another fact",
-            "answering directly", "answer directly", "here's a", "here's the"
-        ]
+        # Remove "AI Assistant" meta-talk
+        text = text.replace("As an AI assistant", "As your companion").strip()
         
-        # Split on sentence enders AND instructional delimiters like commas after meta-talk
-        raw_text = text.replace('!', '.').replace('?', '.').replace(':', '.')
-        # If it starts with meta-talk and has a comma, the answer usually follows the comma
-        if any(text.lower().startswith(fs) for fs in fluff_starts) and ',' in text:
-            text = text.split(',', 1)[1]
-            
-        parts = text.replace('!', '.').replace('?', '.').replace(':', '.').split('.')
-        clean_parts = []
-        
-        prompt_words = set(user_prompt.lower().split())
-        
-        for part in parts:
-            p_low = part.lower().strip()
-            if not p_low or len(p_low.split()) < 3: continue
-
-            # Reject if it starts with any fluff word
-            starts_with_fluff = any(p_low.startswith(fs) for fs in fluff_starts)
-            
-            # Check if it's just repeating the question
-            part_words = set(p_low.replace('who', '').replace('is', '').replace('what', '').split())
-            is_repeating = part_words.issubset(prompt_words) and len(p_low.split()) < 12
-            
-            if not starts_with_fluff and not is_repeating:
-                clean_parts.append(part.strip())
-        
-        # Reconstruct (Primary Answer Focus)
-        if clean_parts:
-            text = clean_parts[0]
-        else:
-            # V3.4 FIXED: If only fluff was found, return a smart default instead of the fluff
-            return "I don't have a direct answer for that right now."
-
-        # 2. Emoji Stripping (V4.2)
-        # Remove all emoji/non-ASCII characters to keep speech clean
+        # Emoji and Non-ASCII cleanup for smooth TTS
         text = "".join(c for c in text if c.isascii() or c.isalnum() or c in " .,!?-")
-
-        # 3. Hallucination Fixes (V4.4 Reality Filter)
-        toxic_phrases = ["is an ai assistant", "is a popular ai", "ai assistant that helps"]
         
-        # Check if we're wrongly identifying a person
-        if any(phrase in text.lower() for phrase in toxic_phrases):
-             # If it's a "Who is" question, it's likely a hallucination
-             if user_prompt.lower().startswith("who is"):
-                 text = "I don't have verified data on this individual right now."
-             else:
-                 # Otherwise just try to strip the toxic part
-                 for phrase in toxic_phrases:
-                     text = text.lower().replace(phrase, "is a known entity").capitalize()
-
-        if "elon musk" in user_prompt.lower() or "modi" in user_prompt.lower():
-            if "is an ai" in text.lower():
-                text = text.lower().replace("is an ai", "is a human leader").capitalize()
-
+        # Final cleanup
         text = text.lstrip(" :.,!?-")
         if text and not text.endswith(('.', '!', '?')):
             text += "."
             
-        return text[:180].strip()
+        return text[:500].strip()
+
 
     def _generate_fallback(self, prompt: str) -> str:
         """Friendly local responses when AI is offline."""
