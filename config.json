@@ -57,8 +57,10 @@
   },
   "ai": {
     "backend": "ollama",
-    "gemini_api_key": "",
-    "ollama_model": "phi:latest",
-    "ollama_url": "http://localhost:11434"
+    "gemini_api_key": "YOUR_KEY_HERE",
+    "gemini_model": "gemini-1.5-flash",
+    "ollama_url": "http://localhost:11434/api/generate",
+    "ollama_model": "tinyllama:latest",
+    "personality_prompt": "You are MEMO, a witty and helpful AI assistant living in a Raspberry Pi. You are concise, fun, and sometimes sarcastic. Keep responses short (under 2 sentences) unless asked for details."
   }
 }

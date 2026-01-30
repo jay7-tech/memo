@@ -87,12 +87,14 @@ def setup():
     else:
         print("✓ Ollama is installed")
 
-    print("Pulling AI Model (phi:latest)...")
+    print("Pulling AI Models...")
+    # Pull tinyllama for speed, phi for quality if needed
     # Try requesting the model. If daemon not running, this might fail.
     try:
+        run_cmd("ollama pull tinyllama:latest")
         run_cmd("ollama pull phi:latest")
     except:
-        print("Could not pull model. Is Ollama running?")
+        print("Could not pull models. Is Ollama running?")
         print("Try running: 'ollama serve' in a separate terminal.")
 
     # 4. Piper TTS (High Quality Voice)
