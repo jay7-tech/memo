@@ -58,21 +58,22 @@ def index():
     <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <title>MEMO // NEURAL INTERFACE v2.0</title>
+        <title>MEMO // NEURAL INTERFACE v3.0</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
         <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
         <style>
             :root {
-                --bg: #05070a;
-                --panel: rgba(10, 15, 25, 0.6);
-                --accent: #00f2ff;
-                --accent-glow: rgba(0, 242, 255, 0.4);
-                --secondary: #ff00ff;
-                --text: #e0e6ed;
-                --text-dim: #6b7c93;
-                --border: rgba(0, 242, 255, 0.15);
-                --glass-border: rgba(255, 255, 255, 0.05);
+                --bg: #08090d;
+                --panel: rgba(15, 17, 30, 0.75);
+                --accent: #ae63fb;
+                --accent-glow: rgba(174, 99, 251, 0.4);
+                --secondary: #4a90e2;
+                --text: #f0f4f8;
+                --text-dim: #94a3b8;
+                --border: rgba(174, 99, 251, 0.2);
+                --glass-border: rgba(255, 255, 255, 0.08);
+                --super-glass: linear-gradient(135deg, rgba(174, 99, 251, 0.05) 0%, rgba(74, 144, 226, 0.05) 100%);
             }
 
             * { box-sizing: border-box; cursor: crosshair; }
@@ -83,362 +84,325 @@ def index():
                 font-family: 'Outfit', sans-serif; 
                 background: var(--bg);
                 color: var(--text); 
-                margin: 0; padding: 0; min-height: 100vh;
+                margin: 0; padding: 0; 
+                height: 100vh;
                 overflow: hidden;
                 background-image: 
-                    radial-gradient(circle at 50% 50%, rgba(0, 242, 255, 0.03) 0%, transparent 70%),
+                    radial-gradient(circle at 10% 10%, rgba(174, 99, 251, 0.07) 0%, transparent 40%),
+                    radial-gradient(circle at 90% 90%, rgba(74, 144, 226, 0.07) 0%, transparent 40%),
                     repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(255,255,255,0.01) 1px, rgba(255,255,255,0.01) 2px);
             }
 
-            /* --- LAYOUT --- */
-            .app-container {
-                display: grid;
-                grid-template-areas: 
-                    "header header"
-                    "vision telemetry"
-                    "terminal telemetry";
-                grid-template-columns: 1fr 340px;
-                grid-template-rows: 70px 1fr 300px;
+            /* --- V3.0 SUPERNOVA LAYOUT --- */
+            .app-wrapper {
+                display: flex;
+                flex-direction: column;
                 height: 100vh;
-                gap: 20px;
-                padding: 20px;
-                max-width: 1800px;
+                padding: 15px;
+                gap: 15px;
+                max-width: 1920px;
                 margin: 0 auto;
             }
 
             .header {
-                grid-area: header;
+                height: 60px;
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
-                padding: 0 20px;
-                background: rgba(10, 15, 25, 0.8);
-                border: 1px solid var(--border);
-                border-radius: 12px;
-                backdrop-filter: blur(10px);
-            }
-
-            .vision { 
-                grid-area: vision;
-                position: relative;
-                border: 1px solid var(--border);
-                border-radius: 16px;
-                overflow: hidden;
-                background: #000;
-            }
-
-            .terminal { 
-                grid-area: terminal;
-                display: flex;
-                flex-direction: column;
+                padding: 0 25px;
                 background: var(--panel);
                 border: 1px solid var(--border);
-                border-radius: 16px;
-                padding: 15px;
+                border-radius: 14px;
                 backdrop-filter: blur(20px);
             }
 
-            .telemetry { 
-                grid-area: telemetry;
-                display: flex;
-                flex-direction: column;
-                gap: 20px;
-            }
-
-            /* --- COMPONENTS --- */
-            .glass-card {
-                background: var(--panel);
-                border: 1px solid var(--glass-border);
-                border-radius: 16px;
-                padding: 20px;
-                backdrop-filter: blur(20px);
-                box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            }
-
-            .logo {
-                font-size: 1.2rem;
-                font-weight: 600;
-                letter-spacing: 5px;
-                color: #fff;
-                display: flex;
-                align-items: center;
+            .main-content {
+                flex: 1;
+                display: grid;
+                grid-template-rows: 1fr 280px;
                 gap: 15px;
-            }
-            .logo span { color: var(--accent); opacity: 0.7; font-size: 0.8rem; }
-
-            /* Circular Telemetry */
-            .telemetry-circle-container {
-                display: flex;
-                justify-content: space-around;
-                margin-top: 10px;
+                min-height: 0;
             }
 
-            .hud-ring {
+            /* --- VISION MAIN STAGE --- */
+            .vision-stage {
                 position: relative;
-                width: 100px; height: 100px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
+                background: #000;
+                border: 1.5px solid var(--border);
+                border-radius: 20px;
+                overflow: hidden;
+                box-shadow: 0 0 40px rgba(0,0,0,0.8), inset 0 0 100px rgba(174, 99, 251, 0.05);
             }
 
-            .hud-ring svg {
-                position: absolute;
-                width: 100%; height: 100%;
-                transform: rotate(-90deg);
+            .feed-img {
+                width: 100%; height: 100%; object-fit: contain;
+                filter: contrast(1.1) brightness(1.05);
             }
 
-            .hud-ring circle {
-                fill: none;
-                stroke-width: 4;
-                stroke-linecap: round;
-            }
-
-            .hud-ring .bg { stroke: rgba(255,255,255,0.05); }
-            .hud-ring .progress { 
-                stroke: var(--accent); 
-                stroke-dasharray: 283; 
-                stroke-dashoffset: 283;
-                transition: stroke-dashoffset 0.5s ease;
-                filter: drop-shadow(0 0 5px var(--accent));
-            }
-
-            .hud-value {
-                font-family: 'JetBrains Mono';
-                font-size: 1.1rem;
-                font-weight: 700;
-                color: #fff;
-            }
-            .hud-label {
-                position: absolute;
-                bottom: -20px;
-                font-size: 0.6rem;
-                color: var(--text-dim);
-                text-transform: uppercase;
-                letter-spacing: 1px;
-            }
-
-            /* Video Feed HUD */
-            .feed-img { width: 100%; height: 100%; object-fit: contain; opacity: 0.9; }
-            .vision-overlay {
+            .hud-frame {
                 position: absolute;
                 inset: 0;
                 pointer-events: none;
-                background: radial-gradient(circle at 50% 50%, transparent 60%, rgba(0,0,0,0.4) 100%);
+                z-index: 10;
             }
-            .reticle {
-                position: absolute;
-                top: 50%; left: 50%;
-                transform: translate(-50%, -50%);
-                width: 200px; height: 200px;
-                border: 1px solid rgba(0, 242, 255, 0.1);
-                border-radius: 50%;
-            }
-            .reticle::before, .reticle::after {
-                content: '';
-                position: absolute;
-                top: 50%; left: 50%;
-                background: var(--accent);
-            }
-            .reticle::before { width: 20px; height: 1px; transform: translate(-50%, -50%); }
-            .reticle::after { width: 1px; height: 20px; transform: translate(-50%, -50%); }
 
-            /* Terminal Area */
+            .hud-label-top {
+                position: absolute;
+                top: 25px; left: 35px;
+                font-family: 'JetBrains Mono';
+                font-size: 0.75rem;
+                color: var(--accent);
+                letter-spacing: 2px;
+                text-shadow: 0 0 10px var(--accent-glow);
+            }
+
+            /* --- BOTTOM CONTROL PANEL --- */
+            .control-panel {
+                display: grid;
+                grid-template-columns: 1fr 400px;
+                gap: 15px;
+            }
+
+            .terminal-glass {
+                background: var(--panel);
+                border: 1px solid var(--glass-border);
+                border-radius: 18px;
+                padding: 20px;
+                backdrop-filter: blur(30px);
+                position: relative;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .telemetry-glass {
+                background: var(--panel);
+                border: 1px solid var(--glass-border);
+                border-radius: 18px;
+                padding: 20px;
+                backdrop-filter: blur(30px);
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            /* --- COMPONENTS --- */
+            .logo {
+                font-size: 1.1rem;
+                font-weight: 600;
+                letter-spacing: 6px;
+                color: #fff;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+            .logo b { color: var(--accent); }
+
             #terminal {
                 flex: 1;
                 overflow-y: auto;
                 font-family: 'JetBrains Mono', monospace;
-                font-size: 0.85rem;
-                padding-right: 10px;
+                font-size: 0.82rem;
+                padding-right: 15px;
             }
-            .log-item {
-                margin-bottom: 10px;
-                padding-left: 15px;
-                border-left: 2px solid transparent;
-                animation: slideIn 0.3s ease-out;
-            }
-            .log-item.ai { border-left-color: var(--accent); background: rgba(0, 242, 255, 0.03); }
-            .log-item.user { border-left-color: var(--secondary); }
-            
-            .l-time { color: var(--text-dim); opacity: 0.5; font-size: 0.7rem; margin-right: 8px; }
-            .l-tag { font-weight: 700; font-size: 0.75rem; min-width: 60px; display: inline-block; }
-            .l-msg { color: #fff; line-height: 1.4; }
 
-            @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+            .log-row {
+                margin-bottom: 12px;
+                animation: fadeIn 0.4s ease;
+                display: flex;
+                gap: 15px;
+            }
+            .l-time { color: var(--text-dim); font-size: 0.7rem; width: 60px; }
+            .l-content { line-height: 1.5; color: #fff; }
+            .log-row.ai .l-content { color: var(--accent); font-weight: 500; }
+
+            @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
             .input-box {
-                margin-top: 15px;
                 display: flex;
-                gap: 10px;
+                gap: 12px;
+                margin-top: 15px;
             }
-            .n-input {
+            .neuro-input {
                 flex: 1;
                 background: rgba(255,255,255,0.03);
                 border: 1px solid var(--glass-border);
-                border-radius: 8px;
-                padding: 12px 15px;
+                border-radius: 10px;
+                padding: 14px 20px;
                 color: #fff;
                 font-family: inherit;
                 outline: none;
                 transition: 0.3s;
             }
-            .n-input:focus { border-color: var(--accent); background: rgba(0, 242, 255, 0.05); }
-            .n-btn {
-                background: var(--accent);
-                color: #000;
+            .neuro-input:focus { border-color: var(--accent); box-shadow: 0 0 15px var(--accent-glow); }
+            
+            .neuro-btn {
+                background: linear-gradient(135deg, var(--accent) 0%, var(--secondary) 100%);
+                color: #fff;
                 border: none;
-                border-radius: 8px;
-                padding: 0 20px;
-                font-weight: 700;
+                border-radius: 10px;
+                padding: 0 30px;
+                font-weight: 600;
                 cursor: pointer;
+                transition: transform 0.2s;
             }
+            .neuro-btn:hover { filter: brightness(1.2); transform: translateY(-2px); }
 
-            /* Modules */
-            .module-grid {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 10px;
+            /* Circular HUD 3.0 */
+            .hud-ring-group {
+                display: flex;
+                justify-content: space-between;
+                padding: 10px 0;
             }
-            .mod-btn {
-                background: rgba(255, 255, 255, 0.02);
+            .ring-stat {
+                position: relative;
+                width: 90px; height: 90px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .ring-stat svg {
+                position: absolute;
+                transform: rotate(-90deg);
+                width: 100%; height: 100%;
+            }
+            .ring-stat circle { fill: none; stroke-width: 5; }
+            .ring-stat .bg { stroke: rgba(255,255,255,0.05); }
+            .ring-stat .bar { 
+                stroke: var(--accent); 
+                stroke-dasharray: 251; 
+                stroke-dashoffset: 251;
+                transition: 0.6s ease-out;
+            }
+            .stat-label { position: absolute; font-family: 'JetBrains Mono'; font-weight: 700; font-size: 1rem; }
+
+            .cog-card {
+                background: rgba(255,255,255,0.02);
                 border: 1px solid var(--glass-border);
                 border-radius: 12px;
                 padding: 15px;
-                color: var(--text-dim);
-                font-family: 'JetBrains Mono';
+            }
+            .cog-row {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 8px;
+            }
+            .cog-label { font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase; }
+            .cog-value { font-family: 'JetBrains Mono'; font-size: 0.8rem; font-weight: 600; }
+
+            .super-controls {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+                margin-top: 10px;
+            }
+            .sc-btn {
+                background: rgba(174, 99, 251, 0.1);
+                border: 1px solid rgba(174, 99, 251, 0.3);
+                border-radius: 10px;
+                padding: 12px;
+                color: #fff;
                 font-size: 0.7rem;
-                text-align: left;
+                font-weight: 600;
+                cursor: pointer;
                 transition: 0.3s;
-                position: relative;
-                overflow: hidden;
+                text-align: center;
             }
-            .mod-btn:hover {
-                background: rgba(0, 242, 255, 0.05);
-                border-color: var(--accent);
-                color: #fff;
-            }
-            .mod-btn span {
-                display: block;
-                font-size: 0.9rem;
-                font-weight: 700;
-                color: #fff;
-                margin-top: 5px;
-            }
+            .sc-btn:hover { background: var(--accent); border-color: #fff; }
 
-            .pulsar {
-                width: 4px; height: 4px;
-                background: var(--accent);
-                border-radius: 50%;
-                position: absolute;
-                top: 15px; right: 15px;
-                box-shadow: 0 0 10px var(--accent);
-                animation: pulse 1.5s infinite;
-            }
-            @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(4); opacity: 0; } }
-
-            h5 { margin: 0 0 15px 0; font-size: 0.75rem; letter-spacing: 2px; color: var(--text-dim); text-transform: uppercase; }
+            h6 { margin: 0 0 10px 0; font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; }
         </style>
     </head>
     <body onload="init()">
-        <div class="app-container">
+        <div class="app-wrapper">
             <!-- HEADER -->
             <header class="header">
                 <div class="logo">
-                    <div style="width: 12px; height: 12px; border: 2px solid var(--accent); border-radius: 50%; box-shadow: 0 0 10px var(--accent);"></div>
-                    MEMO <span>// NEURAL INTERFACE v2.0 // PI_MODE_ACTIVE</span>
+                     <div style="width: 16px; height: 16px; background: conic-gradient(from 180deg at 50% 50%, var(--accent) 0deg, var(--secondary) 360deg); border-radius: 4px; animation: rotate 4s linear infinite;"></div>
+                    MEMO <b>// SUPERNOVA v3.0</b>
                 </div>
                 <div style="display: flex; gap: 40px; font-family: 'JetBrains Mono'; font-size: 0.75rem;">
-                    <div style="color: var(--text-dim)">UPLINK: <span style="color: var(--accent)">STABLE</span></div>
-                    <div style="color: var(--text-dim)">SYSTEM_LATENCY: <span id="ping" style="color: var(--accent)">--</span>MS</div>
+                    <div style="color: var(--text-dim)">CORE: <span style="color: var(--accent)">STABLE</span></div>
+                    <div style="color: var(--text-dim)">UPLINK: <span id="ping" style="color: var(--accent)">--</span>ms</div>
                     <div id="clock" style="color: #fff;">00:00:00</div>
                 </div>
             </header>
 
-            <!-- VISION -->
-            <main class="vision">
-                <img src="/video_feed" class="feed-img" alt="Neural Stream">
-                <div class="vision-overlay">
-                    <div class="reticle"></div>
-                    <!-- Corners -->
-                    <div style="position: absolute; top: 20px; left: 20px; border-top: 2px solid var(--accent); border-left: 2px solid var(--accent); width: 30px; height: 30px;"></div>
-                    <div style="position: absolute; top: 20px; right: 20px; border-top: 2px solid var(--accent); border-right: 2px solid var(--accent); width: 30px; height: 30px;"></div>
-                    <div style="position: absolute; bottom: 20px; left: 20px; border-bottom: 2px solid var(--accent); border-left: 2px solid var(--accent); width: 30px; height: 30px;"></div>
-                    <div style="position: absolute; bottom: 20px; right: 20px; border-bottom: 2px solid var(--accent); border-right: 2px solid var(--accent); width: 30px; height: 30px;"></div>
-                    
-                    <div style="position: absolute; top: 60px; right: 60px; font-family: 'JetBrains Mono'; font-size: 0.65rem; line-height: 1.5; color: var(--accent); text-align: right; opacity: 0.6;">
-                        SCAN_FREQ: 2.4GHZ <br>
-                        BUFFER_STATE: 100% <br>
-                        [ NEURAL_UPLINK ]
-                    </div>
-                </div>
-            </main>
-
-            <!-- TERMINAL -->
-            <section class="terminal">
-                <h5>Neural Command Link</h5>
-                <div id="terminal"></div>
-                <form class="input-box" id="cmd-form">
-                    <input type="text" id="cmd-input" class="n-input" placeholder="Neural transmit..." autocomplete="off">
-                    <button type="submit" class="n-btn">SEND</button>
-                </form>
-            </section>
-
-            <!-- TELEMETRY -->
-            <aside class="telemetry">
-                <div class="glass-card">
-                    <h5>Telemetry HUD</h5>
-                    <div class="telemetry-circle-container">
-                        <div class="hud-ring">
-                            <svg viewBox="0 0 100 100">
-                                <circle class="bg" cx="50" cy="50" r="45"></circle>
-                                <circle id="cpu-ring" class="progress" cx="50" cy="50" r="45"></circle>
-                            </svg>
-                            <div class="hud-value" id="cpu-val">0</div>
-                            <div class="hud-label">CPU</div>
-                        </div>
-                        <div class="hud-ring">
-                            <svg viewBox="0 0 100 100">
-                                <circle class="bg" cx="50" cy="50" r="45"></circle>
-                                <circle id="fps-ring" class="progress" cx="50" cy="50" r="45" style="stroke: var(--secondary); filter: drop-shadow(0 0 5px var(--secondary));"></circle>
-                            </svg>
-                            <div class="hud-value" id="fps-val">0</div>
-                            <div class="hud-label">FPS</div>
+            <div class="main-content">
+                <!-- VISION STAGE -->
+                <section class="vision-stage">
+                    <img src="/video_feed" class="feed-img" alt="Neural Feed">
+                    <div class="hud-frame">
+                        <div class="hud-label-top">[ NEURAL_FEED_ACTIVE ] // MODE: FOCUS_AWARE</div>
+                        
+                        <!-- HUD Corners 3.0 -->
+                        <div style="position: absolute; top: 40px; left: 40px; width: 60px; height: 60px; border-top: 1.5px solid var(--accent); border-left: 1.5px solid var(--accent); opacity: 0.5;"></div>
+                        <div style="position: absolute; top: 40px; right: 40px; width: 60px; height: 60px; border-top: 1.5px solid var(--secondary); border-right: 1.5px solid var(--secondary); opacity: 0.5;"></div>
+                        <div style="position: absolute; bottom: 40px; left: 40px; width: 60px; height: 60px; border-bottom: 1.5px solid var(--secondary); border-left: 1.5px solid var(--secondary); opacity: 0.5;"></div>
+                        <div style="position: absolute; bottom: 40px; right: 40px; width: 60px; height: 60px; border-bottom: 1.5px solid var(--accent); border-right: 1.5px solid var(--accent); opacity: 0.5;"></div>
+                        
+                        <!-- Telemetry Overlay -->
+                        <div style="position: absolute; bottom: 60px; right: 60px; background: rgba(0,0,0,0.4); backdrop-filter: blur(5px); padding: 15px; border-radius: 10px; border: 1px solid var(--glass-border); line-height: 1.6; font-family: 'JetBrains Mono'; font-size: 0.7rem; color: #fff;">
+                            SCAN_TARGET: <span id="hud-id">SEARCHING...</span> <br>
+                            ENVIRONMENT: NOMINAL <br>
+                            UPLINK: 2.4GB/S
                         </div>
                     </div>
-                </div>
+                </section>
 
-                <div class="glass-card" style="flex: 1;">
-                    <h5>Cognitive Module</h5>
-                    <div class="module-grid">
-                        <div class="mod-btn">
-                            STATUS
-                            <span id="cog-status">IDLE</span>
-                            <div class="pulsar"></div>
+                <!-- BOTTOM CONTROLS -->
+                <div class="control-panel">
+                    <div class="terminal-glass">
+                        <h6>Neural Command Console</h6>
+                        <div id="terminal"></div>
+                        <form class="input-box" id="cmd-form">
+                            <input type="text" id="cmd-input" class="neuro-input" placeholder="Execute neural transmit..." autocomplete="off">
+                            <button type="submit" class="neuro-btn">TRANSMIT</button>
+                        </form>
+                    </div>
+
+                    <div class="telemetry-glass">
+                        <h6>Telemetry & Cognitive</h6>
+                        <div class="hud-ring-group">
+                            <div class="ring-stat">
+                                <svg viewBox="0 0 100 100">
+                                    <circle class="bg" cx="50" cy="50" r="40"></circle>
+                                    <circle id="cpu-ring" class="bar" cx="50" cy="50" r="40"></circle>
+                                </svg>
+                                <div class="stat-label" id="cpu-val">0</div>
+                                <div style="position: absolute; bottom: -10px; font-size: 0.6rem; color: var(--text-dim);">CPU</div>
+                            </div>
+                            <div class="ring-stat">
+                                <svg viewBox="0 0 100 100">
+                                    <circle class="bg" cx="50" cy="50" r="40"></circle>
+                                    <circle id="fps-ring" class="bar" cx="50" cy="50" r="40" style="stroke: var(--secondary)"></circle>
+                                </svg>
+                                <div class="stat-label" id="fps-val">0</div>
+                                <div style="position: absolute; bottom: -10px; font-size: 0.6rem; color: var(--text-dim);">FPS</div>
+                            </div>
                         </div>
-                        <div class="mod-btn">
-                            IDENTITY
-                            <span id="cog-id">--</span>
+
+                        <div class="cog-card">
+                            <div class="cog-row">
+                                <span class="cog-label">System Identity</span>
+                                <span class="cog-value" id="cog-id">IDLE</span>
+                            </div>
+                            <div class="cog-row">
+                                <span class="cog-label">Focus State</span>
+                                <span class="cog-value" id="cog-focus">OFF</span>
+                            </div>
+                            <div class="cog-row">
+                                <span class="cog-label">Neural Health</span>
+                                <span class="cog-value" style="color: var(--accent)">OPTIMAL</span>
+                            </div>
                         </div>
-                        <div class="mod-btn">
-                            FOCUS MODE
-                            <span id="cog-focus">OFF</span>
-                        </div>
-                        <div class="mod-btn">
-                            SENSOR_LINK
-                            <span>STABLE</span>
+
+                        <div class="super-controls">
+                            <button onclick="sendCmd('f')" class="sc-btn">OVERRIDE_FOCUS</button>
+                            <button onclick="sendCmd('v')" class="sc-btn">TOGGLE_VOICE</button>
                         </div>
                     </div>
-                    
-                    <h5 style="margin-top: 25px;">Proximal Subjects</h5>
-                    <div id="subjects" style="display: flex; flex-wrap: wrap; gap: 8px;">
-                        <div style="color: var(--text-dim); font-size: 0.7rem;">Scanning...</div>
-                    </div>
                 </div>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <button onclick="sendCmd('f')" class="mod-btn" style="text-align: center;">FORCE_FOCUS</button>
-                    <button onclick="sendCmd('v')" class="mod-btn" style="text-align: center;">MUTE_VOICE</button>
-                </div>
-            </aside>
+            </div>
         </div>
 
         <script>
@@ -458,9 +422,9 @@ def index():
                 const cpuRing = document.getElementById('cpu-ring');
                 const fpsRing = document.getElementById('fps-ring');
                 
-                // Formula: 283 - (283 * percentage / 100)
-                cpuRing.style.strokeDashoffset = 283 - (283 * data.cpu / 100);
-                fpsRing.style.strokeDashoffset = 283 - (283 * data.fps / 30 * 100 / 100); // Scaled for 30fps
+                // Circumference = 2 * PI * R (R=40) ≈ 251
+                cpuRing.style.strokeDashoffset = 251 - (251 * data.cpu / 100);
+                fpsRing.style.strokeDashoffset = 251 - (251 * data.fps / 30 * 100 / 100);
 
                 document.getElementById('cpu-val').innerText = data.cpu;
                 document.getElementById('fps-val').innerText = Math.round(data.fps);
@@ -468,31 +432,19 @@ def index():
                 lastPing = Date.now();
 
                 // Cognitive
-                document.getElementById('cog-id').innerText = data.identity || (data.human_present ? "UNIDENTIFIED" : "NO_SIGNAL");
-                document.getElementById('cog-status').innerText = data.human_present ? "SUBJECT_LOCKED" : "SCANNING...";
+                const userId = data.identity || (data.human_present ? "UNIDENTIFIED" : "NO_SIGNAL");
+                document.getElementById('cog-id').innerText = userId;
+                document.getElementById('hud-id').innerText = userId.toUpperCase();
                 document.getElementById('cog-focus').innerText = data.focus_mode ? "REINFORCED" : "DEACTIVATED";
-                document.getElementById('cog-focus').style.color = data.focus_mode ? "var(--secondary)" : "var(--text-dim)";
-
-                // Subjects
-                const subContainer = document.getElementById('subjects');
-                if(data.objects && data.objects.length) {
-                    subContainer.innerHTML = data.objects.map(o => `
-                        <div style="padding: 5px 10px; background: rgba(0, 242, 255, 0.1); border: 1px solid var(--accent); color: var(--accent); border-radius: 4px; font-size: 0.65rem; font-family: 'JetBrains Mono';">
-                            ${o.toUpperCase()}
-                        </div>
-                    `).join('');
-                } else if (!data.human_present) {
-                    subContainer.innerHTML = '<div style="color: var(--text-dim); font-size: 0.7rem;">NO_ENTITIES_LOCALIZED</div>';
-                }
+                document.getElementById('cog-focus').style.color = data.focus_mode ? "var(--accent)" : "var(--text-dim)";
             });
 
             socket.on('new_log', (entry) => {
                 const div = document.createElement('div');
-                div.className = `log-item ${entry.type}`;
+                div.className = `log-row ${entry.type}`;
                 div.innerHTML = `
-                    <span class="l-time">${entry.time}</span>
-                    <span class="l-tag" style="color: ${entry.type === 'ai' ? 'var(--accent)' : 'var(--secondary)'}">[${entry.type.toUpperCase()}]</span>
-                    <span class="l-msg">${entry.msg}</span>
+                    <div class="l-time">${entry.time}</div>
+                    <div class="l-content">${entry.msg}</div>
                 `;
                 terminal.appendChild(div);
                 terminal.scrollTop = terminal.scrollHeight;
@@ -516,8 +468,6 @@ def index():
                 }
             };
         </script>
-    </body>
-    </html>
     </body>
     </html>
     """)
