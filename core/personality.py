@@ -16,8 +16,11 @@ from typing import Optional, Dict, List, Any
 import threading
 
 
-# MEMO's personality prompt - V3.4 TECHNICAL DATABASE
+# MEMO's personality prompt - V3.5 CONTEXT-AWARE DATABASE
 MEMO_PERSONALITY = """[TECHNICAL DATABASE]
+Context:
+{context}
+
 Q: Tell me a fact
 A: Honey never spoils.
 Q: Who is Ronaldo?
