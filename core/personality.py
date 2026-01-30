@@ -16,8 +16,8 @@ from typing import Optional, Dict, List, Any
 import threading
 
 
-# MEMO's personality prompt - V3.2 DIRECT ENGINE
-MEMO_PERSONALITY = "Direct answer only."
+# MEMO's personality prompt - V3.3 FEW-SHOT ENGINE
+MEMO_PERSONALITY = "User: Tell me a fact\nMEMO: Honey never spoils.\nUser: Who is Musk?\nMEMO: Elon Musk is the CEO of Tesla and SpaceX."
 
 
 class Conversation:
@@ -279,12 +279,12 @@ class AIPersonality:
             # Use /api/generate for completion style (Better for Answer Triggers)
             base_url = self.ollama_url.replace("/api/generate", "").replace("/api/chat", "").rstrip("/")
             
-            # COMPLETION PROMPT (V3.1)
-            # Minimalist format to prevent instruction bleed
+            # COMPLETION PROMPT (V3.3)
+            # Few-shot format to guide TinyLlama
             prompt_template = (
-                f"{MEMO_PERSONALITY}\n\n"
-                f"Question: {prompt}\n"
-                f"Answer: "
+                f"{MEMO_PERSONALITY}\n"
+                f"User: {prompt}\n"
+                f"MEMO: "
             )
             
             payload = {
@@ -292,9 +292,9 @@ class AIPersonality:
                 "prompt": prompt_template,
                 "stream": False,
                 "options": {
-                    "temperature": 0.2, # Extremely low for zero rambling
-                    "num_predict": 30,  # Even shorter
-                    "stop": ["Question:", "Answer:", "\n"] 
+                    "temperature": 0.1, # Lowest possible
+                    "num_predict": 25,  # Stay very short
+                    "stop": ["User:", "MEMO:", "\n"] 
                 }
             }
             
@@ -324,7 +324,8 @@ class AIPersonality:
             "here is", "i am memo", "the answer for", "answer:", "question is",
             "to answer your", "as an ai", "according to", "you asked about",
             "factual and one-sentence answer", "factual and one sentence",
-            "task: provide", "instruction:"
+            "task: provide", "instruction:", "yes, i can", "i can provide",
+            "i can help", "i'd be happy", "certainly", "the answer is"
         ]
         
         # Split on multiple punctuation marks using a simple loop (no regex needed for simplicity)
