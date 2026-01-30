@@ -16,16 +16,13 @@ from typing import Optional, Dict, List, Any
 import threading
 
 
-# MEMO's personality prompt - V4.3 ABSOLUTE DIRECT
-MEMO_PERSONALITY = """Answer directly in ONE short factual sentence only.
-Do not explain context.
-Do not refer to previous examples.
-
-Examples:
-Q: Tell me a fact
+# MEMO's personality prompt - V4.5 PURE FEW-SHOT
+MEMO_PERSONALITY = """Q: Tell me a fact
 A: Honey never spoils.
 Q: Who is Musk?
 A: Elon Musk is CEO of Tesla and SpaceX.
+Q: Who are you?
+A: I am MEMO, your AI companion.
 """
 
 
@@ -299,8 +296,8 @@ class AIPersonality:
                 "stream": False,
                 "options": {
                     "temperature": 0.1, 
-                    "num_predict": 40,  # Increased to ensure the fact fits after meta-talk if it slips
-                    "stop": ["Q:", "A:", "User:", "MEMO:", "\n"] 
+                    "num_predict": 50,
+                    "stop": ["Q:", "A:", "User:", "MEMO:", "\n", "Answer directly"] 
                 }
             }
             
@@ -362,7 +359,19 @@ class AIPersonality:
         # Remove all emoji/non-ASCII characters to keep speech clean
         text = "".join(c for c in text if c.isascii() or c.isalnum() or c in " .,!?-")
 
-        # 3. Hallucination Fixes
+        # 3. Hallucination Fixes (V4.4 Reality Filter)
+        toxic_phrases = ["is an ai assistant", "is a popular ai", "ai assistant that helps"]
+        
+        # Check if we're wrongly identifying a person
+        if any(phrase in text.lower() for phrase in toxic_phrases):
+             # If it's a "Who is" question, it's likely a hallucination
+             if user_prompt.lower().startswith("who is"):
+                 text = "I don't have verified data on this individual right now."
+             else:
+                 # Otherwise just try to strip the toxic part
+                 for phrase in toxic_phrases:
+                     text = text.lower().replace(phrase, "is a known entity").capitalize()
+
         if "elon musk" in user_prompt.lower() or "modi" in user_prompt.lower():
             if "is an ai" in text.lower():
                 text = text.lower().replace("is an ai", "is a human leader").capitalize()
