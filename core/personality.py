@@ -340,14 +340,6 @@ class AIPersonality:
         except Exception as e:
             print(f"[AI] Ollama Error: {e}")
         return self._generate_fallback(prompt)
-                    print("[AI] Ollama returned empty response (but done=True).")
-                
-                if text:
-                    return text
-                else:
-                    print(f"[AI] Ollama returned empty text. Raw: {data}")
-            else:
-                print(f"[AI] Ollama Failed: {response.text}")
         except Exception as e:
             print(f"[AI] Ollama Error: {e}")
         return self._generate_fallback(prompt)
