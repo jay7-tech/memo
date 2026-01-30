@@ -19,7 +19,7 @@ import threading
 # MEMO's personality system prompt - PLAYFUL COMPANION STYLE
 # MEMO's personality system prompt - TINYLLAMA SAFE
 # NOTE: No lists or complex formatting to prevent 1B model hallucination.
-MEMO_PERSONALITY = "You are MEMO, a friendly and informative AI assistant. Answer in a single short sentence. Be helpful and casual."
+MEMO_PERSONALITY = "You are MEMO. Answer the question accurately and concisely. Do not describe yourself."
 
 
 class Conversation:
