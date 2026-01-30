@@ -16,8 +16,8 @@ from typing import Optional, Dict, List, Any
 import threading
 
 
-# MEMO's personality prompt - V3.1 DIRECT ENGINE
-MEMO_PERSONALITY = "Task: Provide a factual, one-sentence answer to the Question. Use NO introductory phrases."
+# MEMO's personality prompt - V3.2 DIRECT ENGINE
+MEMO_PERSONALITY = "Direct answer only."
 
 
 class Conversation:
@@ -322,7 +322,9 @@ class AIPersonality:
         fluff = [
             "sure", "happy to help", "can help", "direct answer", "short answer",
             "here is", "i am memo", "the answer for", "answer:", "question is",
-            "to answer your", "as an ai", "according to", "you asked about"
+            "to answer your", "as an ai", "according to", "you asked about",
+            "factual and one-sentence answer", "factual and one sentence",
+            "task: provide", "instruction:"
         ]
         
         # Split on multiple punctuation marks using a simple loop (no regex needed for simplicity)
