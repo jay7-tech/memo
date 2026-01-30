@@ -313,22 +313,47 @@ class AIPersonality:
                 data = response.json()
                 # Chat endpoint returns 'message' -> 'content'
                 text = data.get('message', {}).get('content', '').strip()
-                
-                # Double check for legacy response format just in case
-                if not text:
-                     text = data.get('response', '').strip()
-
-                if text:
-                    return text
-                else:
-                    print(f"[AI] Ollama returned empty text. Raw: {data}")
+                return self._sanitize_response(text, prompt)
             else:
-                print(f"[AI] Ollama Failed: {response.text}")
-        except Exception as e:
-            print(f"[AI] Ollama Error: {e}")
-        return self._generate_fallback(prompt)
+                return f"Brain freeze! (Error {response.status_code})"
+                
 
     
+    def _sanitize_response(self, text: str, user_prompt: str) -> str:
+        """Clean up TinyLlama's hallucinations and repetitions."""
+        # 1. Remove self-identification spam
+        bad_prefixes = [
+            "I am MEMO", "I am an AI", "As an AI", "I am a friendly", 
+            "MEMO is a", "Elon Musk is an AI", "Hello! I am", 
+            "The user asked", "You asked"
+        ]
+        
+        for prefix in bad_prefixes:
+            if text.lower().strip().startswith(prefix.lower()):
+                # Try to salvage the rest of the sentence
+                parts = text.split('.', 1)
+                if len(parts) > 1:
+                    text = parts[1].strip()
+                else:
+                    text = "" # Kill the bad sentence
+        
+        # 2. Fix the "Elon Musk is an AI" specific hallucination
+        if "is an AI" in text and "Elon" in text:
+             text = text.replace("is an AI-powered artificial intelligence", "is a visionary entrepreneur")
+             text = text.replace("is an AI", "is a tech billionaire")
+
+        # 3. Stop it from repeating the user's prompt
+        # If response is almost identical to prompt (e.g. "Tell a joke")
+        import difflib
+        similarity = difflib.SequenceMatcher(None, text.lower(), user_prompt.lower()).ratio()
+        if similarity > 0.8:
+            # It just echoed. Return a fallback.
+            if "joke" in user_prompt.lower():
+                return "Why did the robot sleep? Because it was le-tired."
+            return "I didn't catch that."
+        
+        return text
+
     def _generate_fallback(self, prompt: str) -> str:
         """Friendly local responses when AI is offline."""
         prompt_lower = prompt.lower()
