@@ -475,11 +475,14 @@ class MEMOApp:
                         print(f">> MEMO: {response}")
                         speak(response)
                     else:
-                        # Pass to query handler
-                        response = self.query_handler.handle_query(user_input, self.scene_state)
+                        # Pass to query handler (Pass personality for LLM fallback)
+                        response = self.query_handler.handle_query(user_input, self.scene_state, personality=self.personality)
                         if response:
                             print(f">> MEMO: {response}")
                             speak(response)
+                            # Log to dashboard
+                            from interface.dashboard import add_log
+                            add_log(response, "ai")
                 
             except EOFError:
                 self.running = False
@@ -487,24 +490,8 @@ class MEMOApp:
             except Exception as e:
                 print(f"[Input] Error: {e}")
     
-    def _terminal_input_loop(self):
-        """Allow typing commands directly in the terminal."""
-        while self.running:
-            try:
-                self.is_prompting = True
-                text = input().strip()
-                self.is_prompting = False
-                
-                if text:
-                    print(f"[Terminal] Transmitting: '{text}'")
-                    self.event_bus.publish(Event(EventType.VOICE_COMMAND, {'text': text}))
-                    # Give a tiny window for the transmission log to be seen
-                    time.sleep(0.1)
-            except EOFError:
-                break
-            except Exception as e:
-                print(f"[Terminal] Input error: {e}")
-                time.sleep(1)
+    # Consolidated terminal loop is already running in self.terminal_thread
+    # No duplicate needed here.
 
     def run(self, source=0, rotation=0):
         """

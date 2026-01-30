@@ -16,9 +16,11 @@ from typing import Optional, Dict, List, Any
 import threading
 
 
-# MEMO's personality prompt - V4.5 PURE FEW-SHOT
+# MEMO's personality prompt - V4.7 MINIMALIST FEW-SHOT
 MEMO_PERSONALITY = """Q: Tell me a fact
 A: Honey never spoils.
+Q: Tell me a joke
+A: Why did the robot cross the road? To get to the other battery!
 Q: Who is Musk?
 A: Elon Musk is CEO of Tesla and SpaceX.
 Q: Who are you?
@@ -295,9 +297,9 @@ class AIPersonality:
                 "prompt": prompt_template,
                 "stream": False,
                 "options": {
-                    "temperature": 0.1, 
-                    "num_predict": 50,
-                    "stop": ["Q:", "A:", "User:", "MEMO:", "\n", "Answer directly"] 
+                    "temperature": 0.3, # Increased slightly for more creative jokes/facts
+                    "num_predict": 100, # Increased for full responses
+                    "stop": ["Q:", "A:", "User:", "MEMO:", "Answer directly"] 
                 }
             }
             
@@ -324,12 +326,17 @@ class AIPersonality:
         # 1. Aggressive Meta-talk Killer
         fluff_starts = [
             "sure", "yes", "okay", "i can", "i would", "here is", "the answer",
-            "memo:", "a:", "q:", "certainly", "happy to", "i'm happy", "another fact"
+            "memo:", "a:", "q:", "certainly", "happy to", "i'm happy", "another fact",
+            "answering directly", "answer directly", "here's a", "here's the"
         ]
         
-        # Split on all sentence enders
+        # Split on sentence enders AND instructional delimiters like commas after meta-talk
         raw_text = text.replace('!', '.').replace('?', '.').replace(':', '.')
-        parts = raw_text.split('.')
+        # If it starts with meta-talk and has a comma, the answer usually follows the comma
+        if any(text.lower().startswith(fs) for fs in fluff_starts) and ',' in text:
+            text = text.split(',', 1)[1]
+            
+        parts = text.replace('!', '.').replace('?', '.').replace(':', '.').split('.')
         clean_parts = []
         
         prompt_words = set(user_prompt.lower().split())
