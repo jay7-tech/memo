@@ -223,7 +223,13 @@ class AIPersonality:
             elif self.backend == 'gemini' and self._gemini_model:
                 response = self._generate_gemini(full_prompt)
             elif self.backend == 'ollama':
-                response = self._generate_ollama(full_prompt)
+                # Ollama Chat API handles system prompt internally now
+                # Add instruction snippet to prompt if it's a quick response
+                if response_type == "quick":
+                    ollama_prompt = f"{prompt} (Keep it short, <10 words)"
+                else:
+                    ollama_prompt = prompt
+                response = self._generate_ollama(ollama_prompt)
             else:
                 response = self._generate_fallback(prompt)
             
@@ -294,32 +300,46 @@ class AIPersonality:
         try:
             import requests
             from interface.dashboard import add_log
-            add_log(f"Brain is thinking about: {prompt[:30]}...", "ai")
+            
+            # Use /api/chat for better instruction following
+            base_url = self.ollama_url.replace("/api/generate", "").replace("/api/chat", "").rstrip("/")
+            
+            # Construct messages properly
+            messages = [
+                {"role": "system", "content": MEMO_PERSONALITY.format(context=self._build_context())},
+                {"role": "user", "content": prompt}
+            ]
             
             payload = {
                 "model": self.ollama_model,
-                "prompt": prompt,
+                "messages": messages,
                 "stream": False,
                 "options": {
-                    "temperature": 0.7,
-                    "stop": ["User:", "System:", "\n\n"] 
+                    "temperature": 0.7
                 }
             }
             
-            # Handle config inconsistencies: ensure we don't duplicate /api/generate
-            base_url = self.ollama_url.replace("/api/generate", "").rstrip("/")
-            response = requests.post(f"{base_url}/api/generate", json=payload, timeout=30)
+            add_log(f"Brain is thinking about: {prompt[:30]}...", "ai")
+            response = requests.post(f"{base_url}/api/chat", json=payload, timeout=30)
 
-            # print(f"[AI] Ollama Status: {response.status_code}") # Silence log
             if response.status_code == 200:
                 data = response.json()
-                text = data.get('response', '').strip()
+                # Chat endpoint returns 'message' -> 'content'
+                text = data.get('message', {}).get('content', '').strip()
                 
-                # Clean up "MEMO:" prefix if model generates it
-                if text.startswith("MEMO:"):
-                    text = text.replace("MEMO:", "", 1).strip()
-                
-                if not text and 'done' in data and data['done'] is True:
+                # Double check for legacy response format just in case
+                if not text:
+                     text = data.get('response', '').strip()
+
+                if text:
+                    return text
+                else:
+                    print(f"[AI] Ollama returned empty text. Raw: {data}")
+            else:
+                print(f"[AI] Ollama Failed: {response.text}")
+        except Exception as e:
+            print(f"[AI] Ollama Error: {e}")
+        return self._generate_fallback(prompt)
                     print("[AI] Ollama returned empty response (but done=True).")
                 
                 if text:
