@@ -16,8 +16,14 @@ from typing import Optional, Dict, List, Any
 import threading
 
 
-# MEMO's personality prompt - V3.3 FEW-SHOT ENGINE
-MEMO_PERSONALITY = "User: Tell me a fact\nMEMO: Honey never spoils.\nUser: Who is Musk?\nMEMO: Elon Musk is the CEO of Tesla and SpaceX."
+# MEMO's personality prompt - V3.4 TECHNICAL DATABASE
+MEMO_PERSONALITY = """[TECHNICAL DATABASE]
+Q: Tell me a fact
+A: Honey never spoils.
+Q: Who is Ronaldo?
+A: Cristiano Ronaldo is a famous Portuguese football player.
+Q: What is the capital of France?
+A: The capital of France is Paris."""
 
 
 class Conversation:
@@ -279,12 +285,12 @@ class AIPersonality:
             # Use /api/generate for completion style (Better for Answer Triggers)
             base_url = self.ollama_url.replace("/api/generate", "").replace("/api/chat", "").rstrip("/")
             
-            # COMPLETION PROMPT (V3.3)
-            # Few-shot format to guide TinyLlama
+            # COMPLETION PROMPT (V3.4)
+            # Technical Database format (Q&A)
             prompt_template = (
                 f"{MEMO_PERSONALITY}\n"
-                f"User: {prompt}\n"
-                f"MEMO: "
+                f"Q: {prompt}\n"
+                f"A: "
             )
             
             payload = {
@@ -292,9 +298,9 @@ class AIPersonality:
                 "prompt": prompt_template,
                 "stream": False,
                 "options": {
-                    "temperature": 0.1, # Lowest possible
-                    "num_predict": 25,  # Stay very short
-                    "stop": ["User:", "MEMO:", "\n"] 
+                    "temperature": 0.1, 
+                    "num_predict": 40,  # Increased to ensure the fact fits after meta-talk if it slips
+                    "stop": ["Q:", "A:", "User:", "MEMO:", "\n"] 
                 }
             }
             
@@ -315,21 +321,17 @@ class AIPersonality:
             return self._generate_fallback(prompt)
 
     def _sanitize_response(self, text: str, user_prompt: str) -> str:
-        """Ultimate Direct Answer Sanitizer (V3.1)."""
+        """Technical Database Sanitizer (V3.4)."""
         if not text: return ""
 
-        # 1. Broad meta-talk and repetitive fluff removal
-        fluff = [
-            "sure", "happy to help", "can help", "direct answer", "short answer",
-            "here is", "i am memo", "the answer for", "answer:", "question is",
-            "to answer your", "as an ai", "according to", "you asked about",
-            "factual and one-sentence answer", "factual and one sentence",
-            "task: provide", "instruction:", "yes, i can", "i can provide",
-            "i can help", "i'd be happy", "certainly", "the answer is"
+        # 1. Aggressive Meta-talk Killer
+        fluff_starts = [
+            "sure", "yes", "okay", "i can", "i would", "here is", "the answer",
+            "memo:", "a:", "q:", "certainly", "happy to", "i'm happy", "another fact"
         ]
         
-        # Split on multiple punctuation marks using a simple loop (no regex needed for simplicity)
-        raw_text = text.replace('!', '.').replace('?', '.')
+        # Split on all sentence enders
+        raw_text = text.replace('!', '.').replace('?', '.').replace(':', '.')
         parts = raw_text.split('.')
         clean_parts = []
         
@@ -337,41 +339,35 @@ class AIPersonality:
         
         for part in parts:
             p_low = part.lower().strip()
-            if not p_low: continue
+            if not p_low or len(p_low.split()) < 3: continue
 
-            # Filter logic:
-            # - No short meta-talk
-            # - No sentences that just contain the question words without extra info
-            # - No sentences that start with meta-intro phrases
+            # Reject if it starts with any fluff word
+            starts_with_fluff = any(p_low.startswith(fs) for fs in fluff_starts)
             
-            is_meta = any(f in p_low for f in fluff) and len(p_low.split()) < 8
+            # Check if it's just repeating the question
+            part_words = set(p_low.replace('who', '').replace('is', '').replace('what', '').split())
+            is_repeating = part_words.issubset(prompt_words) and len(p_low.split()) < 12
             
-            # Check if this sentence is just repeating the question (e.g. "Who is Ronaldo?")
-            part_words = set(p_low.replace('who', '').replace('is', '').split())
-            is_repeating = part_words.issubset(prompt_words) and len(p_low.split()) < 10
-            
-            if not is_meta and not is_repeating:
+            if not starts_with_fluff and not is_repeating:
                 clean_parts.append(part.strip())
         
-        # Reconstruct (Take only the FIRST valid factual statement)
+        # Reconstruct (Primary Answer Focus)
         if clean_parts:
             text = clean_parts[0]
         else:
-            # Fallback: if we filtered everything, take whatever was there but clean it
-            text = text.strip()
+            # V3.4 FIXED: If only fluff was found, return a smart default instead of the fluff
+            return "I don't have a direct answer for that right now."
 
-        # 2. Specific Factual Patching
+        # 2. Hallucination Fixes
         if "elon musk" in user_prompt.lower() or "modi" in user_prompt.lower():
             if "is an ai" in text.lower():
                 text = text.lower().replace("is an ai", "is a human leader").capitalize()
 
-        # 3. Aggressive leading junk removal
         text = text.lstrip(" :.,!?-")
-        
-        # Final formatting
         if text and not text.endswith(('.', '!', '?')):
             text += "."
-        return text[:150].strip() # Safety cap for speech length
+            
+        return text[:180].strip()
 
     def _generate_fallback(self, prompt: str) -> str:
         """Friendly local responses when AI is offline."""
