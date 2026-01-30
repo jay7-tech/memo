@@ -340,9 +340,7 @@ class AIPersonality:
         except Exception as e:
             print(f"[AI] Ollama Error: {e}")
         return self._generate_fallback(prompt)
-        except Exception as e:
-            print(f"[AI] Ollama Error: {e}")
-        return self._generate_fallback(prompt)
+
     
     def _generate_fallback(self, prompt: str) -> str:
         """Friendly local responses when AI is offline."""
