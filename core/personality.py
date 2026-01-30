@@ -197,11 +197,6 @@ class AIPersonality:
             context = self._build_context(scene_state)
             system_prompt = MEMO_PERSONALITY.format(context=context)
             
-            if response_type == "quick":
-                full_prompt = f"{system_prompt}\n\nUser: {prompt}\n\n(Instruction: Short answer, <10 words)\nMEMO:"
-            else:
-                full_prompt = f"{system_prompt}\n\nUser: {prompt}\n\nMEMO:"
-            
             # Extract lightweight history (Last 6 turns)
             history_str = ""
             for h in self.conversation.get_history()[-6:]:
@@ -215,9 +210,8 @@ class AIPersonality:
                 full_prompt = f"{system_prompt}\n\n[History]\n{history_str}\nQ: {prompt}\nA:"
                 response = self._generate_gemini(full_prompt)
             elif self.backend == 'ollama':
-                # For Ollama, we rebuild the prompt template with history
-                ollama_prompt = f"[History]\n{history_str}\nQ: {prompt}"
-                response = self._generate_ollama(ollama_prompt)
+                # Pass both history and prompt to Ollama handler
+                response = self._generate_ollama(prompt, history_str)
             else:
                 response = self._generate_fallback(prompt)
             
@@ -284,7 +278,7 @@ class AIPersonality:
                 print("[AI Gemini] ! Model not found.")
             return self._generate_fallback(prompt)
     
-    def _generate_ollama(self, prompt: str) -> str:
+    def _generate_ollama(self, prompt: str, history: str = "") -> str:
         try:
             import requests
             from interface.dashboard import add_log
@@ -292,10 +286,11 @@ class AIPersonality:
             # Use /api/generate for completion style (Better for Answer Triggers)
             base_url = self.ollama_url.replace("/api/generate", "").replace("/api/chat", "").rstrip("/")
             
-            # COMPLETION PROMPT (V3.4)
-            # Technical Database format (Q&A)
+            # COMPLETION PROMPT (V4.1)
+            # Technical Database format (Q&A) with History
             prompt_template = (
                 f"{MEMO_PERSONALITY}\n"
+                f"[History]\n{history}"
                 f"Q: {prompt}\n"
                 f"A: "
             )
