@@ -659,7 +659,6 @@ def main():
     except KeyboardInterrupt:
         pass  # Clean exit on Ctrl+C
     except Exception as e:
-    except Exception as e:
         print(f"\n[MEMO] Error: {e}")
     finally:
         # Force kill any lingering threads (like dashboard/voice)
