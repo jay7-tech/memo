@@ -20,11 +20,14 @@ else
     echo "[MEMO] AI Service already active."
 fi
 
-# Check if libcamerify exists (needed for Bookworm OS to us OpenCV)
-if command -v libcamerify &> /dev/null; then
-    echo "[MEMO] Detected libcamera system. Using libcamerify wrapper."
+# Check if libcamerify exists AND we are using a Ribbon Camera (not USB)
+# USB Webcams often crash with libcamerify on Bookworm
+if command -v libcamerify &> /dev/null && ! ls /dev/video* &> /dev/null; then
+    echo "[MEMO] Ribbon camera detected. Using libcamerify wrapper."
     libcamerify python main.py
 else
-    echo "[MEMO] Legacy camera system detected. Standard launch."
+    echo "[MEMO] USB Camera or Legacy system detected. Standard launch."
+    # CLEANUP: Kill any lingering instances to prevent "Device busy" errors
+    pkill -f "python main.py" 2>/dev/null
     python main.py
 fi
