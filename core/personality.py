@@ -360,7 +360,11 @@ class AIPersonality:
             # V3.4 FIXED: If only fluff was found, return a smart default instead of the fluff
             return "I don't have a direct answer for that right now."
 
-        # 2. Hallucination Fixes
+        # 2. Emoji Stripping (V4.2)
+        # Remove all emoji/non-ASCII characters to keep speech clean
+        text = "".join(c for c in text if c.isascii() or c.isalnum() or c in " .,!?-")
+
+        # 3. Hallucination Fixes
         if "elon musk" in user_prompt.lower() or "modi" in user_prompt.lower():
             if "is an ai" in text.lower():
                 text = text.lower().replace("is an ai", "is a human leader").capitalize()
