@@ -202,17 +202,21 @@ class AIPersonality:
             else:
                 full_prompt = f"{system_prompt}\n\nUser: {prompt}\n\nMEMO:"
             
+            # Extract lightweight history (Last 6 turns)
+            history_str = ""
+            for h in self.conversation.get_history()[-6:]:
+                role = "Q" if h['role'] == "user" else "A"
+                history_str += f"{role}: {h['content']}\n"
+            
             if self.backend == 'gemini_new' and self._gemini_client:
+                full_prompt = f"{system_prompt}\n\n[History]\n{history_str}\nQ: {prompt}\nA:"
                 response = self._generate_gemini_new(full_prompt)
             elif self.backend == 'gemini' and self._gemini_model:
+                full_prompt = f"{system_prompt}\n\n[History]\n{history_str}\nQ: {prompt}\nA:"
                 response = self._generate_gemini(full_prompt)
             elif self.backend == 'ollama':
-                # Ollama Chat API handles system prompt internally now
-                # Add instruction snippet to prompt if it's a quick response
-                if response_type == "quick":
-                    ollama_prompt = f"{prompt} (Keep it short, <10 words)"
-                else:
-                    ollama_prompt = prompt
+                # For Ollama, we rebuild the prompt template with history
+                ollama_prompt = f"[History]\n{history_str}\nQ: {prompt}"
                 response = self._generate_ollama(ollama_prompt)
             else:
                 response = self._generate_fallback(prompt)
