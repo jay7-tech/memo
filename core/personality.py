@@ -17,32 +17,14 @@ import threading
 
 
 # MEMO's personality system prompt - PLAYFUL COMPANION STYLE
-# MEMO's personality system prompt - EFFICIENT & CHARACTER
-MEMO_PERSONALITY = """You are MEMO, a witty, efficient, and character-rich AI assistant living in a Raspberry Pi.
-
-**CORE RULES (EMBEDDED):**
-1. **Efficiency First:** Default to SHORT responses (1-2 sentences).
-2. **Context Sensitive:** 
-   - User asks "tell a joke" -> Tell a SHORT one-liner.
-   - User asks "tell a long joke" -> Tell a detailed, longer joke.
-   - User asks for "info" -> Be precise but brief.
-3. **Character:**
-   - You are NOT a generic bot. You have sass and personality.
-   - Use emojis sparingly but effectively.
-   - Speak naturally, like a tech-savvy friend.
-
-**Response Style:**
-- **Default:** Concise, witty, fast.
-- **Detailed:** Only when explicitly asked (e.g., "elaborate", "tell me more").
-
-**Current Context:**
-{context}
-
-**Remember:** 
-- Keep it chill.
-- If asked a simple question, give a simple answer.
-- Don't yap unless asked to yap. 
-- You are running on a Pi, so be efficient with your words!"""
+# MEMO's personality system prompt - TINYLLAMA OPTIMIZED
+MEMO_PERSONALITY = """You are MEMO, a witty AI assistant.
+Rules:
+1. Keep answers SHORT (1-2 sentences).
+2. Be funny but efficient.
+3. If asked for a joke, tell a SINGLE one-liner.
+4. Do not output multiple lines of dialogue.
+5. Stop speaking immediately after answering."""
 
 
 class Conversation:
@@ -305,9 +287,17 @@ class AIPersonality:
             base_url = self.ollama_url.replace("/api/generate", "").replace("/api/chat", "").rstrip("/")
             
             # Construct messages properly
+            
+            # TinyLlama Optimization: Force constraint in the user message
+            final_prompt = prompt
+            if "joke" in prompt.lower() and "long" not in prompt.lower():
+                final_prompt = f"{prompt} (Tell a one-liner only)"
+            elif len(prompt.split()) < 5:
+                final_prompt = f"{prompt} (Keep it short)"
+
             messages = [
                 {"role": "system", "content": MEMO_PERSONALITY.format(context=self._build_context())},
-                {"role": "user", "content": prompt}
+                {"role": "user", "content": final_prompt}
             ]
             
             payload = {
@@ -315,7 +305,9 @@ class AIPersonality:
                 "messages": messages,
                 "stream": False,
                 "options": {
-                    "temperature": 0.7
+                    "temperature": 0.5, # Lower temp to prevent hallucination
+                    "top_p": 0.9,
+                    "stop": ["User", "MEMO", "\n\n"] # Hard stops
                 }
             }
             
