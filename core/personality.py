@@ -16,9 +16,8 @@ from typing import Optional, Dict, List, Any
 import threading
 
 
-# MEMO's personality prompt - TINYLLAMA OPTIMIZED
-# We keep this very simple to avoid the model repeating the instructions.
-MEMO_PERSONALITY = "System: You are MEMO, a helpful assistant. Provide a direct, short answer to the user."
+# MEMO's personality prompt - V3 DIRECT ENGINE
+MEMO_PERSONALITY = "Instruction: Answer the user directly and concisely. Do not repeat the question or add meta-talk."
 
 
 class Conversation:
@@ -277,39 +276,35 @@ class AIPersonality:
             import requests
             from interface.dashboard import add_log
             
-            # Use /api/chat for better instruction following
+            # Use /api/generate for completion style (Better for Answer Triggers)
             base_url = self.ollama_url.replace("/api/generate", "").replace("/api/chat", "").rstrip("/")
             
-            # TinyLlama Optimization: Some models on Pi struggle with the 'system' role. 
-            # We'll merge instructions into a single clean block if needed.
-            
-            messages = [
-                {"role": "user", "content": f"{MEMO_PERSONALITY}\n\nUser Question: {prompt}\n\nAssistant Response:"}
-            ]
+            # COMPLETION PROMPT (V3)
+            # This format forces the AI to fill in the blank after "### Answer:"
+            prompt_template = (
+                f"{MEMO_PERSONALITY}\n\n"
+                f"### Question: {prompt}\n"
+                f"### Answer: "
+            )
             
             payload = {
                 "model": self.ollama_model,
-                "messages": messages,
+                "prompt": prompt_template,
                 "stream": False,
                 "options": {
-                    "temperature": 0.4, # Lower for higher accuracy/less rambling
-                    "num_predict": 50,  # Keep responses short
-                    "stop": ["User:", "System:", "Assistant:", "\n"] # Aggressive stops
+                    "temperature": 0.3, # Low temp for high stability
+                    "top_p": 0.5,       # More focused
+                    "num_predict": 40,  # Strict length limit
+                    "stop": ["###", "Question:", "\n"] # Hard stops
                 }
             }
             
             add_log(f"Brain is thinking about: {prompt[:30]}...", "ai")
-            response = requests.post(f"{base_url}/api/chat", json=payload, timeout=90)
+            response = requests.post(f"{base_url}/api/generate", json=payload, timeout=90)
 
             if response.status_code == 200:
                 data = response.json()
-                text = data.get('message', {}).get('content', '').strip()
-                
-                # If TinyLlama decided to ignore the stops and include labels, strip them.
-                for label in ["Assistant Response:", "Response:", "A:", "MEMO:"]:
-                    if text.startswith(label):
-                        text = text[len(label):].strip()
-                
+                text = data.get('response', '').strip()
                 return self._sanitize_response(text, prompt)
             else:
                 return f"Brain freeze! (Error {response.status_code})"
@@ -321,53 +316,45 @@ class AIPersonality:
             return self._generate_fallback(prompt)
 
     def _sanitize_response(self, text: str, user_prompt: str) -> str:
-        """Clean up TinyLlama's hallucinations and repetitions."""
-        # 1. Remove self-identification spam
-        bad_prefixes = [
-            "I am MEMO", "I am an AI", "As an AI", "I am a friendly", 
-            "MEMO is a", "Elon Musk is an AI", "Hello! I am", 
-            "The user asked", "You asked", "Answer the question",
-            "Narendra Modi is an AI", "You are MEMO"
+        """Direct Answer Sanitizer (V3)."""
+        if not text:
+            return ""
+
+        # 1. Broad phrase removal (Meta-talk)
+        fluff = [
+            "sure!", "here's a", "here is", "direct and short", 
+            "i can help", "i am memo", "answer to the", "a short answer",
+            "the question is", "to answer your", "i would say",
+            "according to", "visionary entrepreneur" # Keep this, users like it for Musk
         ]
         
-        for prefix in bad_prefixes:
-            if text.lower().strip().startswith(prefix.lower()):
-                # If it's repeating instructions, try to find where the actual answer starts
-                # Often it repeats the whole prompt then says "Answer: X"
-                if "answer:" in text.lower():
-                    text = text.lower().split("answer:", 1)[1].strip()
-                elif "modi is" in text.lower() and "modi is an ai" not in text.lower():
-                    # Salvage it if it contains the keywords but isn't the AI hallucination
-                    pass 
-                else:
-                    parts = text.split('.', 1)
-                    if len(parts) > 1:
-                        text = parts[1].strip()
-                    else:
-                        text = "" # Kill the bad sentence
+        # Strip common intro sentences
+        sentences = text.split('.')
+        clean_sentences = []
+        for s in sentences:
+            s_low = s.lower().strip()
+            # If the sentence is just intro fluff, skip it
+            is_fluff = any(f in s_low for f in fluff) and len(s_low.split()) < 10
+            if not is_fluff and s.strip():
+                clean_sentences.append(s.strip())
         
-        # 1.5 Strip original system instructions if they leaked
-        if "accurately and concisely" in text.lower():
-             text = text.replace("accurately and concisely", "").replace("without describing yourself", "").strip()
-             # If just separators are left
-             text = text.lstrip("., ")
-        
-        # 2. Fix the "Elon Musk is an AI" specific hallucination
-        if "is an AI" in text and "Elon" in text:
-             text = text.replace("is an AI-powered artificial intelligence", "is a visionary entrepreneur")
-             text = text.replace("is an AI", "is a tech billionaire")
+        text = ". ".join(clean_sentences)
+        if text and not text.endswith('.'):
+            text += '.'
 
-        # 3. Stop it from repeating the user's prompt
-        # If response is almost identical to prompt (e.g. "Tell a joke")
-        import difflib
-        similarity = difflib.SequenceMatcher(None, text.lower(), user_prompt.lower()).ratio()
-        if similarity > 0.8:
-            # It just echoed. Return a fallback.
-            if "joke" in user_prompt.lower():
-                return "Why did the robot sleep? Because it was le-tired."
-            return "I didn't catch that."
+        # 2. Force Factual Accuracy (Specific Hallucination Fixes)
+        if "elon musk" in user_prompt.lower() or "modi" in user_prompt.lower():
+            if "is an ai" in text.lower():
+                text = text.lower().replace("is an ai", "is a human leader").capitalize()
+
+        # 3. Clean up leading punctuation or garbage
+        text = text.lstrip(" :.,!?-")
         
-        return text
+        # 4. Identity reinforcement (One last check)
+        if text.lower().startswith("memo:"):
+            text = text[5:].strip()
+
+        return text.strip()
 
     def _generate_fallback(self, prompt: str) -> str:
         """Friendly local responses when AI is offline."""

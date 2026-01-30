@@ -46,7 +46,7 @@ from core import (
 from camera_input import CameraSource
 from state import SceneState
 from reasoning import RulesEngine
-from core.features import VibeManager # New Feature
+
 from interface import QueryHandler
 from interface.tts_engine import init_tts, speak, speak_now, stop_tts
 
@@ -84,7 +84,6 @@ class MEMOApp:
         
         # Rules engine with personality for dynamic responses
         self.rules_engine = RulesEngine(personality=self.personality)
-        self.vibe_manager = VibeManager() # Vibe DJ
         
         # Voice
         self.voice_input = None
@@ -286,16 +285,6 @@ class MEMOApp:
         
         # Check rules
         events = self.rules_engine.check_rules(self.scene_state, timestamp)
-        
-        # Vibe DJ Check
-        new_vibe = self.vibe_manager.check_vibe(self.scene_state)
-        if new_vibe:
-            self.vibe_manager.play_music(new_vibe)
-            msg = "Switching to Chill Mode." if new_vibe == 'chill' else "Energy Mode Activated!"
-            speak(msg)
-            from interface.dashboard import add_log
-            add_log(f"Vibe DJ: {msg}", "info")
-            print(f">> Vibe DJ: {msg}")
 
         for event_text in events:
             if event_text.startswith("TTS:") and time.time() - self.last_tts_time > 5.0:
