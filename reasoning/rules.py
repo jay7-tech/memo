@@ -50,7 +50,7 @@ class RulesConfig:
         # Feature toggles
         self.enable_hydration = config.get('enable_hydration', True)
         self.enable_posture = config.get('enable_posture', True)
-        self.enable_proximity = config.get('enable_proximity', True)
+        self.enable_proximity = config.get('enable_proximity', False) # Disabled by default to reduce annoyance
         self.enable_greetings = config.get('enable_greetings', False)
 
 
