@@ -16,17 +16,17 @@ from typing import Optional, Dict, List, Any
 import threading
 
 
-# MEMO's personality prompt - V3.5 CONTEXT-AWARE DATABASE
-MEMO_PERSONALITY = """[TECHNICAL DATABASE]
-Context:
-{context}
+# MEMO's personality prompt - V4.3 ABSOLUTE DIRECT
+MEMO_PERSONALITY = """Answer directly in ONE short factual sentence only.
+Do not explain context.
+Do not refer to previous examples.
 
+Examples:
 Q: Tell me a fact
 A: Honey never spoils.
-Q: Who is Ronaldo?
-A: Cristiano Ronaldo is a famous Portuguese football player.
-Q: What is the capital of France?
-A: The capital of France is Paris."""
+Q: Who is Musk?
+A: Elon Musk is CEO of Tesla and SpaceX.
+"""
 
 
 class Conversation:
@@ -204,14 +204,14 @@ class AIPersonality:
                 history_str += f"{role}: {h['content']}\n"
             
             if self.backend == 'gemini_new' and self._gemini_client:
-                full_prompt = f"{system_prompt}\n\n[History]\n{history_str}\nQ: {prompt}\nA:"
+                full_prompt = f"{system_prompt}\n\nQ: {prompt}\nA:"
                 response = self._generate_gemini_new(full_prompt)
             elif self.backend == 'gemini' and self._gemini_model:
-                full_prompt = f"{system_prompt}\n\n[History]\n{history_str}\nQ: {prompt}\nA:"
+                full_prompt = f"{system_prompt}\n\nQ: {prompt}\nA:"
                 response = self._generate_gemini(full_prompt)
             elif self.backend == 'ollama':
-                # Pass both history and prompt to Ollama handler
-                response = self._generate_ollama(prompt, history_str)
+                # Pass clean prompt to Ollama handler
+                response = self._generate_ollama(prompt)
             else:
                 response = self._generate_fallback(prompt)
             
@@ -278,7 +278,7 @@ class AIPersonality:
                 print("[AI Gemini] ! Model not found.")
             return self._generate_fallback(prompt)
     
-    def _generate_ollama(self, prompt: str, history: str = "") -> str:
+    def _generate_ollama(self, prompt: str) -> str:
         try:
             import requests
             from interface.dashboard import add_log
@@ -286,11 +286,9 @@ class AIPersonality:
             # Use /api/generate for completion style (Better for Answer Triggers)
             base_url = self.ollama_url.replace("/api/generate", "").replace("/api/chat", "").rstrip("/")
             
-            # COMPLETION PROMPT (V4.1)
-            # Technical Database format (Q&A) with History
+            # COMPLETION PROMPT (V4.3) - Strict Q&A
             prompt_template = (
                 f"{MEMO_PERSONALITY}\n"
-                f"[History]\n{history}"
                 f"Q: {prompt}\n"
                 f"A: "
             )
