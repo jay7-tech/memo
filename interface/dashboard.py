@@ -58,411 +58,445 @@ def index():
     <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <title>MEMO // NEURAL INTERFACE</title>
+        <title>MEMO // NEURAL INTERFACE v2.0</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
         <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
         <style>
             :root {
-                --bg: #020406;
-                --panel: rgba(15, 20, 28, 0.7);
+                --bg: #05070a;
+                --panel: rgba(10, 15, 25, 0.6);
                 --accent: #00f2ff;
-                --accent-dim: rgba(0, 242, 255, 0.2);
+                --accent-glow: rgba(0, 242, 255, 0.4);
                 --secondary: #ff00ff;
                 --text: #e0e6ed;
-                --text-dim: #8a95a5;
-                --border: rgba(255, 255, 255, 0.08);
-                --glass: rgba(255, 255, 255, 0.03);
+                --text-dim: #6b7c93;
+                --border: rgba(0, 242, 255, 0.15);
+                --glass-border: rgba(255, 255, 255, 0.05);
             }
 
-            * { box-sizing: border-box; }
+            * { box-sizing: border-box; cursor: crosshair; }
+            ::-webkit-scrollbar { width: 4px; }
+            ::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 10px; }
+
             body { 
                 font-family: 'Outfit', sans-serif; 
-                background: var(--bg); 
-                background-image: 
-                    radial-gradient(circle at 10% 10%, rgba(0, 242, 255, 0.08) 0%, transparent 40%),
-                    radial-gradient(circle at 90% 90%, rgba(255, 0, 255, 0.08) 0%, transparent 40%);
+                background: var(--bg);
                 color: var(--text); 
                 margin: 0; padding: 0; min-height: 100vh;
-                overflow-x: hidden;
+                overflow: hidden;
+                background-image: 
+                    radial-gradient(circle at 50% 50%, rgba(0, 242, 255, 0.03) 0%, transparent 70%),
+                    repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(255,255,255,0.01) 1px, rgba(255,255,255,0.01) 2px);
             }
 
-            /* Glassmorphism utility */
-            .glass {
-                background: var(--panel);
-                backdrop-filter: blur(16px);
-                -webkit-backdrop-filter: blur(16px);
-                border: 1px solid var(--border);
-                border-radius: 16px;
-                box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
-            }
-
-            .header {
-                height: 70px;
-                padding: 0 40px;
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                border-bottom: 1px solid var(--border);
-                background: rgba(2, 4, 6, 0.8);
-                backdrop-filter: blur(10px);
-                position: sticky; top: 0; z-index: 1000;
-            }
-
-            .logo {
-                font-size: 1.4rem;
-                font-weight: 600;
-                letter-spacing: 4px;
-                color: #fff;
-                display: flex;
-                align-items: center;
-                gap: 15px;
-            }
-
-            .logo span { color: var(--accent); }
-
-            .status-orbit {
-                width: 12px; height: 12px;
-                background: var(--accent);
-                border-radius: 50%;
-                box-shadow: 0 0 15px var(--accent);
-                position: relative;
-            }
-
-            .status-orbit::after {
-                content: '';
-                position: absolute;
-                inset: -4px;
-                border: 1px solid var(--accent);
-                border-radius: 50%;
-                animation: rotate 4s linear infinite;
-            }
-
-            @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-
-            .main-layout {
+            /* --- LAYOUT --- */
+            .app-container {
                 display: grid;
-                grid-template-columns: 1fr 380px;
-                gap: 25px;
-                padding: 25px;
-                max-width: 1600px;
+                grid-template-areas: 
+                    "header header"
+                    "vision telemetry"
+                    "terminal telemetry";
+                grid-template-columns: 1fr 340px;
+                grid-template-rows: 70px 1fr 300px;
+                height: 100vh;
+                gap: 20px;
+                padding: 20px;
+                max-width: 1800px;
                 margin: 0 auto;
             }
 
-            /* Video Section */
-            .video-hub {
+            .header {
+                grid-area: header;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0 20px;
+                background: rgba(10, 15, 25, 0.8);
+                border: 1px solid var(--border);
+                border-radius: 12px;
+                backdrop-filter: blur(10px);
+            }
+
+            .vision { 
+                grid-area: vision;
+                position: relative;
+                border: 1px solid var(--border);
+                border-radius: 16px;
+                overflow: hidden;
+                background: #000;
+            }
+
+            .terminal { 
+                grid-area: terminal;
+                display: flex;
+                flex-direction: column;
+                background: var(--panel);
+                border: 1px solid var(--border);
+                border-radius: 16px;
+                padding: 15px;
+                backdrop-filter: blur(20px);
+            }
+
+            .telemetry { 
+                grid-area: telemetry;
                 display: flex;
                 flex-direction: column;
                 gap: 20px;
             }
 
-            .feed-container {
+            /* --- COMPONENTS --- */
+            .glass-card {
+                background: var(--panel);
+                border: 1px solid var(--glass-border);
+                border-radius: 16px;
+                padding: 20px;
+                backdrop-filter: blur(20px);
+                box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            }
+
+            .logo {
+                font-size: 1.2rem;
+                font-weight: 600;
+                letter-spacing: 5px;
+                color: #fff;
+                display: flex;
+                align-items: center;
+                gap: 15px;
+            }
+            .logo span { color: var(--accent); opacity: 0.7; font-size: 0.8rem; }
+
+            /* Circular Telemetry */
+            .telemetry-circle-container {
+                display: flex;
+                justify-content: space-around;
+                margin-top: 10px;
+            }
+
+            .hud-ring {
                 position: relative;
-                width: 100%;
-                aspect-ratio: 16/9;
-                background: #000;
-                border-radius: 20px;
-                overflow: hidden;
-                border: 1px solid var(--border);
+                width: 100px; height: 100px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
             }
 
-            .feed-container img {
-                width: 100%; height: 100%; object-fit: contain;
+            .hud-ring svg {
+                position: absolute;
+                width: 100%; height: 100%;
+                transform: rotate(-90deg);
             }
 
-            /* Neural HUD SVG */
-            .hud-overlay {
+            .hud-ring circle {
+                fill: none;
+                stroke-width: 4;
+                stroke-linecap: round;
+            }
+
+            .hud-ring .bg { stroke: rgba(255,255,255,0.05); }
+            .hud-ring .progress { 
+                stroke: var(--accent); 
+                stroke-dasharray: 283; 
+                stroke-dashoffset: 283;
+                transition: stroke-dashoffset 0.5s ease;
+                filter: drop-shadow(0 0 5px var(--accent));
+            }
+
+            .hud-value {
+                font-family: 'JetBrains Mono';
+                font-size: 1.1rem;
+                font-weight: 700;
+                color: #fff;
+            }
+            .hud-label {
+                position: absolute;
+                bottom: -20px;
+                font-size: 0.6rem;
+                color: var(--text-dim);
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+
+            /* Video Feed HUD */
+            .feed-img { width: 100%; height: 100%; object-fit: contain; opacity: 0.9; }
+            .vision-overlay {
                 position: absolute;
                 inset: 0;
                 pointer-events: none;
-                z-index: 10;
+                background: radial-gradient(circle at 50% 50%, transparent 60%, rgba(0,0,0,0.4) 100%);
             }
-
-            .hud-corner {
+            .reticle {
                 position: absolute;
-                width: 40px; height: 40px;
-                border: 2px solid var(--accent-dim);
+                top: 50%; left: 50%;
+                transform: translate(-50%, -50%);
+                width: 200px; height: 200px;
+                border: 1px solid rgba(0, 242, 255, 0.1);
+                border-radius: 50%;
             }
-            .tl { top: 20px; left: 20px; border-right: none; border-bottom: none; }
-            .tr { top: 20px; right: 20px; border-left: none; border-bottom: none; }
-            .bl { bottom: 20px; left: 20px; border-right: none; border-top: none; }
-            .br { bottom: 20px; right: 20px; border-left: none; border-top: none; }
-
-            .scanning-bar {
+            .reticle::before, .reticle::after {
+                content: '';
                 position: absolute;
-                left: 0; width: 100%;
-                height: 2px;
-                background: linear-gradient(90deg, transparent, var(--accent), transparent);
-                opacity: 0.3;
-                animation: scan 3s linear infinite;
+                top: 50%; left: 50%;
+                background: var(--accent);
             }
-            @keyframes scan { 0% { top: 10%; } 100% { top: 90%; } }
+            .reticle::before { width: 20px; height: 1px; transform: translate(-50%, -50%); }
+            .reticle::after { width: 1px; height: 20px; transform: translate(-50%, -50%); }
 
             /* Terminal Area */
-            .command-center {
-                padding: 20px;
-                flex-grow: 1;
-            }
-
-            .terminal-window {
-                height: 280px;
-                background: rgba(0,0,0,0.5);
-                border-radius: 12px;
-                padding: 15px;
+            #terminal {
+                flex: 1;
+                overflow-y: auto;
                 font-family: 'JetBrains Mono', monospace;
                 font-size: 0.85rem;
-                overflow-y: auto;
-                border: 1px solid rgba(255,255,255,0.05);
-                margin-bottom: 15px;
-                scrollbar-width: thin;
-                scrollbar-color: var(--accent) transparent;
+                padding-right: 10px;
             }
-
-            .terminal-window::-webkit-scrollbar { width: 4px; }
-            .terminal-window::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 10px; }
-
-            .log-line { margin-bottom: 8px; animation: fadeIn 0.3s ease-out; }
-            @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+            .log-item {
+                margin-bottom: 10px;
+                padding-left: 15px;
+                border-left: 2px solid transparent;
+                animation: slideIn 0.3s ease-out;
+            }
+            .log-item.ai { border-left-color: var(--accent); background: rgba(0, 242, 255, 0.03); }
+            .log-item.user { border-left-color: var(--secondary); }
             
-            .t-time { color: var(--text-dim); margin-right: 10px; font-size: 0.75rem; }
-            .t-ai { color: var(--accent); font-weight: 700; }
-            .t-alert { color: var(--secondary); text-shadow: 0 0 10px var(--secondary); }
+            .l-time { color: var(--text-dim); opacity: 0.5; font-size: 0.7rem; margin-right: 8px; }
+            .l-tag { font-weight: 700; font-size: 0.75rem; min-width: 60px; display: inline-block; }
+            .l-msg { color: #fff; line-height: 1.4; }
 
-            .input-wrapper {
-                display: flex; gap: 10px;
+            @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+
+            .input-box {
+                margin-top: 15px;
+                display: flex;
+                gap: 10px;
             }
-
-            .neuro-input {
+            .n-input {
                 flex: 1;
-                background: rgba(255,255,255,0.05);
-                border: 1px solid var(--border);
-                border-radius: 12px;
-                padding: 14px 20px;
+                background: rgba(255,255,255,0.03);
+                border: 1px solid var(--glass-border);
+                border-radius: 8px;
+                padding: 12px 15px;
                 color: #fff;
-                font-family: 'Outfit', sans-serif;
+                font-family: inherit;
                 outline: none;
-                transition: all 0.3s ease;
+                transition: 0.3s;
             }
-
-            .neuro-input:focus { border-color: var(--accent); background: rgba(0, 242, 255, 0.05); }
-
-            .neuro-btn {
-                padding: 0 25px;
+            .n-input:focus { border-color: var(--accent); background: rgba(0, 242, 255, 0.05); }
+            .n-btn {
                 background: var(--accent);
                 color: #000;
                 border: none;
-                border-radius: 12px;
-                font-weight: 600;
+                border-radius: 8px;
+                padding: 0 20px;
+                font-weight: 700;
                 cursor: pointer;
-                transition: transform 0.2s;
             }
-            .neuro-btn:active { transform: scale(0.95); }
 
-            /* Sidebar Blocks */
-            .sidebar { display: flex; flex-direction: column; gap: 20px; }
-
-            .telemetry-card { padding: 20px; }
-            .chart-container { height: 120px; margin-top: 15px; }
-
-            .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
-            .stat-item {
-                background: rgba(255,255,255,0.02);
-                padding: 12px; border-radius: 12px;
-                border: 1px solid var(--border);
+            /* Modules */
+            .module-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
             }
-            .stat-label { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; }
-            .stat-value { font-family: 'JetBrains Mono'; font-weight: 700; color: var(--accent); }
-
-            .enity-tag {
-                display: inline-block;
-                padding: 4px 10px;
-                background: var(--accent-dim);
-                border: 1px solid var(--accent);
-                color: var(--accent);
-                border-radius: 6px;
-                font-size: 0.75rem;
-                margin: 3px;
-                animation: pulse-tag 2s infinite;
+            .mod-btn {
+                background: rgba(255, 255, 255, 0.02);
+                border: 1px solid var(--glass-border);
+                border-radius: 12px;
+                padding: 15px;
+                color: var(--text-dim);
+                font-family: 'JetBrains Mono';
+                font-size: 0.7rem;
+                text-align: left;
+                transition: 0.3s;
+                position: relative;
+                overflow: hidden;
             }
-            @keyframes pulse-tag { 0% { opacity: 0.8; } 50% { opacity: 1; } 100% { opacity: 0.8; } }
+            .mod-btn:hover {
+                background: rgba(0, 242, 255, 0.05);
+                border-color: var(--accent);
+                color: #fff;
+            }
+            .mod-btn span {
+                display: block;
+                font-size: 0.9rem;
+                font-weight: 700;
+                color: #fff;
+                margin-top: 5px;
+            }
 
-            h4 { margin: 0; font-weight: 400; letter-spacing: 1px; color: var(--text-dim); font-size: 0.9rem; }
+            .pulsar {
+                width: 4px; height: 4px;
+                background: var(--accent);
+                border-radius: 50%;
+                position: absolute;
+                top: 15px; right: 15px;
+                box-shadow: 0 0 10px var(--accent);
+                animation: pulse 1.5s infinite;
+            }
+            @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(4); opacity: 0; } }
+
+            h5 { margin: 0 0 15px 0; font-size: 0.75rem; letter-spacing: 2px; color: var(--text-dim); text-transform: uppercase; }
         </style>
     </head>
-    <body>
-        <div class="header">
-            <div class="logo">
-                <div class="status-orbit"></div>
-                MEMO <span>// NEURAL INTERFACE</span>
-            </div>
-            <div id="quick-telemetry" style="display: flex; gap: 30px; font-family: 'JetBrains Mono'; font-size: 0.8rem;">
-                <div style="color: var(--text-dim)">P5_X64_HOST: <span style="color: var(--accent)">ACTIVE</span></div>
-                <div style="color: var(--text-dim)">LATENCY: <span id="ping" style="color: var(--accent)">-- ms</span></div>
-            </div>
-        </div>
+    <body onload="init()">
+        <div class="app-container">
+            <!-- HEADER -->
+            <header class="header">
+                <div class="logo">
+                    <div style="width: 12px; height: 12px; border: 2px solid var(--accent); border-radius: 50%; box-shadow: 0 0 10px var(--accent);"></div>
+                    MEMO <span>// NEURAL INTERFACE v2.0 // PI_MODE_ACTIVE</span>
+                </div>
+                <div style="display: flex; gap: 40px; font-family: 'JetBrains Mono'; font-size: 0.75rem;">
+                    <div style="color: var(--text-dim)">UPLINK: <span style="color: var(--accent)">STABLE</span></div>
+                    <div style="color: var(--text-dim)">SYSTEM_LATENCY: <span id="ping" style="color: var(--accent)">--</span>MS</div>
+                    <div id="clock" style="color: #fff;">00:00:00</div>
+                </div>
+            </header>
 
-        <div class="main-layout">
-            <!-- Left Side: Logic & Vision -->
-            <div class="video-hub">
-                <div class="feed-container glass">
-                    <img src="/video_feed" alt="Neural Feed">
-                    <div class="hud-overlay">
-                        <div class="hud-corner tl"></div><div class="hud-corner tr"></div>
-                        <div class="hud-corner bl"></div><div class="hud-corner br"></div>
-                        <div class="scanning-bar"></div>
-                        
-                        <!-- HUD Labels -->
-                        <div style="position: absolute; top: 35px; left: 50px; font-family: 'JetBrains Mono'; font-size: 0.7rem; color: var(--accent); opacity: 0.6;">
-                            [ VIEWPORT_01 ] // AI_VISION_ACTIVE<br>
-                            RESOLUTION: 640x480 // FPS_SYNC: OK
+            <!-- VISION -->
+            <main class="vision">
+                <img src="/video_feed" class="feed-img" alt="Neural Stream">
+                <div class="vision-overlay">
+                    <div class="reticle"></div>
+                    <!-- Corners -->
+                    <div style="position: absolute; top: 20px; left: 20px; border-top: 2px solid var(--accent); border-left: 2px solid var(--accent); width: 30px; height: 30px;"></div>
+                    <div style="position: absolute; top: 20px; right: 20px; border-top: 2px solid var(--accent); border-right: 2px solid var(--accent); width: 30px; height: 30px;"></div>
+                    <div style="position: absolute; bottom: 20px; left: 20px; border-bottom: 2px solid var(--accent); border-left: 2px solid var(--accent); width: 30px; height: 30px;"></div>
+                    <div style="position: absolute; bottom: 20px; right: 20px; border-bottom: 2px solid var(--accent); border-right: 2px solid var(--accent); width: 30px; height: 30px;"></div>
+                    
+                    <div style="position: absolute; top: 60px; right: 60px; font-family: 'JetBrains Mono'; font-size: 0.65rem; line-height: 1.5; color: var(--accent); text-align: right; opacity: 0.6;">
+                        SCAN_FREQ: 2.4GHZ <br>
+                        BUFFER_STATE: 100% <br>
+                        [ NEURAL_UPLINK ]
+                    </div>
+                </div>
+            </main>
+
+            <!-- TERMINAL -->
+            <section class="terminal">
+                <h5>Neural Command Link</h5>
+                <div id="terminal"></div>
+                <form class="input-box" id="cmd-form">
+                    <input type="text" id="cmd-input" class="n-input" placeholder="Neural transmit..." autocomplete="off">
+                    <button type="submit" class="n-btn">SEND</button>
+                </form>
+            </section>
+
+            <!-- TELEMETRY -->
+            <aside class="telemetry">
+                <div class="glass-card">
+                    <h5>Telemetry HUD</h5>
+                    <div class="telemetry-circle-container">
+                        <div class="hud-ring">
+                            <svg viewBox="0 0 100 100">
+                                <circle class="bg" cx="50" cy="50" r="45"></circle>
+                                <circle id="cpu-ring" class="progress" cx="50" cy="50" r="45"></circle>
+                            </svg>
+                            <div class="hud-value" id="cpu-val">0</div>
+                            <div class="hud-label">CPU</div>
+                        </div>
+                        <div class="hud-ring">
+                            <svg viewBox="0 0 100 100">
+                                <circle class="bg" cx="50" cy="50" r="45"></circle>
+                                <circle id="fps-ring" class="progress" cx="50" cy="50" r="45" style="stroke: var(--secondary); filter: drop-shadow(0 0 5px var(--secondary));"></circle>
+                            </svg>
+                            <div class="hud-value" id="fps-val">0</div>
+                            <div class="hud-label">FPS</div>
                         </div>
                     </div>
                 </div>
 
-                <div class="command-center glass">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px;">
-                        <h4>NEURAL COMMAND LINK</h4>
-                        <div style="font-size: 0.7rem; color: var(--text-dim);">SYSTEM_BUS_V1.2</div>
-                    </div>
-                    <div class="terminal-window" id="terminal"></div>
-                    <form class="input-wrapper" id="cmd-form">
-                        <input type="text" id="cmd-input" class="neuro-input" placeholder="Transmit instruction to MEMO..." autocomplete="off">
-                        <button type="submit" class="neuro-btn">SEND</button>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Right Side: Telemetry -->
-            <div class="sidebar">
-                <div class="telemetry-card glass">
-                    <h4>SYSTEM TELEMETRY</h4>
-                    <div class="stat-grid">
-                        <div class="stat-item">
-                            <div class="stat-label">Neural FPS</div>
-                            <div class="stat-value" id="fps-val">0.0</div>
+                <div class="glass-card" style="flex: 1;">
+                    <h5>Cognitive Module</h5>
+                    <div class="module-grid">
+                        <div class="mod-btn">
+                            STATUS
+                            <span id="cog-status">IDLE</span>
+                            <div class="pulsar"></div>
                         </div>
-                        <div class="stat-item">
-                            <div class="stat-label">Core Load</div>
-                            <div class="stat-value" id="cpu-val">0%</div>
+                        <div class="mod-btn">
+                            IDENTITY
+                            <span id="cog-id">--</span>
+                        </div>
+                        <div class="mod-btn">
+                            FOCUS MODE
+                            <span id="cog-focus">OFF</span>
+                        </div>
+                        <div class="mod-btn">
+                            SENSOR_LINK
+                            <span>STABLE</span>
                         </div>
                     </div>
-                    <div class="chart-container">
-                        <canvas id="perfChart"></canvas>
+                    
+                    <h5 style="margin-top: 25px;">Proximal Subjects</h5>
+                    <div id="subjects" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        <div style="color: var(--text-dim); font-size: 0.7rem;">Scanning...</div>
                     </div>
                 </div>
 
-                <div class="telemetry-card glass">
-                    <h4>COGNITIVE STATE</h4>
-                    <div class="stat-grid" style="grid-template-columns: 1fr;">
-                        <div class="stat-item">
-                            <div class="stat-label">Identity Profile</div>
-                            <div class="stat-value" id="identity-val">--</div>
-                        </div>
-                    </div>
-                    <div class="stat-grid">
-                        <div class="stat-item">
-                            <div class="stat-label">Focus Shield</div>
-                            <div id="focus-st" style="font-weight: 700;">OFF</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-label">Gesture Mode</div>
-                            <div style="color: var(--text-dim); font-size: 0.8rem;">READY</div>
-                        </div>
-                    </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <button onclick="sendCmd('f')" class="mod-btn" style="text-align: center;">FORCE_FOCUS</button>
+                    <button onclick="sendCmd('v')" class="mod-btn" style="text-align: center;">MUTE_VOICE</button>
                 </div>
-
-                <!-- Entity Detection Hidden
-                <div class="telemetry-card glass">
-                    <h4>ENTITY DETECTION</h4>
-                    <div id="objects-list" style="margin-top: 10px; min-height: 60px;">
-                        <span style="color: var(--text-dim); font-size: 0.8rem;">No subjects in proximity.</span>
-                    </div>
-                </div>
-                -->
-
-                <!-- Quick Action Shortcuts -->
-                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <button onclick="sendCmd('f')" class="glass" style="padding: 12px; color: #fff; cursor: pointer; font-size: 0.8rem; border: 1px solid var(--border);">TOGGLE FOCUS</button>
-                    <button onclick="sendCmd('v')" class="glass" style="padding: 12px; color: #fff; cursor: pointer; font-size: 0.8rem; border: 1px solid var(--border);">TOGGLE VOICE</button>
-                    <button onclick="sendCmd('s')" class="glass" style="padding: 12px; color: #fff; cursor: pointer; font-size: 0.8rem; border: 1px solid var(--border);">SNAP PHOTO</button>
-                    <button onclick="sendCmd('status')" class="glass" style="padding: 12px; color: #fff; cursor: pointer; font-size: 0.8rem; border: 1px solid var(--border);">STATUS CHECK</button>
-                </div>
-            </div>
+            </aside>
         </div>
 
         <script>
             const socket = io();
             const terminal = document.getElementById('terminal');
             
-            // Performance Chart
-            const ctx = document.getElementById('perfChart').getContext('2d');
-            const perfChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: Array(20).fill(''),
-                    datasets: [{
-                        label: 'FPS',
-                        data: Array(20).fill(0),
-                        borderColor: '#00f2ff',
-                        borderWidth: 2,
-                        tension: 0.4,
-                        pointRadius: 0
-                    }, {
-                        label: 'CPU',
-                        data: Array(20).fill(0),
-                        borderColor: '#ff00ff',
-                        borderWidth: 2,
-                        tension: 0.4,
-                        pointRadius: 0
-                    }]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: { 
-                        y: { display: false, min: 0, max: 100 },
-                        x: { display: false }
-                    }
-                }
-            });
+            function init() {
+                setInterval(() => {
+                    const now = new Date();
+                    document.getElementById('clock').innerText = now.toLocaleTimeString('en-GB');
+                }, 1000);
+            }
 
             let lastPing = Date.now();
-            socket.on('stats_update', function(data) {
-                // Update text stats
-                document.getElementById('fps-val').innerText = data.fps;
-                document.getElementById('cpu-val').innerText = data.cpu + '%';
-                document.getElementById('ping').innerText = (Date.now() - lastPing) + ' ms';
-                lastPing = Date.now();
+            socket.on('stats_update', (data) => {
+                // Update Rings
+                const cpuRing = document.getElementById('cpu-ring');
+                const fpsRing = document.getElementById('fps-ring');
                 
-                document.getElementById('identity-val').innerText = data.identity || (data.human_present ? "UNIDENTIFIED" : "IDLE");
-                document.getElementById('focus-st').innerText = data.focus_mode ? "REINFORCED" : "DEACTIVATED";
-                document.getElementById('focus-st').style.color = data.focus_mode ? "#ff00ff" : "var(--text-dim)";
-                
-                // Entity tags
-                const objContainer = document.getElementById('objects-list');
-                if(data.objects && data.objects.length) {
-                    objContainer.innerHTML = data.objects.map(o => `<span class="enity-tag">${o.toUpperCase()}</span>`).join('');
-                } else {
-                    objContainer.innerHTML = '<span style="color: var(--text-dim); font-size: 0.8rem;">No subjects in proximity.</span>';
-                }
+                // Formula: 283 - (283 * percentage / 100)
+                cpuRing.style.strokeDashoffset = 283 - (283 * data.cpu / 100);
+                fpsRing.style.strokeDashoffset = 283 - (283 * data.fps / 30 * 100 / 100); // Scaled for 30fps
 
-                // Update chart
-                perfChart.data.datasets[0].data.push(data.fps * 2); // Scale for visual
-                perfChart.data.datasets[0].data.shift();
-                perfChart.data.datasets[1].data.push(data.cpu);
-                perfChart.data.datasets[1].data.shift();
-                perfChart.update('none');
+                document.getElementById('cpu-val').innerText = data.cpu;
+                document.getElementById('fps-val').innerText = Math.round(data.fps);
+                document.getElementById('ping').innerText = Date.now() - lastPing;
+                lastPing = Date.now();
+
+                // Cognitive
+                document.getElementById('cog-id').innerText = data.identity || (data.human_present ? "UNIDENTIFIED" : "NO_SIGNAL");
+                document.getElementById('cog-status').innerText = data.human_present ? "SUBJECT_LOCKED" : "SCANNING...";
+                document.getElementById('cog-focus').innerText = data.focus_mode ? "REINFORCED" : "DEACTIVATED";
+                document.getElementById('cog-focus').style.color = data.focus_mode ? "var(--secondary)" : "var(--text-dim)";
+
+                // Subjects
+                const subContainer = document.getElementById('subjects');
+                if(data.objects && data.objects.length) {
+                    subContainer.innerHTML = data.objects.map(o => `
+                        <div style="padding: 5px 10px; background: rgba(0, 242, 255, 0.1); border: 1px solid var(--accent); color: var(--accent); border-radius: 4px; font-size: 0.65rem; font-family: 'JetBrains Mono';">
+                            ${o.toUpperCase()}
+                        </div>
+                    `).join('');
+                } else if (!data.human_present) {
+                    subContainer.innerHTML = '<div style="color: var(--text-dim); font-size: 0.7rem;">NO_ENTITIES_LOCALIZED</div>';
+                }
             });
 
-            socket.on('new_log', function(entry) {
+            socket.on('new_log', (entry) => {
                 const div = document.createElement('div');
-                div.className = 'log-line';
-                const typeClass = entry.type === 'ai' ? 't-ai' : (entry.type === 'alert' ? 't-alert' : '');
-                div.innerHTML = `<span class="t-time">${entry.time}</span> <span class="${typeClass}">[${entry.type.toUpperCase()}]</span> <span>${entry.msg}</span>`;
+                div.className = `log-item ${entry.type}`;
+                div.innerHTML = `
+                    <span class="l-time">${entry.time}</span>
+                    <span class="l-tag" style="color: ${entry.type === 'ai' ? 'var(--accent)' : 'var(--secondary)'}">[${entry.type.toUpperCase()}]</span>
+                    <span class="l-msg">${entry.msg}</span>
+                `;
                 terminal.appendChild(div);
-                if (terminal.childNodes.length > 50) terminal.removeChild(terminal.firstChild);
                 terminal.scrollTop = terminal.scrollHeight;
+                if(terminal.childNodes.length > 30) terminal.removeChild(terminal.firstChild);
             });
 
             function sendCmd(text) {
@@ -473,7 +507,7 @@ def index():
                 });
             }
 
-            document.getElementById('cmd-form').onsubmit = function(e) {
+            document.getElementById('cmd-form').onsubmit = (e) => {
                 e.preventDefault();
                 const input = document.getElementById('cmd-input');
                 if(input.value) {
@@ -481,15 +515,9 @@ def index():
                     input.value = '';
                 }
             };
-
-            // Init greeting
-            setTimeout(() => {
-                const welcome = document.createElement('div');
-                welcome.className = 'log-line';
-                welcome.innerHTML = `<span class="t-time">${new Date().toLocaleTimeString()}</span> <span class="t-ai">[SYSTEM]</span> <span>NEURAL INTERFACE LINK ESTABLISHED.</span>`;
-                terminal.appendChild(welcome);
-            }, 500);
         </script>
+    </body>
+    </html>
     </body>
     </html>
     """)
