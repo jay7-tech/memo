@@ -133,10 +133,12 @@ def fetch_github_trending():
 
 SMART_FEEDS = {
     "computervision": ["computervision", "opencv", "MachineLearning"],
-    "llms": ["LocalLLaMA", "OpenAI", "MachineLearning"],
+    "llms": ["LocalLLaMA", "OpenAI", "Singularity"],
     "robotics": ["robotics", "ROS", "automation"],
     "softwaredevelopment": ["programming", "technology", "opensource"],
-    "aitools": ["ArtificialInteligence", "MachineLearning", "OpenAI"]
+    "aitools": ["ArtificialInteligence", "MachineLearning", "OpenAI"],
+    "internships": ["internships", "csMajors", "cscareerquestions"],
+    "launches": ["technology", "Gadgets", "hardware"]
 }
 
 
@@ -361,29 +363,27 @@ class AIPersonality:
         profile = load_profile()
         updates = []
 
-        # GitHub tools & repos
-        updates += fetch_github_trending()
+        # 1. Tech & AI Launches (Reddit)
+        for sub in SMART_FEEDS["launches"] + SMART_FEEDS["llms"]:
+            items = fetch_reddit_hot(sub)
+            for item in items:
+                updates.append(f"[Launch/News]: {item}")
 
-        # HackerNews tech trends
-        updates += fetch_hackernews()
+        # 2. Internships (Reddit)
+        for sub in SMART_FEEDS["internships"]:
+            items = fetch_reddit_hot(sub)
+            for item in items:
+                if "intern" in item.lower() or "hiring" in item.lower():
+                    updates.append(f"[Career]: {item}")
 
-        # Reddit by interests
-        for interest in profile.get("core_interests", []):
-            key = interest.lower().replace(" ", "")
-            if key in SMART_FEEDS:
-                for sub in SMART_FEEDS[key]:
-                    updates += fetch_reddit_hot(sub)
+        # 3. Trending Tools (GitHub)
+        github_items = fetch_github_trending()
+        updates.extend(github_items)
 
-        # Deduplicate + clean
-        seen = set()
-        clean = []
-
-        for u in updates:
-            if u and u not in seen:
-                seen.add(u)
-                clean.append(u)
-
-        return clean[:15]
+        # 4. Cleanup & Random Selection to keep it fresh
+        # We want a mix, not just the first 15 of one category
+        random.shuffle(updates)
+        return updates[:12]
 
 
         
@@ -413,20 +413,25 @@ class AIPersonality:
                 if not updates:
                     return "Nothing big yet, but I'm watching."
 
-                return "\n".join(f"• {u}" for u in updates[:3])
-
-
-
-                joined = "\n".join(updates)
-
-                summary_prompt = f"""
-Summarize the following into the TOP 3 important updates.
-Each update should be short and clear.
-
-{joined}
-"""
-
-                return self._generate_ollama(summary_prompt)
+                # Create a rich prompt for the anchor persona
+                joined_updates = "\n".join(updates)
+                summary_prompt = (
+                    "You are a tech news anchor. Summarize these raw items into a brisk, exciting 3-sentence spoken update.\n"
+                    "Include:\n"
+                    "1. One major tech launch or AI news.\n"
+                    "2. One trending tool or repo.\n"
+                    "3. One career/internship opportunity if listed.\n\n"
+                    "Rules:\n"
+                    "- Answer in ONE paragraph, not a list.\n"
+                    "- No URLs, no code syntax, no markdown.\n"
+                    "- Do NOT cut off sentences.\n"
+                    "- Keep it under 50 words.\n\n"
+                    f"Raw Data:\n{joined_updates}"
+                )
+                
+                # Generate and then sanitize
+                raw_response = self._generate_ollama(summary_prompt)
+                return self._sanitize_for_speech(raw_response)
 
             
             # Intent Detection Integration
@@ -582,6 +587,47 @@ Each update should be short and clear.
             add_log(f"AI Error: {e}", "error")
             return self._generate_fallback(prompt)
 
+    def _sanitize_for_speech(self, text: str) -> str:
+        """New robust sanitizer for natural text-to-speech."""
+        if not text: return ""
+
+        # Remove markdown links [text](url) -> text
+        import re
+        text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
+        
+        # Remove raw URLs
+        text = re.sub(r'http\S+', '', text)
+        
+        # Remove markdown formatting
+        text = text.replace('**', '').replace('__', '').replace('`', '')
+        
+        # Replace symbols with speech-friendly equivalents
+        replacements = {
+            '/': ' ',
+            '\\': ' ',
+            '_': ' ',
+            '->': ' to ',
+            '>': ' ',
+            '<': ' ',
+            '=': ' equals ',
+            '@': ' at '
+        }
+        for old, new in replacements.items():
+            text = text.replace(old, new)
+
+        # Collapse whitespace
+        text = " ".join(text.split())
+
+        # Cleanup "As an AI" meta-talk if it slipped through
+        text = text.replace("As an AI assistant", "Here is the update")
+        
+        # Ensure final punctuation
+        if text and text[-1] not in ".!?":
+            text += "."
+            
+        return text
+
+    # Kept for backward compatibility if needed, but _sanitize_for_speech is preferred
     def _sanitize_response(self, text: str, user_prompt: str) -> str:
         """Maximum Compatibility Sanitizer (V5.4)."""
         if not text: return ""
