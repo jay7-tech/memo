@@ -1,0 +1,27 @@
+{
+    "field": "AI and Robotics",
+    "role": "student, engineer, researcher",
+    "experience_level": "beginner,intermediate,advanced",
+    "core_interests": [
+        "computer vision",
+        "LLMs",
+        "robotics",
+        "machine learning",
+        "deep learning",
+        "software development",
+        "AI tools"
+    ],
+    "tools_and_topics": [
+        "huggingface",
+        "google developmemt and cloud",
+        "lang chain",
+        "Ai in development",
+        "AI tools"
+    ],
+    "goals": [
+        "get job",
+        "build projects",
+        "learn research"
+    ],
+    "content_preference": "news,tools,jobs,research,all"
+}
