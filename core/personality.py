@@ -15,6 +15,131 @@ from datetime import datetime
 from typing import Optional, Dict, List, Any
 import threading
 
+PROFILE_PATH = "data/user_profile.json"
+
+def load_profile():
+    if os.path.exists(PROFILE_PATH):
+        with open(PROFILE_PATH, "r") as f:
+            return json.load(f)
+    return {}
+
+def save_profile(profile):
+    with open(PROFILE_PATH, "w") as f:
+        json.dump(profile, f, indent=2)
+
+# =========================
+# Helper utilities
+# =========================
+
+PROFILE_PATH = "data/user_profile.json"
+
+def load_profile():
+    if os.path.exists(PROFILE_PATH):
+        with open(PROFILE_PATH, "r") as f:
+            return json.load(f)
+    return {}
+
+def save_profile(profile):
+    with open(PROFILE_PATH, "w") as f:
+        json.dump(profile, f, indent=2)
+
+
+import requests
+
+HEADERS = {"User-Agent": "memo"}
+
+def fetch_reddit_hot(sub):
+    try:
+        import requests
+
+        url = f"https://www.reddit.com/r/{sub}/hot.json?limit=5"
+        headers = {"User-Agent": "MEMO/1.0"}
+
+        r = requests.get(url, headers=headers, timeout=5)
+        if r.status_code != 200:
+            return []
+
+        data = r.json()
+
+        clean = []
+        for item in data["data"]["children"]:
+            title = item["data"]["title"]
+
+            if len(title) < 120:
+                clean.append(title)
+
+        return clean
+
+    except Exception:
+        return []
+
+
+
+def fetch_hackernews():
+    try:
+        import requests
+
+        top_ids = requests.get(
+            "https://hacker-news.firebaseio.com/v0/topstories.json",
+            timeout=5
+        ).json()[:5]
+
+        stories = []
+
+        for sid in top_ids:
+            item = requests.get(
+                f"https://hacker-news.firebaseio.com/v0/item/{sid}.json",
+                timeout=5
+            ).json()
+
+            title = item.get("title")
+            if title:
+                stories.append(title)
+
+        return stories
+
+    except Exception:
+        return []
+
+
+def fetch_github_trending():
+    try:
+        import requests
+
+        url = "https://api.github.com/search/repositories?q=AI+stars:>2000&sort=stars&order=desc&per_page=5"
+        r = requests.get(url, timeout=5)
+
+        if r.status_code != 200:
+            return []
+
+        data = r.json()
+
+        updates = []
+        for repo in data.get("items", []):
+            name = repo["name"]
+            desc = repo.get("description") or ""
+            stars = repo.get("stargazers_count")
+
+            updates.append(
+                f"{name} is trending with {stars} stars for {desc[:80]}"
+            )
+
+        return updates
+
+    except Exception:
+        return []
+
+
+
+SMART_FEEDS = {
+    "computervision": ["computervision", "opencv", "MachineLearning"],
+    "llms": ["LocalLLaMA", "OpenAI", "MachineLearning"],
+    "robotics": ["robotics", "ROS", "automation"],
+    "softwaredevelopment": ["programming", "technology", "opensource"],
+    "aitools": ["ArtificialInteligence", "MachineLearning", "OpenAI"]
+}
+
+
 
 MEMO_PERSONALITY = """<SYSTEM>
 You are MEMO.A  smart assistant robot
@@ -232,6 +357,34 @@ class AIPersonality:
         
         return "\n".join(parts)
     
+    def get_personalized_updates(self):
+        profile = load_profile()
+        updates = []
+
+        # GitHub tools & repos
+        updates += fetch_github_trending()
+
+        # HackerNews tech trends
+        updates += fetch_hackernews()
+
+        # Reddit by interests
+        for interest in profile.get("core_interests", []):
+            key = interest.lower().replace(" ", "")
+            if key in SMART_FEEDS:
+                for sub in SMART_FEEDS[key]:
+                    updates += fetch_reddit_hot(sub)
+
+        # Deduplicate + clean
+        seen = set()
+        clean = []
+
+        for u in updates:
+            if u and u not in seen:
+                seen.add(u)
+                clean.append(u)
+
+        return clean[:15]
+
 
         
     def generate(self, prompt: str, scene_state=None, response_type: str = "quick") -> str:
@@ -243,6 +396,38 @@ class AIPersonality:
         try:
             # Local overrides for speed
             prompt_lower = prompt.lower().strip()
+
+            NEWS_TRIGGERS = [
+                "mino news",
+                "buzz",
+                "what's buzz",
+                "whats buzz",
+                "what's new",
+                "whats new",
+                "updates",
+                "memo news"
+            ]
+            if any(t in prompt_lower for t in NEWS_TRIGGERS):
+                updates = self.get_personalized_updates()
+
+                if not updates:
+                    return "Nothing big yet, but I'm watching."
+
+                return "\n".join(f"• {u}" for u in updates[:3])
+
+
+
+                joined = "\n".join(updates)
+
+                summary_prompt = f"""
+Summarize the following into the TOP 3 important updates.
+Each update should be short and clear.
+
+{joined}
+"""
+
+                return self._generate_ollama(summary_prompt)
+
             
             # Intent Detection Integration
             intent = self.detect_intent(prompt_lower)

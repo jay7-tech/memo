@@ -13,10 +13,9 @@
     ],
     "tools_and_topics": [
         "huggingface",
-        "google developmemt and cloud",
-        "lang chain",
-        "git hub",
-        "Ai in development",
+        "google cloud",
+        "langchain",
+        "github",
         "AI tools"
     ],
     "goals": [
