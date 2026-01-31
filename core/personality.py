@@ -16,17 +16,29 @@ from typing import Optional, Dict, List, Any
 import threading
 
 
-# MEMO's personality prompt - V5.5 BRACKETED
-MEMO_PERSONALITY = """You are MEMO, a witty AI. Respond to the user naturally. Do not respond like a robot. keep the answer short and witty. dont add expressions in brackets
-Current Context:
+MEMO_PERSONALITY = """<SYSTEM>
+You are MEMO.A  smart assistant robot
+Answer in one short helpful sentence.
+Think before answering.
+Be natural and clear.
+</SYSTEM>
+
+Context:
 {context}
 
+Examples:
+
 [User]: Tell me a fact
-[MEMO]: Honey never spoils. It can stay edible for thousands of years!
+[MEMO]: Honey never spoils.
+
 [User]: Tell me a joke
-[MEMO]: Why did the robot cross the road? To get to the other battery!
-[User]: Who are you?
-[MEMO]: I am MEMO, your AI buddy. I'm here to vibe and help out!
+[MEMO]: Robots hate bugs in their code.
+
+[User]: Who is Musk?
+[MEMO]: Elon Musk is CEO of Tesla and SpaceX.
+
+[User]: What is gravity?
+[MEMO]: Gravity is the force that attracts objects toward each other.
 """
 
 
@@ -59,7 +71,7 @@ class AIPersonality:
         
         self.backend = config.get('backend', 'gemini')
         self.gemini_key = config.get('gemini_api_key') or os.environ.get('GEMINI_API_KEY')
-        self.ollama_model = config.get('ollama_model', 'llama3.2')
+        self.ollama_model = config.get('ollama_model', 'phi3:mini')
         self.ollama_url = config.get('ollama_url', 'http://localhost:11434')
         
         self.user_name = config.get('user_name', 'buddy')
@@ -71,7 +83,24 @@ class AIPersonality:
         self._init_backend()
         
         print(f"[AI] ✓ Personality initialized with {self.backend} backend")
-    
+
+    def detect_intent(self, q):
+        q = q.lower()
+
+        if any(x in q for x in ["time", "date", "day"]):
+            return "datetime"
+
+        if any(x in q for x in ["calculate", "+", "-", "*", "/"]):
+            return "math"
+
+        if "has teeth but cannot eat" in q:
+            return "riddle"
+
+        if q.startswith("who is") or q.startswith("what is"):
+            return "fact"
+
+        return "chat"
+
     def _init_backend(self):
         """Initialize the AI backend with a robust model search and fallback."""
         self._gemini_client = None
@@ -187,6 +216,7 @@ class AIPersonality:
         
         return "\n".join(parts)
     
+
         
     def generate(self, prompt: str, scene_state=None, response_type: str = "quick") -> str:
         """Generate an AI response (Thread-safe and throttled)."""
@@ -195,6 +225,25 @@ class AIPersonality:
             return "Just a sec, thinking..."
             
         try:
+            # Local overrides for speed
+            prompt_lower = prompt.lower().strip()
+            
+            # Intent Detection Integration
+            intent = self.detect_intent(prompt_lower)
+            
+            if intent == "datetime":
+                 return datetime.now().strftime("%A, %B %d %Y at %I:%M %p")
+            
+            if intent == "math":
+                try:
+                    # Basic safe eval for calculator
+                    allowed = set("0123456789+-*/(). ")
+                    if set(prompt.replace("calculate", "")).issubset(allowed):
+                        return str(eval(prompt.replace("calculate","")))
+                except:
+                    pass # Fallback to LLM if math fails
+
+
             context = self._build_context(scene_state)
             system_prompt = MEMO_PERSONALITY.format(context=context)
             
@@ -296,9 +345,18 @@ class AIPersonality:
                 "prompt": prompt_template,
                 "stream": False,
                 "options": {
-                    "temperature": 0.7, 
-                    "num_predict": 250, 
-                    "stop": ["[User]:", "\n[User]:"] 
+                     "temperature": 0.25,     # keeps witty but not crazy
+                     "num_predict": 80,       # HARD length limit
+                     "top_p": 0.8,
+                     "repeat_penalty": 1.1,
+                     "stop": [
+                        "[User]:",
+                        "[MEMO]:",
+                        "example",
+                        "Example",
+                        "Sure",
+                        "sure"
+                     ]
                 }
             }
             
@@ -467,6 +525,7 @@ def init_personality(config: Optional[Dict[str, Any]] = None) -> AIPersonality:
 
 def get_personality() -> Optional[AIPersonality]:
     return _ai_personality
+
 
 
 if __name__ == "__main__":
