@@ -8,21 +8,57 @@ class CameraSource:
         self.src = source
         self.rotation = int(rotation)
         
-        if isinstance(self.src, int) and __import__("os").name == "nt":
-             # Use DirectShow on Windows to avoid MSMF errors
-            self.cap = cv2.VideoCapture(self.src, cv2.CAP_DSHOW)
-        else:
-            self.cap = cv2.VideoCapture(self.src)
-        
-        # Optimize for low latency (may not work on all backends but worth trying)
-        # buffer size = 1
-        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1) # Only for V4L2/GStreamer essentially, but harmless
-        
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-        
-        if not self.cap.isOpened():
-            raise RuntimeError(f"Could not open camera source {source}")
+        # Try opening the requested source
+        if not self._open_source(self.src, width, height):
+            # If failed and source was 0, try auto-scanning indices 1-10
+            if self.src == 0:
+                print(f"[Camera] Source 0 failed. Auto-scanning other indices...")
+                found = False
+                for i in range(1, 10):
+                    print(f"[Camera] Trying index {i}...")
+                    if self._open_source(i, width, height):
+                        print(f"[Camera] ✓ Found working camera at index {i}")
+                        self.src = i
+                        found = True
+                        break
+                
+                if not found:
+                    raise RuntimeError(f"Could not open any camera source (Scanned 0-9)")
+            else:
+                raise RuntimeError(f"Could not open camera source {source}")
+
+    def _open_source(self, source, width, height):
+        """Helper to attempt opening a source."""
+        try:
+            if isinstance(source, int):
+                # Windows: Use DirectShow
+                if __import__("os").name == "nt":
+                    self.cap = cv2.VideoCapture(source, cv2.CAP_DSHOW)
+                # Linux/Pi: Enforce V4L2 (User Recommendation)
+                else:
+                    self.cap = cv2.VideoCapture(source, cv2.CAP_V4L2)
+                    # Force MJPG for better framerate on Pi if possible, or standard YUYV
+                    # self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
+            else:
+                self.cap = cv2.VideoCapture(source)
+            
+            if not self.cap.isOpened():
+                return False
+                
+            # Set params
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            
+            # Read one frame to confirm it's real
+            ret, _ = self.cap.read()
+            if not ret:
+                self.cap.release()
+                return False
+                
+            return True
+        except:
+            return False
 
         self.latest_frame = None
         self.status = False
