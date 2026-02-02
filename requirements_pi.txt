@@ -1,34 +1,28 @@
-# MEMO - Raspberry Pi 5 Requirements
-# ====================================
+# MEMO - Raspberry Pi Requirements
+# Usage: pip install -r requirements_pi.txt
 
-# Core AI & Vision (Headless for Pi)
-opencv-python-headless>=4.8.0 
-ultralytics>=8.0.0
-numpy>=1.24.0
-facenet-pytorch
-# mediapipe>=0.10.0 # Not compatible with Python 3.13 yet on Pi
+# Core Hardware
+RPi.GPIO                # GPIO Control
+pyaudio                 # Microphone (Requires: sudo apt install portaudio19-dev)
+spidev                  # SPI Interface (Optional)
 
-# Audio
+# Computer Vision & AI
+opencv-python-headless>=4.8.0  # Headless (No GUI) for better performance
+numpy<2.0               # Use <2.0 for best compatibility with ARM wheels
+ultralytics             # YOLOv8 (might be slow, use NCNN/TFLite if possible)
+mediapipe-rpi4          # Optimized mediapipe if available, else standard `mediapipe`
+
+# Audio & Speech
+vosk>=0.3.45            # Offline Speech (Best for Pi)
+sounddevice             # Alternative Audio
+pyttsx3                 # Text-to-Speech (Needs espeak: sudo apt install espeak)
 SpeechRecognition
-pyaudio
-openwakeword>=0.6.0
-vosk>=0.3.45
 
-# Web/Dashboard
-flask
-flask-socketio>=5.3.0
-python-socketio>=5.10.0
-eventlet
-gevent
-requests
-werkzeug
-
-# Utils
-colorlog
-pyyaml
+# Utilities
 psutil
+requests
+flask
+flask-socketio
 python-dotenv
-
-# LLM Backends
-google-genai
-ollama
+colorlog
+ollama                  # Use external Ollama server if Pi is too slow
