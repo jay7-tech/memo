@@ -1,7 +1,7 @@
 {
     "llm": {
         "provider": "ollama",
-        "model": "phi3:mini",
+        "model": "tinyllama",
         "fallback_model": "tinyllama"
     },
     "camera": {

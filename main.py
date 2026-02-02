@@ -299,7 +299,11 @@ class MEMOApp:
         # Determine what to run this frame
         run_detection = not self.perf_monitor.should_skip_frame(self.frame_count)
         run_pose = run_detection
-        run_face = self.frame_count % 10 == 0  # Face rec every 10 frames
+        if self.burst_enabled:
+             # In burst mode, we want maximum accuracy when awake
+             run_face = run_detection
+        else:
+             run_face = self.frame_count % 10 == 0  # Legacy mode
         
         # Run perception
         result = self.perception.process(

@@ -93,7 +93,7 @@ class PoseEstimator:
             valid_points += 1
             
         if not keypoints_dict:
-            print(f"[DEBUG] Pose: Person found but all keypoints filtered. Confs: {confs}")
+            # print(f"[DEBUG] Pose: Person found but all keypoints filtered. Confs: {confs}")
             return None
             
         return {"keypoints": keypoints_dict}
