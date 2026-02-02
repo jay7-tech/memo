@@ -79,8 +79,13 @@ class SceneState:
         
         # System flags
         self.focus_mode = False 
+        self.vision_active = True # Track if vision is awake or sleeping
         self.register_trigger = False
         self.register_name = "User"
+        
+        # New flags for command handling
+        self.wake_request = False # Trigger burst vision
+        self.verbose_logging = False # Toggle dashboard/terminal logs
         
         self.selfie_trigger = False # Flag for snapshot
         
@@ -116,7 +121,7 @@ class SceneState:
             except Exception as e:
                 print(f"[Error] Failed to load memory: {e}")
 
-    def update(self, detections, pose_data, timestamp, frame_width=640, frame_height=480):
+    def update(self, detections, pose_data, identity, timestamp, frame_width=640, frame_height=480):
         self.width = frame_width
         
         # 1. Update Objects
@@ -147,34 +152,41 @@ class SceneState:
             current_labels.add(label)
 
         # 2. Update Human
-        # REQUIRE both Pose Data AND Object Detection to agree it's a person
-        # This prevents "Ghost" pose detections on chairs/coats from keeping identity alive.
         if pose_data and 'keypoints' in pose_data and person_detected:
             self.human['present'] = True
             self.human['keypoints'] = pose_data['keypoints']
             self.human['last_seen'] = timestamp
             
-            # Determine Pose State (Simple Heuristic)
+            # Identity Persistence Logic
+            if identity:
+                # Strong match found
+                self.human['identity'] = identity
+            else:
+                # No match this frame, check persistence
+                # If we had an identity recently and the person is still here, keep it.
+                # Only clear if we haven't seen a confirmed face for > 5.0 seconds
+                pass 
+            
+            # Note: We rely on the caller NOT to overwrite identity if it returns None
+            # Actually, effective persistence happens because we DON'T set it to None here.
+            
+            # Determine Pose State
             new_pose = self._determine_pose(pose_data['keypoints'])
             
             # Update pose duration tracking
             current_pose = self.human['pose_state']
             if new_pose != current_pose and new_pose != 'unknown':
-                # State changed
                 self.human['pose_state'] = new_pose
                 self.human['pose_start_time'] = timestamp
             elif 'pose_start_time' not in self.human:
-                # Initialize if missing
                 self.human['pose_start_time'] = timestamp
                 
         else:
             self.human['present'] = False
-            self.human['identity'] = None # Reset identity if person leaves
             
-            # We keep old keypoints? Or clear? 
-            # Prompt says "Human pose changed". If person leaves, 'present' becomes false.
-            # We can leave pose_state as last known or set to unknown.
-            if timestamp - self.human['last_seen'] > 1.0: # 1 second buffer
+            # RESET IDENTITY Only if person is gone for > 5.0s
+            if timestamp - self.human['last_seen'] > 5.0:
+                 self.human['identity'] = None
                  self.human['pose_state'] = 'unknown'
 
     def _determine_pose(self, keypoints):

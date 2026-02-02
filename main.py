@@ -113,6 +113,7 @@ class MEMOApp:
         self.last_tts_time = 0
         self.verbose_logging = False
         self.is_prompting = False # Flag to silence logs during user input
+        self.vision_active = True # Track vision state for power management
         
         # Display settings
         sys_cfg = self.config.get('system', {})
@@ -302,10 +303,33 @@ class MEMOApp:
                 is_waking = True
                 print(f">> SYSTEM: Vision WAKE (Periodic - {self.burst_duration}s)")
             
+            # 4. Focus Mode (Always Awake)
+            elif self.scene_state.focus_mode:
+                is_waking = True
+            
+            # 5. Manual Wake Request (New)
+            if self.scene_state.wake_request:
+                self.trigger_end_time = now + 30.0 # Wake for 30s
+                self.scene_state.wake_request = False # Reset flag
+                is_waking = True
+                print(">> SYSTEM: Vision WAKE (Manual)")
+            
+            # 6. Sleep Request (Override)
+            if getattr(self.scene_state, 'sleep_request', False):
+                is_waking = False
+                self.trigger_end_time = 0 # Cancel any active trigger
+                self.startup_end_time = 0 # CANCEL STARTUP WARMUP (Fix for high CPU)
+                self.scene_state.sleep_request = False
+                print(">> SYSTEM: Vision SLEEP (Manual)")
+            
+            # Update state for main loop to handle camera power
+            self.vision_active = is_waking
+            self.scene_state.vision_active = is_waking # Sync for dashboard
+            
             if not is_waking:
                 # SLEEP: Return empty result, save CPU
                 return {'detections': [], 'pose': None, 'identity': None}
-        # ------------------------
+
 
         # Determine what to run this frame
         run_detection = not self.perf_monitor.should_skip_frame(self.frame_count)
@@ -334,9 +358,26 @@ class MEMOApp:
         detections = perception_result.get('detections', [])
         pose_data = perception_result.get('pose')
         identity = perception_result.get('identity')
+        pose_data = perception_result.get('pose')
+        identity = perception_result.get('identity')
+        face_score = perception_result.get('face_score', 0.0)
         
-        # Update state
-        self.scene_state.update(detections, pose_data, timestamp, w, h)
+        # Sync verbose logging
+        self.verbose_logging = self.scene_state.verbose_logging
+        
+        # Emit debug logs to dashboard if available AND enabled
+        if self.dashboard and self.verbose_logging and face_score > 0:
+             try:
+                 from interface.dashboard import socketio
+                 socketio.emit('perception_log', {
+                     'time': time.strftime("%H:%M:%S"),
+                     'msg': f"Face: {identity or 'None'} (Score: {face_score:.3f})"
+                 })
+             except:
+                 pass
+
+        # Update state (Pass identity for persistence)
+        self.scene_state.update(detections, pose_data, identity, timestamp, w, h)
         
         # Throttled object logging (Silenced during prompting)
         visible_labels = [d['label'] for d in detections]
@@ -344,12 +385,14 @@ class MEMOApp:
         #     print(f"[Vision] Detecting: {visible_labels}")
         
         # Check for new presence/absence for logging
-        if identity and identity != self.scene_state.human.get('identity'):
-             from interface.dashboard import add_log
-             add_log(f"Identity confirmed: {identity}", "info")
+        # Use PERSISTED identity from scene_state, not the raw one
+        persisted_id = self.scene_state.human.get('identity')
+        if persisted_id and identity and identity != persisted_id:
+             # Wait, this logic is tricky if identity is None but persisted is set.
+             # Just log if we get a new confirmed identity
+             pass
              
-        # Update identity (sync with perception)
-        self.scene_state.human['identity'] = identity
+        # Check rules
         
         # Check rules
         events = self.rules_engine.check_rules(self.scene_state, timestamp)
@@ -437,43 +480,55 @@ class MEMOApp:
             conf = det['confidence']
             
             color = (0, 255, 0)  # Green
-            if label == 'cell phone' and self.scene_state.focus_mode:
+            
+            # Show Identity on Person Box
+            if label == 'person':
+                identity = self.scene_state.human.get('identity')
+                if identity:
+                    label = f"{identity} ({conf:.2f})"
+                    color = (0, 255, 255) # Yellow for recognized
+                else:
+                    label = f"Person ({conf:.2f})"
+            elif label == 'cell phone' and self.scene_state.focus_mode:
                 color = (0, 0, 255)  # Red for distraction
             
             cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
-            cv2.putText(frame, f"{label} {conf:.2f}", (x, y - 10),
+            cv2.putText(frame, label, (x, y - 10),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
         
-        # Draw pose keypoints
-        if pose_data and 'keypoints' in pose_data:
+        # Draw pose keypoints (Only if verbose)
+        if self.verbose_logging and pose_data and 'keypoints' in pose_data:
             for name, (px, py) in pose_data['keypoints'].items():
                 cv2.circle(frame, (int(px), int(py)), 4, (255, 0, 0), -1)
         
-        # Draw status overlay
-        stats = self.perf_monitor.get_stats()
-        identity = self.scene_state.human.get('identity', 'Unknown')
-        pose_state = self.scene_state.human.get('pose_state', 'unknown')
-        focus = "ON" if self.scene_state.focus_mode else "OFF"
-        
-        # Status bar
-        y_offset = 30
-        cv2.putText(frame, f"FPS: {stats['fps']} | CPU: {stats['cpu']}%",
-                   (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
-        cv2.putText(frame, f"Pose: {pose_state}",
-                   (10, y_offset + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
-        cv2.putText(frame, f"Identity: {identity}",
-                   (10, y_offset + 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-        
-        focus_color = (0, 0, 255) if self.scene_state.focus_mode else (150, 150, 150)
-        cv2.putText(frame, f"Focus: {focus}",
-                   (10, y_offset + 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, focus_color, 2)
+        # Draw status overlay (Only if verbose)
+        if self.verbose_logging:
+            stats = self.perf_monitor.get_stats()
+            identity = self.scene_state.human.get('identity', 'Unknown')
+            pose_state = self.scene_state.human.get('pose_state', 'unknown')
+            focus = "ON" if self.scene_state.focus_mode else "OFF"
+            
+            # Status bar
+            y_offset = 30
+            cv2.putText(frame, f"FPS: {stats['fps']} | CPU: {stats['cpu']}%",
+                       (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+            cv2.putText(frame, f"Pose: {pose_state}",
+                       (10, y_offset + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+            cv2.putText(frame, f"Identity: {identity}",
+                       (10, y_offset + 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            
+            focus_color = (0, 0, 255) if self.scene_state.focus_mode else (150, 150, 150)
+            cv2.putText(frame, f"Focus: {focus}",
+                       (10, y_offset + 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, focus_color, 2)
         
         return frame
     
     def _terminal_input_loop(self):
         """Handle console input in background thread."""
         print("\n=== MEMO Commands ===")
-        print("  focus on/off  - Toggle distraction detection")
+        print("  focus on/off  - Toggle distraction detection (Keeps Vision ON)")
+        print("  y / scan      - Wake Vision for 30s")
+        print("  stop scan     - Sleep Vision immediately")
         print("  register <name> - Register your face (or type 'r')")
         print("  where is <obj> - Find object location")
         print("  voice on/off  - Toggle voice input")
@@ -487,12 +542,16 @@ class MEMOApp:
                 if not user_input:
                     continue
                 
+                cmd = user_input # Use original case for command processor
                 cmd_lower = user_input.lower()
                 
-                if cmd_lower in ['quit', 'exit', 'q']:
+                # STRICT quit matching to avoid false positives (e.g. "stop scan")
+                if cmd_lower in ['quit', 'exit', 'shutdown', 'q']:
+                    print(">> SYSTEM: Quit command received")
                     self.running = False
                     break
                 
+                # Process other commands
                 elif cmd_lower == 'voice on' and self.voice_input:
                     self.voice_input.set_active(True)
                     print(">> SYSTEM: Voice input ENABLED")
@@ -511,13 +570,19 @@ class MEMOApp:
                     self.verbose_logging = False
                     print(">> SYSTEM: Verbose logging DISABLED")
                     
-                elif cmd_lower == 'y':
+                elif cmd_lower in ['y', 'scan', 'look', 'scan on', 'start vision']:
                     if self.burst_enabled:
-                         print("\n>> SYSTEM: Vision WAKE (Manual 'y' Trigger)")
-                         # Wake for 30 seconds on manual trigger
+                         print("\n>> SYSTEM: Vision WAKE (Manual Trigger)")
                          self.trigger_end_time = time.time() + 30.0
                     else:
                          print(">> Burst mode disabled. Vision is always on.")
+
+                elif cmd_lower in ['stop scan', 'stop look', 'stop vision']:
+                    if self.burst_enabled:
+                        print("\n>> SYSTEM: Vision SLEEP (Manual Stop)")
+                        self.trigger_end_time = time.time() # Expires immediately
+                    else:
+                        print(">> Burst mode disabled. Cannot sleep.")
 
                 elif cmd_lower == 'r' or cmd_lower == 'register':
                     print("\n>> INTERACTIVE REGISTRATION")
@@ -645,6 +710,16 @@ class MEMOApp:
             
             # Process frame
             perception_result = self._process_frame(frame)
+            
+            # Dynamic Power Management
+            if self.vision_active:
+                if cam.low_power_mode:
+                    cam.set_low_power(False)
+            else:
+                if not cam.low_power_mode:
+                    cam.set_low_power(True)
+                # IMPORTANT: Yield CPU when sleeping to prevent 100% Core usage in tight loop!
+                time.sleep(0.1)
             
             # Update state
             self._update_state(frame, perception_result)

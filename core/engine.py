@@ -195,6 +195,7 @@ class PerceptionPipeline:
         self._last_detections = []
         self._last_pose = None
         self._last_identity = None
+        self._last_face_score = 0.0
         
         # Lazy loading flags
         self._detector = None
@@ -283,7 +284,8 @@ class PerceptionPipeline:
         results = {
             'detections': self._last_detections,
             'pose': self._last_pose,
-            'identity': self._last_identity
+            'identity': self._last_identity,
+            'face_score': self._last_face_score
         }
         
         try:
@@ -304,8 +306,14 @@ class PerceptionPipeline:
                 
             if 'identity' in futures:
                 try:
-                    results['identity'] = futures['identity'].result(timeout=0.01)
-                    self._last_identity = results['identity']
+                    res = futures['identity'].result(timeout=0.01)
+                    if res:
+                         self._last_identity, self._last_face_score = res
+                    else:
+                         self._last_identity, self._last_face_score = None, 0.0
+                    
+                    results['identity'] = self._last_identity
+                    results['face_score'] = self._last_face_score
                 except concurrent.futures.TimeoutError:
                     pass
                     
@@ -321,7 +329,7 @@ class PerceptionPipeline:
             return self._recognize_face(frame, self._last_pose)
         return None
 
-    def _recognize_face(self, frame, pose_data) -> Optional[str]:
+    def _recognize_face(self, frame, pose_data) -> Optional[tuple]:
         """Extract face from pose keypoints and recognize."""
         if not pose_data or 'keypoints' not in pose_data:
             return None
@@ -402,9 +410,9 @@ class CommandProcessor:
             return self._cmd_register("register User", context)
 
         # === QUIT / EXIT ===
-        quit_patterns = ['quit', 'exit', 'bye', 'goodbye', 'close', 'stop', 'shut down', 'shutdown', 'q']
+        quit_patterns = ['quit', 'exit', 'bye', 'goodbye', 'close', 'shut down', 'shutdown', 'q']
         for pattern in quit_patterns:
-            if text_lower == 'q' or (pattern in text_lower and 'focus' not in text_lower):
+            if text_lower == 'q' or (pattern in text_lower and 'focus' not in text_lower and 'scan' not in text_lower):
                 if self.on_quit:
                     self.on_quit()
                 return "Goodbye!"
@@ -467,6 +475,32 @@ class CommandProcessor:
         if 'where' in text_lower:
             return self._cmd_where_is(text, context)
         
+        # === SCAN / VISION CONTROL ===
+        if text_lower in ['scan', 'wake vision', 'wake up', 'start scan', 'y']:
+            if context and 'scene_state' in context:
+                context['scene_state'].wake_request = True
+            return "Scanning environment..."
+            
+        if text_lower in ['stop scan', 'sleep', 'stop vision', 'end scan']:
+            if context and 'scene_state' in context:
+                context['scene_state'].wake_request = False # This might need special handling in main.py to force sleep
+                # We'll use a special string that main.py recognizes or just rely on wake_request=False
+                # Actually, main.py checks wake_request to START wake. To STOP, we need to clear the timer.
+                # Let's set a 'force_sleep' flag if needed, or just let main.py see this.
+                context['scene_state'].sleep_request = True 
+            return "Vision system entering sleep mode."
+
+        # === LOGS CONTROL ===
+        if 'logs' in text_lower:
+            if 'on' in text_lower or 'enable' in text_lower:
+                if context and 'scene_state' in context:
+                    context['scene_state'].verbose_logging = True
+                return "Debug logs enabled."
+            if 'off' in text_lower or 'disable' in text_lower:
+                if context and 'scene_state' in context:
+                    context['scene_state'].verbose_logging = False
+                return "Debug logs disabled."
+
         # === WHAT DO YOU SEE ===
         see_patterns = ['what do you see', 'what can you see', 'what see', 'describe']
         for pattern in see_patterns:

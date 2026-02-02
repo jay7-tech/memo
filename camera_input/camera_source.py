@@ -37,8 +37,10 @@ class CameraSource:
         self.latest_frame = None
         self.status = False
         self.running = True
-        self.lock = threading.Lock()
-
+        self.status = False
+        self.running = True
+        self.low_power_mode = False  # Start in active mode
+        
         # Start background thread to read frames
         self.thread = threading.Thread(target=self._update, daemon=True)
         self.thread.start()
@@ -51,9 +53,21 @@ class CameraSource:
                 break
             time.sleep(0.1)
 
+            time.sleep(0.1)
+
+    def set_low_power(self, enabled: bool):
+        """Toggle low power mode (1 FPS vs 30 FPS)."""
+        self.low_power_mode = enabled
+        rate = "1 FPS" if enabled else "30 FPS"
+        print(f"[Camera] Power Mode: {'LOW' if enabled else 'HIGH'} ({rate})")
+
     def _update(self):
         while self.running:
             if self.cap.isOpened():
+                # Throttling for Low Power Mode
+                if self.low_power_mode:
+                    time.sleep(1.0) # 1 FPS
+                    
                 ret, frame = self.cap.read()
                 if ret:
                     # Apply rotation if needed

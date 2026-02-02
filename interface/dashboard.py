@@ -61,6 +61,7 @@ def index():
         <title>MEMO // NEURAL INTERFACE v4.0</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
         <style>
             :root {
@@ -71,11 +72,12 @@ def index():
                 --text-main: #1e293b;
                 --text-side: #64748b;
                 --border: #e2e8f0;
-                --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+                --danger: #ef4444;
+                --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
             }
 
             * { box-sizing: border-box; }
-            ::-webkit-scrollbar { width: 5px; }
+            ::-webkit-scrollbar { width: 6px; }
             ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 
             body { 
@@ -89,26 +91,26 @@ def index():
                 overflow: hidden;
             }
 
-            /* --- LUMINA V4.0 LAYOUT --- */
             .header {
-                height: 70px;
+                height: 64px;
                 background: var(--panel);
                 border-bottom: 1px solid var(--border);
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
-                padding: 0 40px;
-                z-index: 100;
+                padding: 0 32px;
+                box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+                z-index: 10;
             }
 
             .main-stage {
                 flex: 1;
                 display: grid;
-                grid-template-columns: 1fr 360px;
+                grid-template-columns: 1fr 380px;
                 gap: 24px;
                 padding: 24px;
                 min-height: 0;
-                max-width: 1800px;
+                max-width: 1600px;
                 margin: 0 auto;
                 width: 100%;
             }
@@ -120,307 +122,260 @@ def index():
                 min-height: 0;
             }
 
-            /* --- COMPONENTS --- */
-            .logo {
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                font-weight: 700;
-                font-size: 1.25rem;
-                letter-spacing: -0.5px;
-            }
-            .logo .dot { width: 12px; height: 12px; background: var(--accent); border-radius: 3px; }
+            .logo { font-weight: 700; font-size: 1.25rem; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; color: var(--text-main); }
+            .dot { width: 10px; height: 10px; background: var(--accent); border-radius: 3px; }
 
             .card {
                 background: var(--panel);
                 border: 1px solid var(--border);
                 border-radius: 20px;
-                box-shadow: var(--shadow);
                 overflow: hidden;
+                display: flex;
+                flex-direction: column;
+                box-shadow: var(--shadow);
             }
 
             .vision-box {
                 flex: 1;
                 background: #000;
-                border-radius: 24px;
+                border-radius: 20px;
                 position: relative;
                 overflow: hidden;
-                border: 8px solid var(--panel);
-                box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-            }
-
-            .feed-img { width: 100%; height: 100%; object-fit: contain; }
-
-            /* Terminal Area */
-            .terminal-box {
-                height: 250px;
-                display: flex;
-                flex-direction: column;
-                padding: 20px;
-            }
-
-            #terminal {
-                flex: 1;
-                overflow-y: auto;
-                font-family: 'JetBrains Mono', monospace;
-                font-size: 0.85rem;
-                padding-right: 15px;
-            }
-
-            .log-item {
-                margin-bottom: 12px;
-                padding: 8px 12px;
-                border-radius: 8px;
-                background: #f1f5f9;
-                border-left: 4px solid #cbd5e1;
-            }
-            .log-item.ai { border-left-color: var(--accent); background: var(--accent-dim); color: #065f46; }
-
-            .input-group {
-                margin-top: 15px;
-                display: flex;
-                gap: 10px;
-            }
-            .input-group input {
-                flex: 1;
-                border: 1px solid var(--border);
-                border-radius: 12px;
-                padding: 12px 20px;
-                font-family: inherit;
-                outline: none;
-                transition: 0.2s;
-            }
-            .input-group input:focus { border-color: var(--accent); ring: 2px solid var(--accent-dim); }
-            
-            .btn {
-                background: var(--text-main);
-                color: #fff;
-                border: none;
-                border-radius: 12px;
-                padding: 0 24px;
-                font-weight: 600;
-                cursor: pointer;
-                transition: 0.2s;
-            }
-            .btn:hover { transform: translateY(-1px); opacity: 0.9; }
-
-            /* Right Sidebar */
-            .sidebar {
-                display: flex;
-                flex-direction: column;
-                gap: 20px;
-            }
-
-            .stat-block {
-                padding: 24px;
-            }
-
-            .stat-header {
-                font-size: 0.75rem;
-                font-weight: 700;
-                color: var(--text-side);
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                margin-bottom: 20px;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-            }
-
-            .hud-rings {
-                display: flex;
-                justify-content: space-around;
-                margin-bottom: 24px;
-            }
-
-            .ring {
-                position: relative;
-                width: 100px; height: 100px;
+                border: 4px solid var(--panel);
+                box-shadow: var(--shadow);
                 display: flex;
                 align-items: center;
                 justify-content: center;
             }
-            .ring svg { transform: rotate(-90deg); width: 100%; height: 100%; }
-            .ring circle { fill: none; stroke-width: 6; }
-            .ring .bg { stroke: #f1f5f9; }
-            .ring .bar { 
-                stroke: var(--accent); 
-                stroke-dasharray: 251; 
-                stroke-dashoffset: 251;
-                transition: 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-                stroke-linecap: round;
-            }
-            .ring .val { position: absolute; font-weight: 700; font-size: 1.25rem; }
-
-            .cog-item {
+            .feed-img { width: 100%; height: 100%; object-fit: contain; }
+            
+            .overlay-badge {
+                position: absolute; top: 15px; left: 15px;
+                background: rgba(0,0,0,0.6);
+                backdrop-filter: blur(4px);
+                padding: 6px 12px;
+                border-radius: 6px;
+                font-family: 'JetBrains Mono';
+                font-size: 0.7rem;
                 display: flex;
-                flex-direction: column;
-                gap: 4px;
-                padding: 12px 0;
-                border-bottom: 1px solid var(--border);
+                align-items: center;
+                gap: 8px;
             }
-            .cog-item:last-child { border: none; }
-            .cog-label { font-size: 0.7rem; color: var(--text-side); text-transform: uppercase; }
-            .cog-value { font-weight: 600; font-size: 0.9rem; }
+            .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #64748b; }
+            .status-dot.active { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
 
+            .terminal-box { height: 220px; padding: 16px; }
+            #terminal {
+                flex: 1;
+                overflow-y: auto;
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 0.8rem;
+                color: var(--text-main);
+                margin-bottom: 10px;
+            }
+            .log-item { margin-bottom: 6px; line-height: 1.4; word-break: break-all; }
+            .log-item span { opacity: 0.6; margin-right: 8px; font-size: 0.7rem; }
+            
+            .sidebar { display: flex; flex-direction: column; gap: 16px; }
+            
+            .stat-block { padding: 16px; }
+            .stat-header {
+                font-size: 0.7rem;
+                font-weight: 700;
+                color: var(--text-side);
+                letter-spacing: 1px;
+                margin-bottom: 12px;
+                text-transform: uppercase;
+            }
+
+            /* Controls */
             .control-grid {
                 display: grid;
                 grid-template-columns: 1fr 1fr;
-                gap: 12px;
-                padding: 24px;
+                gap: 10px;
             }
             .c-btn {
-                background: #f1f5f9;
+                background: var(--bg);
                 border: 1px solid var(--border);
-                border-radius: 12px;
-                padding: 12px;
-                font-size: 0.75rem;
-                font-weight: 600;
                 color: var(--text-main);
+                padding: 12px;
+                border-radius: 8px;
+                font-weight: 600;
+                font-size: 0.75rem;
                 cursor: pointer;
-                text-align: center;
                 transition: 0.2s;
             }
-            .c-btn:hover { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+            .c-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+            .c-btn.danger:hover { border-color: var(--danger); color: var(--danger); background: rgba(239, 68, 68, 0.1); }
+            .c-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
-            .status-badge {
-                padding: 4px 10px;
-                border-radius: 20px;
-                font-size: 0.65rem;
-                font-weight: 700;
-                background: #f1f5f9;
-                color: var(--text-side);
+            canvas { max-height: 120px; width: 100%; }
+
+            .input-group { display: flex; gap: 8px; }
+            input {
+                flex: 1;
+                background: var(--bg);
+                border: 1px solid var(--border);
+                color: var(--text-main);
+                padding: 8px 12px;
+                border-radius: 8px;
+                font-family: inherit;
+                outline: none;
             }
-            .status-badge.active { background: #dcfce7; color: #166534; }
+            input:focus { border-color: var(--accent); }
+            .send-btn { background: var(--accent); border: none; color: white; border-radius: 8px; padding: 0 16px; cursor: pointer; font-weight: 600; }
         </style>
     </head>
     <body onload="init()">
         <header class="header">
             <div class="logo">
                 <div class="dot"></div>
-                MEMO <span style="font-weight: 400; color: var(--text-side); font-size: 1rem; margin-left: 8px;"> // Dashboard v4.0</span>
+                MEMO <span style="opacity: 0.5; font-weight: 400; font-size: 0.9rem;"> // DASHBOARD 2.0</span>
             </div>
-            <div style="display: flex; gap: 32px; font-size: 0.85rem; font-weight: 600; color: var(--text-side);">
-                <div>LATENCY: <span id="ping" style="color: var(--text-main)">--</span>ms</div>
-                <div id="clock" style="color: var(--text-main)">00:00:00</div>
-                <div class="status-badge active">SYSTEM READY</div>
+            <div style="font-size: 0.8rem; font-family: 'JetBrains Mono'; color: var(--text-side);">
+                LATENCY: <span id="ping" style="color: var(--accent)">--</span>ms
             </div>
         </header>
 
         <main class="main-stage">
-            <!-- Left: Vision & Terminal -->
             <div class="vision-container">
                 <div class="vision-box">
-                    <img src="/video_feed" class="feed-img" alt="Neural Feed">
-                    <!-- Clean minimal overlays -->
-                    <div style="position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.5); padding: 8px 16px; border-radius: 8px; color: #fff; font-size: 0.75rem; font-family: 'JetBrains Mono'; backdrop-filter: blur(4px);">
-                        LIVE_FEED // CACHE_READY
+                    <img src="/video_feed" class="feed-img">
+                    <div class="overlay-badge">
+                        <div id="vision-dot" class="status-dot"></div>
+                        <span id="vision-text">VISION SLEEP</span>
                     </div>
                 </div>
 
                 <div class="card terminal-box">
-                    <div class="stat-header">NEURAL COMMAND LOGS <span class="status-badge" style="font-size: 0.6rem">UPLINK_STABLE</span></div>
+                    <div class="stat-header">NEURAL LOGS</div>
                     <div id="terminal"></div>
                     <form class="input-group" id="cmd-form">
-                        <input type="text" id="cmd-input" placeholder="Type a command for MEMO..." autocomplete="off">
-                        <button type="submit" class="btn" id="send-btn">TRANSMIT</button>
+                        <input type="text" id="cmd-input" placeholder="Enter command..." autocomplete="off">
+                        <button type="submit" class="send-btn">PCT</button>
                     </form>
                 </div>
             </div>
 
-            <!-- Right: Stats & Controls -->
             <div class="sidebar">
+                <!-- Status Card -->
                 <div class="card stat-block">
-                    <div class="stat-header">SYSTEM PERFORMANCE</div>
-                    <div class="hud-rings">
-                        <div class="ring">
-                            <svg viewBox="0 0 100 100">
-                                <circle class="bg" cx="50" cy="50" r="40"></circle>
-                                <circle id="cpu-ring" class="bar" cx="50" cy="50" r="40"></circle>
-                            </svg>
-                            <div class="val" id="cpu-val">0</div>
-                            <div style="position: absolute; bottom: -15px; font-size: 0.65rem; color: var(--text-side); font-weight: 600;">CPU %</div>
+                    <div class="stat-header">SYSTEM STATUS</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 0.8rem;">
+                        <div>
+                            <div style="color: var(--text-side); font-size: 0.7rem;">IDENTITY</div>
+                            <div id="status-id" style="font-weight: 600; font-size: 1rem;">--</div>
                         </div>
-                        <div class="ring">
-                            <svg viewBox="0 0 100 100">
-                                <circle class="bg" cx="50" cy="50" r="40"></circle>
-                                <circle id="fps-ring" class="bar" cx="50" cy="50" r="40" style="stroke: #6366f1;"></circle>
-                            </svg>
-                            <div class="val" id="fps-val">0</div>
-                            <div style="position: absolute; bottom: -15px; font-size: 0.65rem; color: var(--text-side); font-weight: 600;">FPS</div>
+                        <div>
+                            <div style="color: var(--text-side); font-size: 0.7rem;">FOCUS MODE</div>
+                            <div id="status-focus" style="font-weight: 600; font-size: 1rem;">OFF</div>
                         </div>
                     </div>
                 </div>
 
-                <div class="card stat-block" style="flex: 1;">
-                    <div class="stat-header">COGNITIVE PROFILE</div>
-                    <div class="cog-item">
-                        <span class="cog-label">IDENTIFIED SUBJECT</span>
-                        <span class="cog-value" id="cog-id">SEARCHING...</span>
-                    </div>
-                    <div class="cog-item">
-                        <span class="cog-label">FOCUS REINFORCEMENT</span>
-                        <span class="cog-value" id="cog-focus">DEACTIVATED</span>
-                    </div>
-                    <div class="cog-item">
-                        <span class="cog-label">CORE BACKEND</span>
-                        <span class="cog-value">OLLAMA / TINYLLAMA</span>
+                <!-- Controls -->
+                <div class="card stat-block">
+                    <div class="stat-header">MANUAL OVERRIDE</div>
+                    <div class="control-grid">
+                        <button id="btn-wake" class="c-btn" onclick="sendCmd('scan')">WAKE VISION</button>
+                        <button id="btn-sleep" class="c-btn danger" onclick="sendCmd('stop scan')">SLEEP</button>
+                        <button id="btn-focus-on" class="c-btn" onclick="sendCmd('focus on')">FOCUS ON</button>
+                        <button id="btn-focus-off" class="c-btn" onclick="sendCmd('focus off')">FOCUS OFF</button>
+                        <button id="btn-logs" class="c-btn" onclick="sendCmd('logs on')">DEBUG LOGS</button>
+                        <button class="c-btn danger" onclick="sendCmd('quit')">SHUTDOWN</button>
                     </div>
                 </div>
 
-                <div class="card control-grid">
-                    <button onclick="sendCmd('f')" class="c-btn">FORCE FOCUS</button>
-                    <button onclick="sendCmd('v')" class="c-btn">MUTE VOICE</button>
-                    <button onclick="sendCmd('status')" class="c-btn" style="grid-column: span 2;">RUN DIAGNOSTICS</button>
-                </div>
+                <!-- ... (Perception Log) ... -->
+
+                <!-- ... (Graphs) ... -->
+
             </div>
         </main>
 
+        <!-- ... (Style) ... -->
+
         <script>
-            const socket = io();
-            const terminal = document.getElementById('terminal');
+            // ... (Socket Init) ...
             
-            function init() {
-                setInterval(() => {
-                    const now = new Date();
-                    document.getElementById('clock').innerText = now.toLocaleTimeString('en-US', { hour12: false });
-                }, 1000);
+            // Helper to toggle active class
+            function toggleBtn(id, active) {
+                const btn = document.getElementById(id);
+                if (btn) {
+                    if (active) btn.classList.add('active');
+                    else btn.classList.remove('active');
+                }
             }
+
+            // ... (Circle Logic) ...
 
             let lastPing = Date.now();
             socket.on('stats_update', (data) => {
-                const cpuRing = document.getElementById('cpu-ring');
-                const fpsRing = document.getElementById('fps-ring');
-                
-                // Circumference = 2 * PI * R (R=40) ≈ 251
-                cpuRing.style.strokeDashoffset = 251 - (251 * data.cpu / 100);
-                fpsRing.style.strokeDashoffset = 251 - (251 * data.fps / 30 * 100 / 100);
-
-                document.getElementById('cpu-val').innerText = data.cpu;
-                document.getElementById('fps-val').innerText = Math.round(data.fps);
+                // Update Ping
                 document.getElementById('ping').innerText = Date.now() - lastPing;
                 lastPing = Date.now();
 
-                const userId = data.identity || (data.human_present ? "UNIDENTIFIED HUMAN" : "NO SUBJECT");
-                document.getElementById('cog-id').innerText = userId.toUpperCase();
+                // Update Status text
+                const vDot = document.getElementById('vision-dot');
+                const vText = document.getElementById('vision-text');
+                if (data.vision_active) {
+                    vDot.classList.add('active');
+                    vText.innerText = "VISION ACTIVE";
+                    vText.style.color = "#10b981";
+                } else {
+                    vDot.classList.remove('active');
+                    vText.innerText = "VISION SLEEP";
+                    vText.style.color = "#94a3b8";
+                }
+
+                document.getElementById('status-id').innerText = (data.identity || "Scanning...").toUpperCase();
                 
-                const focus = document.getElementById('cog-focus');
-                focus.innerText = data.focus_mode ? "REINFORCED" : "DEACTIVATED";
-                focus.style.color = data.focus_mode ? "var(--accent)" : "var(--text-side)";
+                const focusEl = document.getElementById('status-focus');
+                focusEl.innerText = data.focus_mode ? "Active" : "Standby";
+                focusEl.style.color = data.focus_mode ? "#10b981" : "#94a3b8";
+                
+                // Update Button States
+                toggleBtn('btn-wake', data.vision_active);
+                toggleBtn('btn-sleep', !data.vision_active);
+                
+                toggleBtn('btn-focus-on', data.focus_mode);
+                toggleBtn('btn-focus-off', !data.focus_mode);
+                
+                // Logic for Logs Button (Clicking toggles it, but we need state)
+                // Assuming data.verbose_logging is sent
+                const logsBtn = document.getElementById('btn-logs');
+                if (data.verbose_logging) {
+                    logsBtn.classList.add('active');
+                    logsBtn.innerText = "LOGS ACTIVE";
+                    logsBtn.onclick = () => sendCmd('logs off');
+                } else {
+                    logsBtn.classList.remove('active');
+                    logsBtn.innerText = "DEBUG LOGS";
+                    logsBtn.onclick = () => sendCmd('logs on');
+                }
+
+                // Update Circles
+                setProgress('cpu-ring', data.cpu, 100);
+                setProgress('fps-ring', data.fps, 30); 
             });
 
             socket.on('new_log', (entry) => {
                 const div = document.createElement('div');
-                div.className = `log-item ${entry.type}`;
-                div.innerHTML = `
-                    <span style="font-size: 0.65rem; color: var(--text-side); margin-right: 8px;">${entry.time}</span>
-                    <strong style="font-size: 0.7rem; margin-right: 8px;">[${entry.type.toUpperCase()}]</strong>
-                    <span>${entry.msg}</span>
-                `;
+                div.className = 'log-item';
+                div.innerHTML = `<span>${entry.time}</span> ${entry.msg}`;
                 terminal.appendChild(div);
                 terminal.scrollTop = terminal.scrollHeight;
-                if(terminal.childNodes.length > 50) terminal.removeChild(terminal.firstChild);
             });
+
+            socket.on('perception_log', (entry) => {
+                const div = document.createElement('div');
+                div.style.marginBottom = "4px";
+                div.innerHTML = `<span style="opacity:0.5; margin-right:6px;">${entry.time}</span> ${entry.msg}`;
+                perceptionLog.appendChild(div);
+                perceptionLog.scrollTop = perceptionLog.scrollHeight;
+            });
+            
+            // ... sendCmd ...
 
             function sendCmd(text) {
                 fetch('/api/command', {
@@ -433,10 +388,7 @@ def index():
             document.getElementById('cmd-form').onsubmit = (e) => {
                 e.preventDefault();
                 const input = document.getElementById('cmd-input');
-                if(input.value) {
-                    sendCmd(input.value);
-                    input.value = '';
-                }
+                if(input.value) { sendCmd(input.value); input.value = ''; }
             };
         </script>
     </body>
@@ -471,6 +423,8 @@ def start_server():
                     'human_present': scene_state_ref.human['present'],
                     'identity': scene_state_ref.human['identity'],
                     'focus_mode': scene_state_ref.focus_mode,
+                    'vision_active': getattr(scene_state_ref, 'vision_active', True),
+                    'verbose_logging': getattr(scene_state_ref, 'verbose_logging', False), # Added
                     'objects': list(scene_state_ref.objects.keys()),
                     'cpu': stats['cpu'],
                     'fps': stats['fps']
