@@ -12,7 +12,7 @@ sudo apt update && sudo apt upgrade -y
 # Install Core Libraries (Audio, PortAudio, Espeak, Atlas)
 sudo apt install -y python3-pyaudio portaudio19-dev
 sudo apt install -y espeak libespeak1
-sudo apt install -y libatlas-base-dev
+sudo apt install -y libopenblas-dev
 sudo apt install -y python3-pip git
 ```
 
@@ -91,6 +91,13 @@ You mentioned `phi3:mini` is not on the Pi yet. You need to install Ollama and p
    ```bash
    ollama pull tinyllama
    ```
+
+   **Troubleshooting: "Server not responding"?**
+   If you see this error, start the server manually in a new terminal window:
+   ```bash
+   ollama serve
+   ```
+   Then try `ollama pull` again in your original window.
 
 ## 8. Run MEMO
 Start the bot!
