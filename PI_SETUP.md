@@ -109,14 +109,28 @@ Start the bot!
 python main.py
 ```
 
-### Auto-Start on Boot (Optional)
-To make MEMO run automatically when the Pi turns on:
-
-1. Open crontab:
-   ```bash
-   crontab -e
-   ```
-2. Add this line at the bottom:
-   ```bash
    @reboot /bin/bash /home/pi/MEMO/start_memo.sh
    ```
+
+## 9. Performance Tuning (Pi 5)
+To make MEMO run faster with all features enabled:
+
+1.  **Use TinyLlama** (Faster Brain):
+    If `phi3` is slow (taking >10s to reply), switch to `tinyllama`.
+    ```bash
+    ollama pull tinyllama
+    ```
+    Then edit `config_rpi.json` and change `"model": "phi3:mini"` to `"model": "tinyllama"`.
+
+2.  **Overclock (Optional)**:
+    Pi 5 handles overclocking well. Add this to `/boot/firmware/config.txt`:
+    ```
+    arm_freq=2800
+    gpu_freq=900
+    ```
+
+3.  **Enable ZRAM**:
+    Helps with memory management.
+    ```bash
+    sudo apt install zram-tools
+    ```

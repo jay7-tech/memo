@@ -17,13 +17,17 @@
         "face_threshold": 0.5,
         "object_confidence": 0.5,
         "phone_confidence": 0.70,
-        "frame_skip": 5,
-        "detection_interval": 5.0,
-        "face_recognition_interval": 3.0,
+        "frame_skip": 15,
+        "detection_interval": 2.0,
+        "face_recognition_interval": 5.0,
         "enable_emotion": false,
         "enable_gestures": false,
-        "enable_motion": false,
-        "enable_face_rec": true
+        "enable_motion": true,
+        "enable_face_rec": true,
+        "burst_mode": true,
+        "burst_interval": 30.0,
+        "burst_duration": 2.0,
+        "startup_duration": 15.0
     },
     "voice": {
         "enable_voice_input": true,

@@ -101,6 +101,15 @@ class MEMOApp:
         
         # Stats
         self.frame_count = 0
+        
+        # Burst Mode State (Pi 5 Optimization)
+        p_cfg = self.config.get('perception', {})
+        self.burst_enabled = p_cfg.get('burst_mode', False)
+        self.burst_interval = p_cfg.get('burst_interval', 30.0)
+        self.burst_duration = p_cfg.get('burst_duration', 2.0)
+        self.startup_end_time = time.time() + p_cfg.get('startup_duration', 10.0)
+        self.last_burst_time = time.time()
+        self.trigger_end_time = self.startup_end_time # Start awake
         self.last_tts_time = 0
         self.verbose_logging = False
         self.is_prompting = False # Flag to silence logs during user input
@@ -168,6 +177,11 @@ class MEMOApp:
     
     def _on_voice_command(self, event: Event):
         """Handle voice commands."""
+        # WAKE UP VISION on any voice interaction
+        if self.burst_enabled:
+            print(">> SYSTEM: Vision WAKE (Trigger)")
+            self.trigger_end_time = time.time() + 10.0 
+
         text = event.data.get('text', '')
         response = self.command_processor.process(
             text, 
@@ -259,6 +273,29 @@ class MEMOApp:
         self.frame_count += 1
         self.perf_monitor.record_frame()
         
+        # --- BURST MODE LOGIC ---
+        if self.burst_enabled:
+            now = time.time()
+            is_waking = False
+            
+            # 1. Startup
+            if now < self.startup_end_time:
+                is_waking = True
+            # 2. Trigger (Voice/Manual)
+            elif now < self.trigger_end_time:
+                is_waking = True
+            # 3. Periodic Wakeup
+            elif now - self.last_burst_time > self.burst_interval:
+                self.last_burst_time = now
+                self.trigger_end_time = now + self.burst_duration
+                is_waking = True
+                print(f">> SYSTEM: Vision WAKE (Periodic - {self.burst_duration}s)")
+            
+            if not is_waking:
+                # SLEEP: Return empty result, save CPU
+                return {'detections': [], 'pose': None, 'identity': None}
+        # ------------------------
+
         # Determine what to run this frame
         run_detection = not self.perf_monitor.should_skip_frame(self.frame_count)
         run_pose = run_detection
