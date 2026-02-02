@@ -97,6 +97,8 @@ You mentioned `phi3:mini` is not on the Pi yet. You need to install Ollama and p
    ```bash
    ollama serve
    ```
+   *If it says "address already in use", that's GOOD! It means it's already running. Just go to step 2.*
+   
    Then try `ollama pull` again in your original window.
 
 ## 8. Run MEMO
