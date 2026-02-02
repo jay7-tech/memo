@@ -14,7 +14,7 @@
     "perception": {
         "yolo_model": "yolov8n.pt",
         "pose_model": "yolov8n-pose.pt",
-        "face_threshold": 0.40,
+        "face_threshold": 0.35,
         "object_confidence": 0.65,
         "phone_confidence": 0.75,
         "frame_skip": 15,
@@ -27,7 +27,7 @@
         "burst_mode": true,
         "burst_interval": 30.0,
         "burst_duration": 4.0,
-        "startup_duration": 15.0
+        "startup_duration": 60.0
     },
     "voice": {
         "enable_voice_input": true,
@@ -57,6 +57,7 @@
         "force_pi_mode": true
     },
     "system": {
+        "headless_mode": true,
         "focus_mode_default": false,
         "greeting_enabled": true,
         "personality_mode": "helpful",

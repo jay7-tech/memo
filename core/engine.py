@@ -338,11 +338,12 @@ class PerceptionPipeline:
             l_ear = kp['LEFT_EAR']
             r_ear = kp['RIGHT_EAR']
             ear_dist = abs(l_ear[0] - r_ear[0])
-            face_w = int(ear_dist * 2.0)
+            # v1.1 Accuracy Fix: Widen crop to include full head context
+            face_w = int(ear_dist * 2.5) 
         else:
-            face_w = 150  # Default face width
-        
-        face_h = int(face_w * 1.2)
+            face_w = 180  # Slightly larger default
+
+        face_h = int(face_w * 1.4) # Capture more chin/forehead
         x = int(nose[0]) - face_w // 2
         y = int(nose[1]) - face_h // 2
         

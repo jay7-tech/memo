@@ -115,7 +115,18 @@ class MEMOApp:
         self.is_prompting = False # Flag to silence logs during user input
         
         # Display settings
-        self.show_display = not self.perf_monitor.is_raspberry_pi
+        sys_cfg = self.config.get('system', {})
+        force_headless = sys_cfg.get('headless_mode', False)
+        
+        # Determine display mode:
+        # 1. Defaults to False if Pi
+        # 2. Defaults to True if PC
+        # 3. Overridden by config 'headless_mode'
+        # 4. Overridden by CLI args
+        if force_headless:
+            self.show_display = False
+        else:
+            self.show_display = not self.perf_monitor.is_raspberry_pi
         
         # Check command line for headless override
         if "--headless" in sys.argv:
@@ -500,6 +511,14 @@ class MEMOApp:
                     self.verbose_logging = False
                     print(">> SYSTEM: Verbose logging DISABLED")
                     
+                elif cmd_lower == 'y':
+                    if self.burst_enabled:
+                         print("\n>> SYSTEM: Vision WAKE (Manual 'y' Trigger)")
+                         # Wake for 30 seconds on manual trigger
+                         self.trigger_end_time = time.time() + 30.0
+                    else:
+                         print(">> Burst mode disabled. Vision is always on.")
+
                 elif cmd_lower == 'r' or cmd_lower == 'register':
                     print("\n>> INTERACTIVE REGISTRATION")
                     # Prompt directly in the terminal thread

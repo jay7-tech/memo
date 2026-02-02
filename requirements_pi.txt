@@ -11,6 +11,7 @@ opencv-python-headless>=4.8.0
 numpy<2.0               
 ultralytics
 mediapipe               # (Install standard version)
+facenet-pytorch
 
 # Audio & Speech
 vosk>=0.3.45            # Offline Speech (Best for Pi)
