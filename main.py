@@ -113,7 +113,9 @@ class MEMOApp:
         self.last_tts_time = 0
         self.verbose_logging = False
         self.is_prompting = False # Flag to silence logs during user input
+        self.is_prompting = False # Flag to silence logs during user input
         self.vision_active = True # Track vision state for power management
+        self.forced_sleep = False # Manual sleep override flag
         
         # Display settings
         sys_cfg = self.config.get('system', {})
@@ -285,50 +287,55 @@ class MEMOApp:
         self.frame_count += 1
         self.perf_monitor.record_frame()
         
-        # --- BURST MODE LOGIC ---
-        if self.burst_enabled:
-            now = time.time()
-            is_waking = False
+        # --- GLOBAL SLEEP/WAKE LOGIC ---
+        now = time.time()
+        
+        # 0. Check Manual Override Commands
+        if self.scene_state.wake_request:
+            self.forced_sleep = False # Wake up!
+            self.trigger_end_time = now + 30.0
+            self.scene_state.wake_request = False
+            print(">> SYSTEM: Vision WAKE (Manual)")
+
+        if getattr(self.scene_state, 'sleep_request', False):
+            self.forced_sleep = True # Force sleep
+            self.trigger_end_time = 0 
+            self.startup_end_time = 0
+            self.scene_state.sleep_request = False
+            print(">> SYSTEM: Vision SLEEP (Manual)")
             
-            # 1. Startup
-            if now < self.startup_end_time:
-                is_waking = True
-            # 2. Trigger (Voice/Manual)
-            elif now < self.trigger_end_time:
-                is_waking = True
-            # 3. Periodic Wakeup
+        # 1. Determine Target State
+        should_be_awake = False
+        
+        if self.scene_state.focus_mode:
+            should_be_awake = True
+            self.forced_sleep = False # Focus overrides sleep
+            
+        elif self.burst_enabled:
+            # Burst Mode Logic
+            if now < self.startup_end_time: should_be_awake = True
+            elif now < self.trigger_end_time: should_be_awake = True
             elif now - self.last_burst_time > self.burst_interval:
                 self.last_burst_time = now
                 self.trigger_end_time = now + self.burst_duration
-                is_waking = True
+                should_be_awake = True
                 print(f">> SYSTEM: Vision WAKE (Periodic - {self.burst_duration}s)")
+        else:
+            # PC Mode (Always On)
+            should_be_awake = True
+        
+        # 2. Apply Forced Sleep Override
+        if self.forced_sleep:
+            should_be_awake = False
             
-            # 4. Focus Mode (Always Awake)
-            elif self.scene_state.focus_mode:
-                is_waking = True
-            
-            # 5. Manual Wake Request (New)
-            if self.scene_state.wake_request:
-                self.trigger_end_time = now + 30.0 # Wake for 30s
-                self.scene_state.wake_request = False # Reset flag
-                is_waking = True
-                print(">> SYSTEM: Vision WAKE (Manual)")
-            
-            # 6. Sleep Request (Override)
-            if getattr(self.scene_state, 'sleep_request', False):
-                is_waking = False
-                self.trigger_end_time = 0 # Cancel any active trigger
-                self.startup_end_time = 0 # CANCEL STARTUP WARMUP (Fix for high CPU)
-                self.scene_state.sleep_request = False
-                print(">> SYSTEM: Vision SLEEP (Manual)")
-            
-            # Update state for main loop to handle camera power
-            self.vision_active = is_waking
-            self.scene_state.vision_active = is_waking # Sync for dashboard
-            
-            if not is_waking:
-                # SLEEP: Return empty result, save CPU
-                return {'detections': [], 'pose': None, 'identity': None}
+        # 3. Apply State
+        self.vision_active = should_be_awake
+        self.scene_state.vision_active = should_be_awake
+        
+        if not should_be_awake:
+             return {'detections': [], 'pose': None, 'identity': None}
+             
+         # --- END SLEEP LOGIC ---
 
 
         # Determine what to run this frame

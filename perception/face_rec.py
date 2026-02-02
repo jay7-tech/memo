@@ -311,7 +311,7 @@ class FaceRecognizer:
                 best_match = name
         
         if best_similarity >= self.threshold:
-            print(f"[FaceRec] MATCH: {best_match} ({best_similarity:.3f})")
+            # print(f"[FaceRec] MATCH: {best_match} ({best_similarity:.3f})")
             return best_match, best_similarity
         else:
             # print(f"[FaceRec] Ignored: {best_match} ({best_similarity:.3f}) < {self.threshold}")
