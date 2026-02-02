@@ -12,57 +12,27 @@ class CameraSource:
         self.src = source
         self.rotation = int(rotation)
         
-        # Try opening the requested source
-        if not self._open_source(self.src, width, height):
-            # If failed and source was 0, try auto-scanning indices 1-10
-            if self.src == 0:
-                print(f"[Camera] Source 0 failed. Auto-scanning other indices...")
-                found = False
-                for i in range(1, 10):
-                    print(f"[Camera] Trying index {i}...")
-                    if self._open_source(i, width, height):
-                        print(f"[Camera] ✓ Found working camera at index {i}")
-                        self.src = i
-                        found = True
-                        break
-                
-                if not found:
-                    raise RuntimeError(f"Could not open any camera source (Scanned 0-9)")
-            else:
-                raise RuntimeError(f"Could not open camera source {source}")
-
-    def _open_source(self, source, width, height):
-        """Helper to attempt opening a source."""
-        try:
-            if isinstance(source, int):
-                # Windows: Use DirectShow
-                if __import__("os").name == "nt":
-                    self.cap = cv2.VideoCapture(source, cv2.CAP_DSHOW)
-                # Linux/Pi: Enforce V4L2 (User Recommendation)
-                else:
-                    self.cap = cv2.VideoCapture(source, cv2.CAP_V4L2)
-                    # Force MJPG for better framerate on Pi if possible, or standard YUYV
-                    # self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
-            else:
-                self.cap = cv2.VideoCapture(source)
-            
-            if not self.cap.isOpened():
-                return False
-                
-            # Set params
+        if __import__("os").name == "nt":
+             # Use DirectShow on Windows
+            self.cap = cv2.VideoCapture(source, cv2.CAP_DSHOW)
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        else:
+            # Linux/Pi: FORCE /dev/video0 with V4L2 (User Fix)
+            # Auto-scan removed because OpenCV reopening is buggy on Pi
+            print(f"[Camera] Opening /dev/video0 with V4L2...")
+            self.cap = cv2.VideoCapture("/dev/video0", cv2.CAP_V4L2)
             
-            # Read one frame to confirm it's real
-            ret, _ = self.cap.read()
-            if not ret:
-                self.cap.release()
-                return False
-                
-            return True
-        except:
-            return False
+            # Force params
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+            self.cap.set(cv2.CAP_PROP_FPS, 30)
+        
+        if not self.cap.isOpened():
+            raise RuntimeError(f"Could not open /dev/video0 (Check connection or libcamerify)")
+
+        # Optimization: Buffer size 1
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
         self.latest_frame = None
         self.status = False
