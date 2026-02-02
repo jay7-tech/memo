@@ -211,10 +211,17 @@ class PerceptionPipeline:
     def _init_detector(self):
         """Lazy init object detector."""
         if self._detector is None:
-            from perception import ObjectDetector
-            model = self.config.get('yolo_model', 'yolov8n.pt')
-            self._detector = ObjectDetector(model)
-            print("[Perception] Object detector initialized")
+            try:
+                from perception import ObjectDetector
+                model = self.config.get('yolo_model', 'yolov8n.pt')
+                self._detector = ObjectDetector(model)
+                print("[Perception] Object detector initialized")
+            except ImportError as e:
+                print(f"[Perception] Warning: Object detection unavailable (Missing library?): {e}")
+                self._detector = False  # Prevent retrying
+            except Exception as e:
+                print(f"[Perception] Detector init failed: {e}")
+                self._detector = False
     
     def _init_pose(self):
         """Lazy init pose estimator."""

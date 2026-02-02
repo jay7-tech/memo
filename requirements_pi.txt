@@ -9,8 +9,8 @@ spidev                  # SPI Interface (Optional)
 # Computer Vision & AI
 opencv-python-headless>=4.8.0
 numpy<2.0               
-# ultralytics           # (Commented out: Heavy, install manually if needed)
-# mediapipe-rpi4        # (Commented out: Install standard mediapipe manually if needed)
+ultralytics
+mediapipe               # (Install standard version)
 
 # Audio & Speech
 vosk>=0.3.45            # Offline Speech (Best for Pi)
