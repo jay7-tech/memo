@@ -288,16 +288,86 @@ def index():
 
                 <!-- ... (Perception Log) ... -->
 
-                <!-- ... (Graphs) ... -->
+                <!-- Graphs -->
+                <div class="card stat-block" style="flex: 1; display:flex; flex-direction:column; min-height: 200px;">
+                    <div class="stat-header">SYSTEM PERFORMANCE</div>
+                    <div style="flex: 1; display: flex; justify-content: space-around; align-items: center;">
+                        
+                        <!-- CPU Circle -->
+                        <div class="circle-container">
+                            <div class="circle-box">
+                                <svg class="progress-ring" width="100" height="100">
+                                    <circle class="track" cx="50" cy="50" r="40"/>
+                                    <circle id="cpu-ring" class="progress" cx="50" cy="50" r="40" stroke="#10b981"/>
+                                </svg>
+                                <div class="circle-text" id="cpu-val">--</div>
+                            </div>
+                            <div class="circle-label">CPU %</div>
+                        </div>
 
+                        <!-- FPS Circle -->
+                        <div class="circle-container">
+                            <div class="circle-box">
+                                <svg class="progress-ring" width="100" height="100">
+                                    <circle class="track" cx="50" cy="50" r="40"/>
+                                    <circle id="fps-ring" class="progress" cx="50" cy="50" r="40" stroke="#6366f1"/>
+                                </svg>
+                                <div class="circle-text" id="fps-val">--</div>
+                            </div>
+                            <div class="circle-label">FPS</div>
+                        </div>
+
+                    </div>
+                </div>
             </div>
         </main>
 
-        <!-- ... (Style) ... -->
+        <style>
+            .circle-container { text-align: center; }
+            .circle-box { position: relative; width: 100px; height: 100px; margin: 0 auto 8px auto; }
+            .progress-ring { transform: rotate(-90deg); transform-origin: 50% 50%; }
+            circle { fill: transparent; stroke-width: 8; stroke-linecap: round; }
+            .track { stroke: #e2e8f0; }
+            .progress { 
+                stroke-dasharray: 251.2; /* 2 * PI * 40 */
+                stroke-dashoffset: 251.2;
+                transition: stroke-dashoffset 0.5s ease-in-out;
+            }
+            .circle-text {
+                position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+                display: flex; align-items: center; justify-content: center;
+                font-size: 1.5rem; font-weight: 700; color: var(--text-main);
+            }
+            .circle-label { font-size: 0.75rem; color: var(--text-side); font-weight: 600; }
+        </style>
 
         <script>
-            // ... (Socket Init) ...
+            const socket = io();
+            const terminal = document.getElementById('terminal');
+            const perceptionLog = document.getElementById('perception-log');
             
+            // Circle Config
+            const radius = 40;
+            const circumference = 2 * Math.PI * radius;
+            
+            function setProgress(id, value, max) {
+                const ring = document.getElementById(id);
+                const valEl = document.getElementById(id.replace('ring', 'val'));
+                
+                // Clamp value
+                if (value > max) value = max;
+                if (value < 0) value = 0;
+                
+                const brightness = value / max;
+                const offset = circumference - (brightness * circumference);
+                
+                ring.style.strokeDashoffset = offset;
+                valEl.innerText = Math.round(value);
+            }
+
+            // Init not needed for simple JS
+            function init() {} 
+
             // Helper to toggle active class
             function toggleBtn(id, active) {
                 const btn = document.getElementById(id);

@@ -9,10 +9,10 @@
   "perception": {
     "yolo_model": "yolov8n.pt",
     "pose_model": "yolov8n-pose.pt",
-    "face_threshold": 0.6,
+    "face_threshold": 0.45,
     "object_confidence": 0.4,
     "phone_confidence": 0.6,
-    "frame_skip": 3,
+    "frame_skip": 2,
     "detection_interval": 3.0,
     "face_recognition_interval": 2.0,
     "enable_emotion": false,

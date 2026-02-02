@@ -14,7 +14,7 @@
     "perception": {
         "yolo_model": "yolov8n.pt",
         "pose_model": "yolov8n-pose.pt",
-        "face_threshold": 0.50,
+        "face_threshold": 0.45,
         "object_confidence": 0.60,
         "phone_confidence": 0.75,
         "frame_skip": 5,

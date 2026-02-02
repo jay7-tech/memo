@@ -306,7 +306,7 @@ class PerceptionPipeline:
                 
             if 'identity' in futures:
                 try:
-                    res = futures['identity'].result(timeout=0.01)
+                    res = futures['identity'].result(timeout=0.1) # Increased timeout for CPU calculation
                     if res:
                          self._last_identity, self._last_face_score = res
                     else:
