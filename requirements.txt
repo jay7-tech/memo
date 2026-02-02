@@ -1,11 +1,11 @@
 # Computer Vision & AI
 opencv-python>=4.8.0
-ultralytics>=8.0.0      # YOLOv8 for Object/Pose
 numpy>=1.24.0
 torch
 torchvision
 facenet-pytorch         # Face Recognition
 mediapipe>=0.10.0       # Hand gestures, face mesh
+ultralytics>=8.0.0      # YOLOv8 for Object/Pose
 
 # Audio & Speech
 pyttsx3                 # Text-to-Speech (Offline)

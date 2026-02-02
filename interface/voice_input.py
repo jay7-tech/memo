@@ -58,7 +58,18 @@ class VoiceListener:
         self.running = True
         self.is_listening_active = False  # Default OFF
         self.use_offline = use_offline and HAS_VOSK
+        self.last_interaction = 0 # For wake word window
         
+        # The instruction seems to be trying to add a print statement related to model_path here.
+        # However, the `model_path` parameter is already passed to `_init_vosk` where it's handled.
+        # The provided snippet is syntactically incomplete and seems to be a partial replacement.
+        # Given the instruction "Add print statement to show checked model path",
+        # and the context provided, it seems the user wants to add a print statement
+        # for the `model_path` parameter passed to the constructor.
+        # The `if not os.path.exists(model_path):ream = None` part is malformed.
+        # I will add the print statement for the `model_path` parameter.
+        print(f"[Voice] Initializing with Vosk model path: {os.path.abspath(model_path)}")
+
         # Vosk setup
         self.vosk_model = None
         self.vosk_recognizer = None
@@ -88,6 +99,7 @@ class VoiceListener:
     def _init_vosk(self):
         """Initialize Vosk offline recognition."""
         model_paths = [
+            "models/vosk-model",
             "models/vosk/vosk-model-en",
             "models/vosk/vosk-model-small-en-us-0.15",
             os.path.expanduser("~/.vosk/vosk-model-en"),
@@ -151,6 +163,79 @@ class VoiceListener:
         except Exception as e:
             print(f"[Voice] Google API init failed: {e}")
     
+    def _process_detected_text(self, text: str):
+        """
+        Filter and process detected text based on state.
+        
+        Logic:
+        1. If TTS is busy -> IGNORE (Self-mute)
+        2. If Direct Command -> ACCEPT
+        3. If Wake Word -> ACCEPT & Open Active Window
+        4. If Active Window Open -> ACCEPT
+        5. Else -> IGNORE
+        """
+        if not text: return
+
+        # 1. Self-Mute: Check TTS
+        try:
+            from interface.tts_engine import get_tts_engine
+            tts = get_tts_engine()
+            if tts and tts.is_busy():
+                print(f"[Voice] Ignored '{text}' (TTS Active)")
+                return
+        except:
+            pass
+
+        text_lower = text.lower().strip()
+        
+        # 2. Direct Commands (Bypass Wake Word)
+        # "buzz", "focus on", "focus off", "voice off", "quit", "memo news", "who is..." (optional for fast queries)
+        direct_triggers = [
+            # Core commands
+            "buzz", "focus on", "focus off", "voice off", 
+            "quit", "memo news", "mino news", "updates",
+            "stop", "silence", "pause",
+            
+            # Phonetic Aliases (Fix for offline recognition)
+            "bus", "buys", "bugs", "but", "base", "bars", # for "buzz"
+            "me no news", "my news", "more news", "leno news",# for "memo news"
+        ]
+        
+        is_direct = any(t in text_lower for t in direct_triggers)
+        
+        # 3. Wake Word Check
+        # Default wake words if not set
+        wake_words = ["hey memo", "memo", "computer", "ok memo"]
+        if self.wake_word:
+            wake_words.append(self.wake_word)
+            
+        has_wake_word = any(w in text_lower for w in wake_words)
+        
+        # 4. Active Window Check
+        # If we interacted recently (within 10s), we are "awake"
+        is_awake = (time.time() - self.last_interaction) < 10.0
+        
+        if is_direct or has_wake_word or is_awake:
+            # Valid command!
+            self.last_interaction = time.time()
+            
+            # Strip wake word for cleaner processing (optional)
+            # Strip wake word for cleaner processing (optional)
+            for w in wake_words:
+                if text_lower.startswith(w):
+                    text = text[len(w):].strip()
+                    break
+            
+            # Fix: Don't process empty commands (e.g. just "Hey Memo")
+            if not text:
+                print(f">> VOICE AWAKE (Waiting for command...)")
+                return
+
+            print(f">> VOICE ACTIVE: {text}")
+            self.callback(text)
+        else:
+            print(f"[Voice] Ignored '{text}' (No wake word)")
+
     def _listen_loop(self):
         """Main listening loop for Vosk."""
         if not self.use_offline:
@@ -164,22 +249,15 @@ class VoiceListener:
                 continue
             
             try:
-                # OPTIMIZATION: Skip audio processing if TTS is speaking
-                from interface.tts_engine import get_tts_engine
-                tts = get_tts_engine()
-                if tts and tts.is_busy():
-                    time.sleep(0.1)
-                    continue
+                # Basic sleep to prevent CPU hogging
+                time.sleep(0.01)
                     
                 data = self.audio_stream.read(4096, exception_on_overflow=False)
                 
                 if self.vosk_recognizer.AcceptWaveform(data):
                     result = json.loads(self.vosk_recognizer.Result())
                     text = result.get('text', '').strip()
-                    
-                    if text:
-                        print(f">> VOICE (offline): {text}")
-                        self.callback(text)
+                    self._process_detected_text(text)
                 
             except Exception as e:
                 if self.running:
@@ -197,8 +275,7 @@ class VoiceListener:
         
         try:
             text = recognizer.recognize_google(audio).lower()
-            print(f">> VOICE (online): {text}")
-            self.callback(text)
+            self._process_detected_text(text)
             
         except sr.UnknownValueError:
             pass  # Speech not understood

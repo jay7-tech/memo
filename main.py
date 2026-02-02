@@ -213,11 +213,27 @@ class MEMOApp:
         self.running = False
     
     def _init_voice(self, callback):
-        """Initialize voice input module."""
+        """Initialize voice input module (Pro > Standard)."""
+        # 1. Try High-Fidelity Pro Engine
+        try:
+            from interface.speech_pro import HighFidelityTranscriber
+            print("[Voice] Loading High-Fidelity Engine...")
+            self.voice_input = HighFidelityTranscriber(
+                callback_func=callback,
+                model_size="tiny.en",
+                compute_type="int8" # Light on Pi
+            )
+            self.voice_input.start()
+            print("[Voice] ✓ Pro Engine initialized")
+            return
+        except Exception as e:
+            print(f"[Voice] Pro Engine skipped: {e}")
+
+        # 2. Fallback to Standard
         try:
             from interface.voice_input import VoiceListener
             self.voice_input = VoiceListener(callback_func=callback)
-            print("[Voice] Input module initialized")
+            print("[Voice] Standard Input module initialized")
         except Exception as e:
             print(f"[Voice] Init failed: {e}")
             self.voice_input = None

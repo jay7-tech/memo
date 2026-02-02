@@ -8,7 +8,11 @@ class CameraSource:
         self.src = source
         self.rotation = int(rotation)
         
-        self.cap = cv2.VideoCapture(self.src)
+        if isinstance(self.src, int) and __import__("os").name == "nt":
+             # Use DirectShow on Windows to avoid MSMF errors
+            self.cap = cv2.VideoCapture(self.src, cv2.CAP_DSHOW)
+        else:
+            self.cap = cv2.VideoCapture(self.src)
         
         # Optimize for low latency (may not work on all backends but worth trying)
         # buffer size = 1

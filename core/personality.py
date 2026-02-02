@@ -315,7 +315,17 @@ class AIPersonality:
                 models = [m['name'] for m in resp.json().get('models', [])]
                 if self.ollama_model in models:
                     self.backend = 'ollama'
-                    print(f"[AI] ✓ Brain: Ollama ({self.ollama_model}) connected.")
+                    print(f"[AI] Warming up {self.ollama_model}...")
+                    try:
+                        # Force model load
+                        requests.post(
+                            f"{base_url}/api/generate", 
+                            json={"model": self.ollama_model, "prompt": "hi", "stream": False},
+                            timeout=60
+                        )
+                        print(f"[AI] ✓ Brain: Ollama ({self.ollama_model}) warmed up and ready.")
+                    except Exception as e:
+                        print(f"[AI] Warmup warning: {e}")
                     return
                 elif models:
                     self.ollama_model = models[0]
