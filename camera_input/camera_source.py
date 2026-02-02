@@ -4,6 +4,10 @@ import threading
 
 class CameraSource:
     def __init__(self, source=0, width=640, height=480, rotation=0):
+        # Initialize lock immediately to prevent race conditions
+        import threading
+        self.lock = threading.Lock()
+
         # Enforce string for URL if it looks like one, or int for index
         self.src = source
         self.rotation = int(rotation)
