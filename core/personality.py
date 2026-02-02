@@ -561,8 +561,9 @@ class AIPersonality:
                 "prompt": prompt_template,
                 "stream": False,
                 "options": {
-                     "temperature": 0.25,     # keeps witty but not crazy
-                     "num_predict": 120,       # HARD length limit
+                     "temperature": 0.25,
+                     "num_predict": 100,      # Sligthly shorter for speed
+                     "num_ctx": 1024,         # Context limit for Pi RAM usage
                      "top_p": 0.8,
                      "repeat_penalty": 1.1,
                      "stop": [
@@ -570,14 +571,14 @@ class AIPersonality:
                         "[MEMO]:",
                         "example",
                         "Example",
-                        "Sure",
-                        "sure"
+                        "Sure"
                      ]
-                }
+                },
+                "keep_alive": "60m" # Keep model loaded in RAM
             }
             
             add_log(f"Brain is thinking about: {prompt[:30]}...", "ai")
-            response = requests.post(f"{base_url}/api/generate", json=payload, timeout=180)
+            response = requests.post(f"{base_url}/api/generate", json=payload, timeout=120)
 
             if response.status_code == 200:
                 data = response.json()
