@@ -129,8 +129,9 @@ class TTSEngine:
         # Strip internal labels like "TTS:"
         text = text.replace("TTS:", "").strip()
         
-        # Strip emojis for the voice engine
-        clean = re.sub(r'[^\x00-\x7F]+', ' ', text)
+        # Strip emojis and special characters for the voice engine
+        # This keeps standard ASCII, basic punctuation, but removes emojis/unicode symbols
+        clean = text.encode('ascii', 'ignore').decode('ascii')
         
         # Remove hashtags
         clean = re.sub(r'#\w+', '', clean)

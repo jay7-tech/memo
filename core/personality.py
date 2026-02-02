@@ -577,7 +577,7 @@ class AIPersonality:
             }
             
             add_log(f"Brain is thinking about: {prompt[:30]}...", "ai")
-            response = requests.post(f"{base_url}/api/generate", json=payload, timeout=90)
+            response = requests.post(f"{base_url}/api/generate", json=payload, timeout=180)
 
             if response.status_code == 200:
                 data = response.json()
