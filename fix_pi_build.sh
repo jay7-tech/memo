@@ -13,7 +13,9 @@ echo ">>> [3/4] Pre-installing Pillow..."
 # Install Pillow explicitly to ensure it links to system libs
 pip install "Pillow>=10.0.0" --no-cache-dir
 
-echo ">>> [4/4] Installing FaceNet..."
-pip install facenet-pytorch
+echo ">>> [4/4] Installing FaceNet (Ignoring version conflicts)..."
+# Use --no-deps because facenet-pytorch asks for old numpy/torch
+# We want it to use the NEW ones we already have.
+pip install facenet-pytorch --no-deps
 
 echo ">>> DONE! Now try running main.py"
