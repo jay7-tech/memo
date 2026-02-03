@@ -18,7 +18,7 @@ openwakeword            # Wake Word Detection
 onnxruntime             # Required for openwakeword
 webrtcvad-wheels>=2.0.10 # VAD for Windows
 scipy>=1.10.0           # Signal processing
-# openai-whisper          # (Removed in favor of faster-whisper)
+openai-whisper          # (Fallback if faster-whisper fails)
 
 # Dashboard & API
 flask                   # Web Dashboard

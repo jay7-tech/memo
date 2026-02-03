@@ -408,7 +408,7 @@ class FaceRecognizer:
         
         # Threshold: Lower is better. 
         # < 0.9 is strong match. > 1.1 is different person.
-        l2_threshold = 0.95 
+        l2_threshold = 0.7
         
         if best_dist < l2_threshold:
             # Convert to "Confidence" for UI (Inverse of distance)
