@@ -424,14 +424,17 @@ class AIPersonality:
                 joined_updates = "\n".join(updates)
                 # Simplify for Phi-3 (Avoid roleplay hallucinations)
                 summary_prompt = (
-                    "Here are fresh tech news headlines. Select the top 3 most interesting ones.\n"
-                    "Output a short spoken update summarizing them.\n"
-                    "Start with 'Here is the latest buzz...'\n\n"
+                    "Instructions: Read the following news headlines aloud.\n"
+                    "Do not add any other text. Do not apologize. Just read the top 3 items.\n\n"
                     f"Headlines:\n{joined_updates}"
                 )
                 
                 # Generate and then sanitize
                 raw_response = self._generate_ollama(summary_prompt)
+                
+                # CRITICAL: Strip model artifacts
+                raw_response = raw_response.replace("<|solution|>", "").replace("|end_solution|>", "")
+                
                 return self._sanitize_for_speech(raw_response)
 
             
