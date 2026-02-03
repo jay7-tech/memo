@@ -18,4 +18,10 @@ if grep -q "Raspberry Pi\|BCM" /proc/cpuinfo 2>/dev/null; then
 fi
 
 echo "Starting MEMO..."
-python main.py "$@"
+# Check for libcamerify (Fix for /dev/video0 error on Bookworm)
+if command -v libcamerify &> /dev/null; then
+    echo "Running with libcamerify wrapper..."
+    libcamerify python main.py "$@"
+else
+    python main.py "$@"
+fi

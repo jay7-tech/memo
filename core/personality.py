@@ -457,9 +457,9 @@ class AIPersonality:
             context = self._build_context(scene_state)
             system_prompt = MEMO_PERSONALITY.format(context=context)
             
-            # Extract lightweight history (Last 6 turns)
+            # Optimize for Pi: Minimal history (Last 2 turns)
             history_str = ""
-            for h in self.conversation.get_history()[-6:]:
+            for h in self.conversation.get_history()[-2:]:
                 role = "Q" if h['role'] == "user" else "A"
                 history_str += f"{role}: {h['content']}\n"
             
@@ -556,8 +556,9 @@ class AIPersonality:
                 "stream": False,
                 "options": {
                      "temperature": 0.25,
-                     "num_predict": 100,      # Sligthly shorter for speed
-                     "num_ctx": 1024,         # Context limit for Pi RAM usage
+                     # Optimize for Pi: Shorter generation, smaller context
+                     "num_predict": 60,       
+                     "num_ctx": 512,          
                      "top_p": 0.8,
                      "repeat_penalty": 1.1,
                      "stop": [
