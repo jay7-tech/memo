@@ -1,0 +1,199 @@
+import time
+import threading
+import os
+import cv2
+import numpy as np
+from pathlib import Path
+from PIL import Image
+from typing import Dict, List, Optional
+import random
+
+# Initial safe imports
+try:
+    from .driver import LCD_ST7735
+    HARDWARE_AVAILABLE = True
+except ImportError:
+    HARDWARE_AVAILABLE = False
+except Exception as e:
+    print(f"[LCD] Driver Error: {e}")
+    HARDWARE_AVAILABLE = False
+
+class LCDManager:
+    def __init__(self, assets_path=None, rotation=90):
+        self.running = False
+        self.thread = None
+        self.lock = threading.Lock()
+        
+        # Paths
+        if assets_path:
+            self.assets_dir = Path(assets_path)
+        else:
+            self.assets_dir = Path(__file__).parent / "assets"
+            
+        # Hardware / Sim
+        self.lcd = None
+        self.sim_mode = True
+        
+        # Try Hardware
+        if HARDWARE_AVAILABLE:
+            try:
+                self.lcd = LCD_ST7735(rotation=rotation)
+                self.sim_mode = False
+                print("[LCD] Hardware Initialized.")
+            except Exception as e:
+                print(f"[LCD] Hardware Init Failed: {e}")
+                self.sim_mode = True
+        
+        if self.sim_mode:
+            print("[LCD] Running in Simulation Mode (OpenCV Window).")
+
+        # Animation State
+        self.anims: Dict[str, List[Image.Image]] = {}
+        self.current_frames = []
+        self.frame_idx = 0
+        self.fps_ms = 100
+        self.loop = True
+        self.fallback_to_idle = True
+        self.idle_variant = "center"
+        self.mode = "IDLE" # IDLE, ANIMATING
+        self.last_idle_move = time.time()
+        
+        # Preload Assets
+        self._load_assets()
+
+    def _load_assets(self):
+        """Load minimal set of frames to memory."""
+        print(f"[LCD] Loading assets from {self.assets_dir}...")
+        
+        target_size = (128, 128)
+        
+        if not self.assets_dir.exists():
+            print(f"[LCD] Warning: Assets dir {self.assets_dir} missing!")
+            return
+
+        for folder in self.assets_dir.iterdir():
+            if folder.is_dir():
+                frames = []
+                # Sort ensuring frame_001, frame_002...
+                sorted_files = sorted(folder.glob("*.png"), key=lambda p: p.name)
+                for fp in sorted_files:
+                    try:
+                        img = Image.open(fp).convert("RGB")
+                        if img.size != target_size:
+                            img = img.resize(target_size, Image.Resampling.LANCZOS)
+                        frames.append(img)
+                    except Exception:
+                        pass
+                if frames:
+                    self.anims[folder.name] = frames
+                    # print(f"  - Loaded {folder.name} ({len(frames)} frames)")
+        
+        # Set default
+        self.current_frames = self.anims.get("idle_center", [])
+
+    def start(self):
+        if self.running: return
+        self.running = True
+        self.thread = threading.Thread(target=self._run_loop, daemon=True)
+        self.thread.start()
+        print("[LCD] Manager Started.")
+
+    def stop(self):
+        self.running = False
+        if self.thread:
+            self.thread.join(timeout=1.0)
+        if self.lcd:
+            self.lcd.close()
+        if self.sim_mode:
+            try:
+                cv2.destroyWindow("MEMO Face")
+            except: pass
+
+    def play(self, name: str, loop=False, fps_ms=100, fallback_to_idle=True):
+        """Thread-safe request to play animation."""
+        with self.lock:
+            # Map common variants
+            if name == "happy": name = "laugh"
+            if name == "listening": name = "love" # Temp mapping
+            
+            if name not in self.anims:
+                # print(f"[LCD] Warn: Animation '{name}' not found.")
+                return 
+
+            self.current_frames = self.anims[name]
+            self.frame_idx = 0
+            self.fps_ms = fps_ms
+            self.loop = loop
+            self.fallback_to_idle = fallback_to_idle
+            self.mode = "ANIMATING" if not loop else "IDLE"
+            
+            if "idle" in name:
+                self.idle_variant = name.replace("idle_", "")
+                self.last_idle_move = time.time()
+
+    def _run_loop(self):
+        while self.running:
+            start_time = time.time()
+            
+            # 1. Get current frame
+            frame_img = None
+            with self.lock:
+                if self.current_frames:
+                    if self.frame_idx < len(self.current_frames):
+                        frame_img = self.current_frames[self.frame_idx]
+                        self.frame_idx += 1
+                    else:
+                        # Animation ended
+                        if self.loop:
+                            self.frame_idx = 0
+                            frame_img = self.current_frames[0]
+                        else:
+                            # End of oneshot
+                            if self.fallback_to_idle:
+                                # Switch to idle immediately
+                                var = f"idle_{self.idle_variant}"
+                                self.current_frames = self.anims.get(var, [])
+                                self.loop = True
+                                self.frame_idx = 0
+                                self.mode = "IDLE"
+                            else:
+                                # Hold last frame
+                                frame_img = self.current_frames[-1]
+
+            # 2. Render
+            if frame_img:
+                if self.sim_mode:
+                    # Convert PIL RGB to OpenCV BGR
+                    open_cv_image = np.array(frame_img) 
+                    open_cv_image = open_cv_image[:, :, ::-1].copy() 
+                    # Scale up for visibility
+                    display_img = cv2.resize(open_cv_image, (256, 256), interpolation=cv2.INTER_NEAREST)
+                    cv2.imshow("MEMO Face", display_img)
+                    cv2.waitKey(1)
+                elif self.lcd:
+                    self.lcd.display_image(frame_img)
+
+            # 3. Idle Logic (Look around)
+            with self.lock:
+                if self.mode == "IDLE":
+                    if time.time() - self.last_idle_move > 6.0:
+                        # Random drift
+                        opts = ["idle_center", "idle_left", "idle_right"]
+                        # Avoid current if possible
+                        curr = f"idle_{self.idle_variant}"
+                        opts = [o for o in opts if o != curr]
+                        next_anim = random.choice(opts)
+                        
+                        self.current_frames = self.anims.get(next_anim, [])
+                        self.frame_idx = 0
+                        self.idle_variant = next_anim.replace("idle_", "")
+                        self.loop = False # Play transition once? 
+                        # Actually assets are loops. Let's just switch loop
+                        self.loop = True
+                        self.last_idle_move = time.time()
+                        # print(f"[LCD] Drift to {next_anim}")
+
+            # 4. FPS Sleep
+            elapsed = (time.time() - start_time) * 1000
+            wait_ms = max(10, self.fps_ms - elapsed)
+            time.sleep(wait_ms / 1000.0)

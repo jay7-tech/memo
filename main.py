@@ -49,6 +49,7 @@ from reasoning import RulesEngine
 
 from interface import QueryHandler
 from interface.tts_engine import init_tts, speak, speak_now, stop_tts
+from interface.lcd import LCDManager
 
 
 class MEMOApp:
@@ -69,6 +70,10 @@ class MEMOApp:
         
         # State
         self.scene_state = SceneState()
+        
+        # LCD Face (Hardware or Sim)
+        self.lcd = LCDManager()
+        self.lcd.start()
         
         # Processing
         self.perception = PerceptionPipeline(self.config.get('perception', {}))
@@ -112,7 +117,6 @@ class MEMOApp:
         self.trigger_end_time = self.startup_end_time # Start awake
         self.last_tts_time = 0
         self.verbose_logging = False
-        self.is_prompting = False # Flag to silence logs during user input
         self.is_prompting = False # Flag to silence logs during user input
         self.vision_active = True # Track vision state for power management
         self.forced_sleep = False # Manual sleep override flag
@@ -164,6 +168,13 @@ class MEMOApp:
         self.scene_state.focus_mode = enabled
         status = "enabled" if enabled else "disabled"
         print(f">> SYSTEM: Focus Mode {status.upper()}")
+        
+        # Update LCD
+        if enabled:
+            self.lcd.play("focus_on", loop=True)
+        else:
+            self.lcd.play("focus_off", loop=True, fps_ms=120)
+
         # Use AI personality for varied response
         if enabled:
             speak(self.personality.focus_on())
@@ -178,9 +189,11 @@ class MEMOApp:
             name = event.data.get('name', 'User')
             self.scene_state.register_name = name
             self.scene_state.register_trigger = True
+            self.lcd.play("love", loop=False) # Show love when registering
             
         elif action == 'selfie':
             self.scene_state.selfie_trigger = True
+            self.lcd.play("blush", loop=False)
             
         elif action == 'toggle_voice':
             if self.voice_input:
@@ -188,6 +201,7 @@ class MEMOApp:
                 self.voice_input.set_active(new_state)
                 status = "ENABLED" if new_state else "DISABLED"
                 speak(f"Voice {status}")
+                self.lcd.play("listening" if new_state else "silence", loop=False)
     
     def _on_voice_command(self, event: Event):
         """Handle voice commands."""
@@ -196,7 +210,20 @@ class MEMOApp:
             print(">> SYSTEM: Vision WAKE (Trigger)")
             self.trigger_end_time = time.time() + 10.0 
 
-        text = event.data.get('text', '')
+        text = event.data.get('text', '').lower()
+        
+        # LCD Triggers based on keywords
+        if "laugh" in text or "joke" in text or "funny" in text:
+            self.lcd.play("laugh", loop=False)
+        elif "sleep" in text or "tired" in text:
+            self.lcd.play("sleep", loop=False)
+        elif "love" in text or "like you" in text:
+            self.lcd.play("love", loop=False)
+        elif "hate" in text or "bad" in text:
+            self.lcd.play("hate", loop=False)
+        elif "angry" in text:
+             self.lcd.play("angry", loop=False)
+
         response = self.command_processor.process(
             text, 
             {'scene_state': self.scene_state}
@@ -788,6 +815,7 @@ class MEMOApp:
         if self.show_display:
             cv2.destroyAllWindows()
         stop_tts()
+        self.lcd.stop()
         self.event_bus.stop()
         print("[MEMO] Goodbye!")
 
