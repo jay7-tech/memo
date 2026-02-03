@@ -151,6 +151,30 @@ class LCDManager:
         """Happy flash before speaking."""
         self.play("wink", loop=False, fps_ms=60, fallback_to_idle=True)
 
+    # --- New Interactive Expressions ---
+    
+    def set_focus_mode(self, active: bool):
+        """Serious mode for productivity."""
+        if active:
+            # Police/Siren eyes
+            self.play("focus_police", loop=True, fps_ms=150)
+        else:
+            self.play("idle_center", loop=True, fps_ms=100)
+
+    def trigger_distraction(self):
+        """Angry 'No Phone' warning."""
+        # Play distraction anim, then go back to Focus Mode (Police)
+        # We need a way to 'fallback' to a specific anim, not just idle_center.
+        # For now, let's play it, and relying on caller to re-set focus mode if needed?
+        # Or simpler:
+        self.play("distraction", loop=False, fps_ms=100, fallback_to_idle=False) 
+        # Hack: After non-loop, it usually goes to 'idle_variant'.
+        # We might need to manually reset focus mode in main loop or here.
+        
+    def trigger_selfie(self):
+        """Camera shutter and flash."""
+        self.play("selfie_cam", loop=False, fps_ms=50, fallback_to_idle=True)
+
     def get_current_frame(self):
         """Get the latest frame for main thread rendering (Sim Mode)."""
         with self.lock:

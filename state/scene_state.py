@@ -88,6 +88,7 @@ class SceneState:
         self.verbose_logging = False # Toggle dashboard/terminal logs
         
         self.selfie_trigger = False # Flag for snapshot
+        self.last_distraction_alert = 0.0 # Cooldown for focus mode nagging
         
         # Dashboard communication
         import queue
@@ -121,7 +122,7 @@ class SceneState:
             except Exception as e:
                 print(f"[Error] Failed to load memory: {e}")
 
-    def update(self, detections, pose_data, identity, timestamp, frame_width=640, frame_height=480):
+    def update(self, detections, pose_data, identity, timestamp, frame_width=640, frame_height=480, face_score=0.0):
         self.width = frame_width
         
         # 1. Update Objects
@@ -161,11 +162,20 @@ class SceneState:
             if identity:
                 # Strong match found
                 self.human['identity'] = identity
+                self.human['face_score'] = face_score
+                self.human['uncertainty_start'] = None # Reset uncertainty
             else:
-                # No match this frame, check persistence
-                # If we had an identity recently and the person is still here, keep it.
-                # Only clear if we haven't seen a confirmed face for > 5.0 seconds
-                pass 
+                # No match this frame. 
+                # If we have an identity, verify if we should clear it.
+                if self.human['identity']:
+                     if self.human.get('uncertainty_start') is None:
+                         # Start doubting
+                         self.human['uncertainty_start'] = timestamp
+                     elif timestamp - self.human['uncertainty_start'] > 1.0: # 1 second grace period
+                         # Too long without confirmation -> Clear
+                         self.human['identity'] = None
+                         self.human['face_score'] = 0.0
+                         self.human['uncertainty_start'] = None 
             
             # Note: We rely on the caller NOT to overwrite identity if it returns None
             # Actually, effective persistence happens because we DON'T set it to None here.

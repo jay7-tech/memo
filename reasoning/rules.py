@@ -208,8 +208,8 @@ class RulesEngine:
         """Check for distractions in focus mode."""
         events = []
         
-        if not scene_state.focus_mode:
-            return events
+        # Handled by Main Event Loop now for better LCD integration
+        return events
         
         # Check for cell phone
         current_visible = set()

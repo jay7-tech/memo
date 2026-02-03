@@ -170,10 +170,7 @@ class MEMOApp:
         print(f">> SYSTEM: Focus Mode {status.upper()}")
         
         # Update LCD
-        if enabled:
-            self.lcd.play("focus_on", loop=True)
-        else:
-            self.lcd.play("focus_off", loop=True, fps_ms=120)
+        self.lcd.set_focus_mode(enabled)
 
         # Use AI personality for varied response
         if enabled:
@@ -193,7 +190,7 @@ class MEMOApp:
             
         elif action == 'selfie':
             self.scene_state.selfie_trigger = True
-            self.lcd.trigger_flash()
+            self.lcd.trigger_selfie()
             
         elif action == 'toggle_voice':
             if self.voice_input:
@@ -224,19 +221,21 @@ class MEMOApp:
         elif "angry" in text:
              self.lcd.play("angry", loop=False)
 
-        response = self.command_processor.process(
+        executed, response = self.command_processor.process(
             text, 
             {'scene_state': self.scene_state}
         )
         
-        if response:
-            print(f">> MEMO: {response}")
-            self.lcd.trigger_eureka() # Happy flash
-            self.lcd.set_speaking()
-            speak(response)
-            # Log to dashboard
-            from interface.dashboard import add_log
-            add_log(response, "ai")
+        if executed:
+            # Command handled (either with response or silently)
+            if response:
+                print(f">> MEMO: {response}")
+                self.lcd.trigger_eureka() # Happy flash
+                self.lcd.set_speaking()
+                speak(response)
+                # Log to dashboard
+                from interface.dashboard import add_log
+                add_log(response, "ai")
         else:
             # Pass to query handler (uses AI personality for complex questions)
             response = self.query_handler.handle_query(text, self.scene_state, personality=self.personality)
@@ -257,6 +256,9 @@ class MEMOApp:
                 # Log to dashboard
                 from interface.dashboard import add_log
                 add_log(f"DISTRACTION ALERT: {obj}", "alert")
+                
+                # LCD Expression (New)
+                self.lcd.trigger_distraction()
                 
                 # Use AI for witty distraction alert
                 if 'phone' in obj.lower():
@@ -419,7 +421,7 @@ class MEMOApp:
                  pass
 
         # Update state (Pass identity for persistence)
-        self.scene_state.update(detections, pose_data, identity, timestamp, w, h)
+        self.scene_state.update(detections, pose_data, identity, timestamp, w, h, face_score=face_score)
         
         # Throttled object logging (Silenced during prompting)
         visible_labels = [d['label'] for d in detections]
@@ -428,6 +430,25 @@ class MEMOApp:
         
         # Check for new presence/absence for logging
         # Use PERSISTED identity from scene_state, not the raw one
+        
+        # --- FOCUS MODE LOGIC ---
+        if self.scene_state.focus_mode:
+            # Check for distractions (Cell Phone)
+            distractions = ['cell phone']
+            detected_distractions = [d['label'] for d in detections if d['label'] in distractions]
+            
+            if detected_distractions:
+                current_time = time.time()
+                # 15 second cooldown
+                if current_time - self.scene_state.last_distraction_alert > 15.0:
+                    self.scene_state.last_distraction_alert = current_time
+                    
+                    # Publish Alert Event (Handled by _on_distraction)
+                    self.event_bus.publish(Event(
+                        EventType.DISTRACTION_DETECTED,
+                        {'object': 'cell phone'}
+                    ))
+                    print(f">> FOCUS: Distraction Detected (Cooldown Reset)")
         persisted_id = self.scene_state.human.get('identity')
         if persisted_id and identity and identity != persisted_id:
              # Wait, this logic is tricky if identity is None but persisted is set.
@@ -527,8 +548,14 @@ class MEMOApp:
             # Show Identity on Person Box
             if label == 'person':
                 identity = self.scene_state.human.get('identity')
+                face_score = self.scene_state.human.get('face_score', 0.0) # Need to ensure this is stored
+                
+                # Retrieve score if available (It might be in perception result or state)
+                # Actually scene_state stores 'identity' but not explicitly 'face_score' in the human dict usually?
+                # Let's check update_state.
                 if identity:
-                    label = f"{identity} ({conf:.2f})"
+                     # If we have a cached score, show it
+                    label = f"{identity} ({face_score:.2f})"
                     color = (0, 255, 255) # Yellow for recognized
                 else:
                     label = f"Person ({conf:.2f})"
@@ -650,14 +677,16 @@ class MEMOApp:
                 
                 else:
                     # Process as command
-                    response = self.command_processor.process(
+                    # Process as command
+                    executed, response = self.command_processor.process(
                         user_input,
                         {'scene_state': self.scene_state}
                     )
                     
-                    if response:
-                        print(f">> MEMO: {response}")
-                        speak(response)
+                    if executed:
+                         if response:
+                            print(f">> MEMO: {response}")
+                            speak(response)
                     else:
                         # Pass to query handler (Pass personality for LLM fallback)
                         response = self.query_handler.handle_query(user_input, self.scene_state, personality=self.personality)

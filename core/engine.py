@@ -235,7 +235,8 @@ class PerceptionPipeline:
         """Lazy init face recognition."""
         if self._face_rec is None:
             try:
-                from perception.face_rec import FaceRecognizer
+                # Use the new ONNX engine (Aliased as FaceRecognizer in perception/__init__.py)
+                from perception import FaceRecognizer
                 threshold = self.config.get('face_threshold', 0.6)
                 self._face_rec = FaceRecognizer(threshold=threshold)
                 print("[Perception] Face recognition initialized")
@@ -380,16 +381,14 @@ class CommandProcessor:
         # Callback for quit
         self.on_quit = None
     
-    def process(self, text: str, context: Dict[str, Any] = None) -> Optional[str]:
+    def process(self, text: str, context: Dict[str, Any] = None) -> (bool, Optional[str]):
         """
         Process a text command.
         
-        Args:
-            text: Command text
-            context: Additional context (scene_state, etc.)
-        
         Returns:
-            Response string or None
+            (executed, response_string)
+            executed: True if the input was handled as a command
+            response_string: The string to speak/print (or None if handled silently)
         """
         text_lower = text.strip().lower()
         self.history.append(text)
@@ -398,17 +397,18 @@ class CommandProcessor:
             
         # === SHORTHAND COMMANDS (Now available via terminal/dashboard) ===
         if text_lower == 's':
-            return self._cmd_selfie(text, context)
+            return True, self._cmd_selfie(text, context)
         elif text_lower == 'f':
             enabled = not (context['scene_state'].focus_mode if context else False)
-            return self._cmd_focus_on(text, context) if enabled else self._cmd_focus_off(text, context)
+            res = self._cmd_focus_on(text, context) if enabled else self._cmd_focus_off(text, context)
+            return True, res
         elif text_lower == 'v':
             # This is a bit tricky as main.py manages the voice_input instance.
             # We'll publish a system alert so main.py can handle the toggle.
             self.event_bus.publish(Event(EventType.SYSTEM_ALERT, {'action': 'toggle_voice'}))
-            return "Toggling voice input..."
+            return True, "Toggling voice input..."
         elif text_lower == 'r':
-            return self._cmd_register("register User", context)
+            return True, self._cmd_register("register User", context)
 
         # === QUIT / EXIT ===
         quit_patterns = ['quit', 'exit', 'bye', 'goodbye', 'close', 'shut down', 'shutdown', 'q']
@@ -416,7 +416,7 @@ class CommandProcessor:
             if text_lower == 'q' or (pattern in text_lower and 'focus' not in text_lower and 'scan' not in text_lower):
                 if self.on_quit:
                     self.on_quit()
-                return "Goodbye!"
+                return True, "Goodbye!"
         
         # === FOCUS MODE ON ===
         focus_on_patterns = [
@@ -426,7 +426,7 @@ class CommandProcessor:
         ]
         for pattern in focus_on_patterns:
             if pattern in text_lower:
-                return self._cmd_focus_on(text, context)
+                return True, self._cmd_focus_on(text, context)
         
         # === FOCUS MODE OFF ===
         focus_off_patterns = [
@@ -438,14 +438,14 @@ class CommandProcessor:
         ]
         for pattern in focus_off_patterns:
             if pattern in text_lower:
-                return self._cmd_focus_off(text, context)
+                return True, self._cmd_focus_off(text, context)
         
         # Check for "focus" + negative word anywhere
         if 'focus' in text_lower:
             negative_words = ['off', 'disable', 'stop', 'end', 'no', 'deactivate', 'of']
             for neg in negative_words:
                 if neg in text_lower:
-                    return self._cmd_focus_off(text, context)
+                    return True, self._cmd_focus_off(text, context)
         
         # === SELFIE / PHOTO ===
         selfie_patterns = [
@@ -455,7 +455,7 @@ class CommandProcessor:
         ]
         for pattern in selfie_patterns:
             if pattern in text_lower:
-                return self._cmd_selfie(text, context)
+                return True, self._cmd_selfie(text, context)
         
         # === REGISTER FACE ===
         register_patterns = [
@@ -464,76 +464,72 @@ class CommandProcessor:
         ]
         for pattern in register_patterns:
             if pattern in text_lower:
-                return self._cmd_register(text, context)
+                return True, self._cmd_register(text, context)
         
         # === VOICE CONTROL ===
         if 'voice' in text_lower and 'on' in text_lower:
-            return "Voice is already active since you're speaking to me!"
+            return True, "Voice is already active since you're speaking to me!"
         if 'voice' in text_lower and ('off' in text_lower or 'stop' in text_lower):
-            return "To stop voice, press the V key or type 'voice off'."
+            return True, "To stop voice, press the V key or type 'voice off'."
         
         # === WHERE IS ===
         if 'where' in text_lower:
-            return self._cmd_where_is(text, context)
+            return True, self._cmd_where_is(text, context)
         
         # === SCAN / VISION CONTROL ===
         if text_lower in ['scan', 'wake vision', 'wake up', 'start scan', 'y']:
             if context and 'scene_state' in context:
                 context['scene_state'].wake_request = True
-            return "Scanning environment..."
+            return True, "Scanning environment..."
             
         if text_lower in ['stop scan', 'sleep', 'stop vision', 'end scan']:
             if context and 'scene_state' in context:
-                context['scene_state'].wake_request = False # This might need special handling in main.py to force sleep
-                # We'll use a special string that main.py recognizes or just rely on wake_request=False
-                # Actually, main.py checks wake_request to START wake. To STOP, we need to clear the timer.
-                # Let's set a 'force_sleep' flag if needed, or just let main.py see this.
                 context['scene_state'].sleep_request = True 
-            return "Vision system entering sleep mode."
+            return True, "Vision system entering sleep mode."
 
         # === LOGS CONTROL ===
         if 'logs' in text_lower:
             if 'on' in text_lower or 'enable' in text_lower:
                 if context and 'scene_state' in context:
                     context['scene_state'].verbose_logging = True
-                return "Debug logs enabled."
+                return True, "Debug logs enabled."
             if 'off' in text_lower or 'disable' in text_lower:
                 if context and 'scene_state' in context:
                     context['scene_state'].verbose_logging = False
-                return "Debug logs disabled."
+                return True, "Debug logs disabled."
 
         # === WHAT DO YOU SEE ===
         see_patterns = ['what do you see', 'what can you see', 'what see', 'describe']
         for pattern in see_patterns:
             if pattern in text_lower:
-                return self._cmd_what_see(text, context)
+                return True, self._cmd_what_see(text, context)
         
         # === STATUS ===
-        status_patterns = ['status', 'how are you', 'what is happening', "what's happening"]
+        status_patterns = ['status', 'how are you', 'stats', "what's happening"]
         for pattern in status_patterns:
             if pattern in text_lower:
-                return self._cmd_status(text, context)
+                return True, self._cmd_status(text, context)
         
         # === WHO AM I ===
         if 'who am i' in text_lower or 'who i am' in text_lower:
-            return self._cmd_who_am_i(text, context)
+            return True, self._cmd_who_am_i(text, context)
         
-        # No match - return None for pass-through to query handler
-        return None
+        # No match - return (False, None) for pass-through to query handler
+        return False, None
     
     def _cmd_focus_on(self, text: str, context: Dict) -> str:
         self.event_bus.publish(Event(
             EventType.FOCUS_MODE_CHANGED,
             {'enabled': True}
         ))
-        return "Focus mode enabled. I will watch for distractions."
+        return None # Delegate response to event handler
     
     def _cmd_focus_off(self, text: str, context: Dict) -> str:
         self.event_bus.publish(Event(
             EventType.FOCUS_MODE_CHANGED,
             {'enabled': False}
         ))
-        return "Focus mode disabled."
+        return None # Delegate response to event handler
     
     def _cmd_register(self, text: str, context: Dict) -> str:
         # Extract name if provided

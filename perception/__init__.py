@@ -12,7 +12,7 @@ def __getattr__(name):
         from .pose_estimation import PoseEstimator
         return PoseEstimator
     elif name == "FaceRecognizer":
-        from .face_rec import FaceRecognizer
+        from .face_rec_onnx import FaceRecONNX as FaceRecognizer
         return FaceRecognizer
     elif name == "MotionDetector":
         from .motion_detector import MotionDetector
