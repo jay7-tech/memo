@@ -150,11 +150,12 @@ class VoiceListener:
                         print(f"\n[Voice] ⚡ WAKE: '{text}'!")
                         
                         # Audio Cue (Windows only)
+                        # Audio Cue (Windows only)
                         try:
                             import winsound
                             winsound.Beep(1000, 200) # High beep
-                        except:
-                            pass
+                        except Exception as e:
+                            print(f"[Voice] Wake Beep Error: {e}")
                             
                         self._listen_for_command(stream)
                         
@@ -208,8 +209,8 @@ class VoiceListener:
             try:
                 import winsound
                 winsound.Beep(800, 150) # Lower beep
-            except:
-                pass
+            except Exception as e:
+                print(f"[Voice] Beep Error: {e}")
             self._process_command(b''.join(audio_buffer))
 
     def _process_command(self, audio_data):

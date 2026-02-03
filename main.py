@@ -242,7 +242,16 @@ class MEMOApp:
     
     def _init_voice(self, callback):
         """Initialize voice input module (Pro > Standard)."""
-        # 1. Try High-Fidelity Pro Engine
+        # 1. Standard Input module (Vosk + Beep Feedback - PREFERRED by User)
+        try:
+            from interface.voice_input import VoiceListener
+            self.voice_input = VoiceListener(callback_func=callback)
+            print("[Voice] Standard Input module initialized (Vosk)")
+            return
+        except Exception as e:
+            print(f"[Voice] Standard Init failed: {e}")
+
+        # 2. Try High-Fidelity Pro Engine (Fallback)
         try:
             from interface.speech_pro import HighFidelityTranscriber
             print("[Voice] Loading High-Fidelity Engine...")
@@ -253,17 +262,8 @@ class MEMOApp:
             )
             self.voice_input.start()
             print("[Voice] ✓ Pro Engine initialized")
-            return
         except Exception as e:
             print(f"[Voice] Pro Engine skipped: {e}")
-
-        # 2. Fallback to Standard
-        try:
-            from interface.voice_input import VoiceListener
-            self.voice_input = VoiceListener(callback_func=callback)
-            print("[Voice] Standard Input module initialized")
-        except Exception as e:
-            print(f"[Voice] Init failed: {e}")
             self.voice_input = None
     
     def _init_dashboard(self):
@@ -454,7 +454,8 @@ class MEMOApp:
                         
                         success = self.perception._face_rec.register_face(
                             clean_frame, [x, y, 200, 240],
-                            name=self.scene_state.register_name
+                            name=self.scene_state.register_name,
+                            keypoints=kp
                         )
                         
                         if success:
