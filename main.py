@@ -193,7 +193,7 @@ class MEMOApp:
             
         elif action == 'selfie':
             self.scene_state.selfie_trigger = True
-            self.lcd.play("blush", loop=False)
+            self.lcd.trigger_flash()
             
         elif action == 'toggle_voice':
             if self.voice_input:
@@ -231,6 +231,8 @@ class MEMOApp:
         
         if response:
             print(f">> MEMO: {response}")
+            self.lcd.trigger_eureka() # Happy flash
+            self.lcd.set_speaking()
             speak(response)
             # Log to dashboard
             from interface.dashboard import add_log
@@ -240,6 +242,8 @@ class MEMOApp:
             response = self.query_handler.handle_query(text, self.scene_state, personality=self.personality)
             if response:
                 print(f">> MEMO: {response}")
+                self.lcd.trigger_eureka()
+                self.lcd.set_speaking()
                 speak(response)
                 # Log to dashboard
                 from interface.dashboard import add_log
@@ -272,7 +276,11 @@ class MEMOApp:
         # 1. Standard Input module (Vosk + Beep Feedback - PREFERRED by User)
         try:
             from interface.voice_input import VoiceListener
-            self.voice_input = VoiceListener(callback_func=callback)
+            self.voice_input = VoiceListener(
+                callback_func=callback,
+                on_wake=lambda: self.lcd.set_listening(),
+                on_processing=lambda: self.lcd.set_thinking()
+            )
             print("[Voice] Standard Input module initialized (Vosk)")
             return
         except Exception as e:
@@ -785,6 +793,16 @@ class MEMOApp:
             # Display
             if self.show_display:
                 cv2.imshow("MEMO Vision", frame)
+                
+                # Render LCD Simulation (if active)
+                lcd_frame = self.lcd.get_current_frame()
+                if lcd_frame:
+                    import numpy as np
+                    # Convert PIL to CV2
+                    open_cv_image = np.array(lcd_frame) 
+                    open_cv_image = open_cv_image[:, :, ::-1].copy() # RGB to BGR
+                    display_img = cv2.resize(open_cv_image, (256, 256), interpolation=cv2.INTER_NEAREST)
+                    cv2.imshow("MEMO Face", display_img)
                 
                 # Handle keyboard (Only works if display window has focus)
                 key = cv2.waitKey(1) & 0xFF

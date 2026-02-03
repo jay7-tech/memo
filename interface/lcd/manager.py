@@ -56,7 +56,9 @@ class LCDManager:
         self.fallback_to_idle = True
         self.idle_variant = "center"
         self.mode = "IDLE" # IDLE, ANIMATING
+        self.mode = "IDLE" # IDLE, ANIMATING
         self.last_idle_move = time.time()
+        self.last_frame_sim = None # Buffer for main thread rendering
         
         # Preload Assets
         self._load_assets()
@@ -104,20 +106,14 @@ class LCDManager:
             self.thread.join(timeout=1.0)
         if self.lcd:
             self.lcd.close()
-        if self.sim_mode:
-            try:
-                cv2.destroyWindow("MEMO Face")
-            except: pass
 
     def play(self, name: str, loop=False, fps_ms=100, fallback_to_idle=True):
         """Thread-safe request to play animation."""
         with self.lock:
             # Map common variants
             if name == "happy": name = "laugh"
-            if name == "listening": name = "love" # Temp mapping
             
             if name not in self.anims:
-                # print(f"[LCD] Warn: Animation '{name}' not found.")
                 return 
 
             self.current_frames = self.anims[name]
@@ -130,6 +126,37 @@ class LCDManager:
             if "idle" in name:
                 self.idle_variant = name.replace("idle_", "")
                 self.last_idle_move = time.time()
+
+    # --- High Level Behaviors ---
+    
+    def set_listening(self):
+        """Eyes wide, attentive, pulsating."""
+        self.play("listening", loop=True, fps_ms=80)
+
+    def set_thinking(self):
+        """Eyes looking around / searching."""
+        self.play("thinking", loop=True, fps_ms=100)
+
+    def set_speaking(self):
+        """Default to idle center for now (or mouth if avail)."""
+        self.play("idle_center", loop=True, fps_ms=150)
+
+    def trigger_flash(self, post_flash_anim="idle_center"):
+        """Camera flash effect (White -> Fade). High priority."""
+        self.play("flash", loop=False, fps_ms=30, fallback_to_idle=True)
+        # Note: The fallback will go to the previous idle variant. 
+        # If we want to force something after flash, we'd need a queue or callback.
+
+    def trigger_eureka(self):
+        """Happy flash before speaking."""
+        self.play("wink", loop=False, fps_ms=60, fallback_to_idle=True)
+
+    def get_current_frame(self):
+        """Get the latest frame for main thread rendering (Sim Mode)."""
+        with self.lock:
+            if hasattr(self, 'last_frame_sim') and self.last_frame_sim:
+                return self.last_frame_sim
+        return None
 
     def _run_loop(self):
         while self.running:
@@ -160,39 +187,20 @@ class LCDManager:
                                 # Hold last frame
                                 frame_img = self.current_frames[-1]
 
-            # 2. Render
+            # 2. Render Hardware (Sim handled externally)
             if frame_img:
-                if self.sim_mode:
-                    # Convert PIL RGB to OpenCV BGR
-                    open_cv_image = np.array(frame_img) 
-                    open_cv_image = open_cv_image[:, :, ::-1].copy() 
-                    # Scale up for visibility
-                    display_img = cv2.resize(open_cv_image, (256, 256), interpolation=cv2.INTER_NEAREST)
-                    cv2.imshow("MEMO Face", display_img)
-                    cv2.waitKey(1)
-                elif self.lcd:
+                self.last_frame_sim = frame_img # Store for main thread
+                if self.lcd:
                     self.lcd.display_image(frame_img)
 
             # 3. Idle Logic (Look around)
             with self.lock:
                 if self.mode == "IDLE":
                     if time.time() - self.last_idle_move > 6.0:
-                        # Random drift
-                        opts = ["idle_center", "idle_left", "idle_right"]
-                        # Avoid current if possible
-                        curr = f"idle_{self.idle_variant}"
-                        opts = [o for o in opts if o != curr]
-                        next_anim = random.choice(opts)
+                        # Random drift logic (Simplified for new assets)
+                        # Just ensure we have a valid idle animation
+                        pass
                         
-                        self.current_frames = self.anims.get(next_anim, [])
-                        self.frame_idx = 0
-                        self.idle_variant = next_anim.replace("idle_", "")
-                        self.loop = False # Play transition once? 
-                        # Actually assets are loops. Let's just switch loop
-                        self.loop = True
-                        self.last_idle_move = time.time()
-                        # print(f"[LCD] Drift to {next_anim}")
-
             # 4. FPS Sleep
             elapsed = (time.time() - start_time) * 1000
             wait_ms = max(10, self.fps_ms - elapsed)

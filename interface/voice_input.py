@@ -44,9 +44,14 @@ class VoiceListener:
         callback_func: Callable[[str], None],
         wake_word: str = "hey_memo", # Ignored in favor of list
         use_offline: bool = True,
-        model_path: str = "models/vosk/vosk-model-en"
+        model_path: str = "models/vosk/vosk-model-en",
+        on_wake: Optional[Callable] = None,
+        on_processing: Optional[Callable] = None
     ):
         self.callback = callback_func
+        self.on_wake = on_wake
+        self.on_processing = on_processing
+        
         self.running = True
         self.is_listening_active = True # Default to active (but waiting for wake word)
         self.use_offline = use_offline
@@ -149,6 +154,9 @@ class VoiceListener:
                     if any(w in text for w in self.wake_words):
                         print(f"\n[Voice] ⚡ WAKE: '{text}'!")
                         
+                        if self.on_wake:
+                            self.on_wake()
+
                         # Audio Cue (Windows only)
                         # Audio Cue (Windows only)
                         try:
@@ -158,6 +166,9 @@ class VoiceListener:
                             print(f"[Voice] Wake Beep Error: {e}")
                             
                         self._listen_for_command(stream)
+
+                        if self.on_processing:
+                            self.on_processing()
                         
                         # Reset wake recognizer
                         self.wake_recognizer.Reset()

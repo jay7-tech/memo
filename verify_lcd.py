@@ -25,16 +25,22 @@ def test():
     lcd = LCDManager()
     lcd.start()
     
-    print("LCD Started. Playing 'focus_on'...")
-    lcd.play("focus_on", loop=True)
+    print("LCD Started. Testing States...")
+    
+    print("[1] Listening Mode (Wide Eyes)...")
+    lcd.set_listening()
+    time.sleep(3)
+    
+    print("[2] Thinking Mode (Searching)...")
+    lcd.set_thinking()
+    time.sleep(3)
+    
+    print("[3] Eureka! (Wink)...")
+    lcd.trigger_eureka()
     time.sleep(2)
     
-    print("Playing 'laugh'...")
-    lcd.play("laugh", loop=False)
-    time.sleep(2)
-    
-    print("Playing 'sleep'...")
-    lcd.play("sleep", loop=True)
+    print("[4] Selfie Flash!...")
+    lcd.trigger_flash()
     time.sleep(2)
     
     print("Stopping...")
