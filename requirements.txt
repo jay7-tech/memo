@@ -1,6 +1,6 @@
 # Computer Vision & AI
 opencv-python>=4.8.0
-numpy>=1.24.0      # <2.0 preferred for compatibility, but 2.x accepted with fixes
+numpy<2.0           # CRITICAL: faster-whisper requires numpy<2.0
 torch
 torchvision
 # facenet-pytorch         # Face Rec (Optional)
@@ -8,13 +8,17 @@ mediapipe>=0.10.0       # Hand gestures
 ultralytics>=8.0.0      # YOLOv8 for Object/Pose
 
 # Audio & Speech
-pyttsx3                 # Text-to-Speech (Offline)
+pyttsx3                 # Text-to-Speech (Legacy Offline)
+edge-tts                # High-Quality Neural TTS (Online)
 SpeechRecognition       # Google Speech API (Fallback)
 pyaudio                 # Microphone Input
-vosk>=0.3.45            # Offline Speech (Primary)
+vosk>=0.3.45            # Offline Speech (Fallback)
+faster-whisper          # High-Fidelity Speech (Primary)
+openwakeword            # Wake Word Detection
+onnxruntime             # Required for openwakeword
 webrtcvad-wheels>=2.0.10 # VAD for Windows
 scipy>=1.10.0           # Signal processing
-openai-whisper          # High-Fidelity Fallback
+# openai-whisper          # (Removed in favor of faster-whisper)
 
 # Dashboard & API
 flask                   # Web Dashboard

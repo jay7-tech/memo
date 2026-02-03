@@ -681,6 +681,11 @@ class MEMOApp:
         # Initialize voice input
         def on_voice(text):
             text = text.replace("hello pc", "").strip()
+            # Safety: Ignore very short noise like 'a', 'was'
+            if len(text) < 4:
+                print(f"[Voice] Ignored too short: '{text}'")
+                return
+                
             self.event_bus.publish(Event(
                 EventType.VOICE_COMMAND,
                 {'text': text}

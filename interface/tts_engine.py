@@ -98,11 +98,20 @@ class TTSEngine:
     
     def _speak_text(self, text: str):
         """Speak text using the selected backend."""
+        self._speaking = True
+        
+        # CLEAN TEXT (Sanitize for human-like speech)
+        try:
+            from interface.tts_cleaner import clean_text_for_tts
+            text = clean_text_for_tts(text)
+        except ImportError:
+            pass # Fallback
+            
         if not text:
+            self._speaking = False
             return
         
         with self._lock:
-            self._speaking = True
             try:
                 if self._backend == 'sapi':
                     self._speak_sapi(text)
@@ -113,7 +122,10 @@ class TTSEngine:
                 elif self._backend == 'sapi_direct':
                     self._speak_sapi_direct(text)
                 else:
-                    print(f"🔊 [MEMO]: {text}")
+                    print(f"[TTS] {text}")
+                    # print(f"🔊 [MEMO]: {text}")
+            except Exception as e:
+                print(f"[TTS Error] {e}")
             finally:
                 self._speaking = False
     
