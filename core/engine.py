@@ -356,7 +356,8 @@ class PerceptionPipeline:
         y = int(nose[1]) - face_h // 2
         
         if self._face_rec:
-            return self._face_rec.recognize(frame, [x, y, face_w, face_h])
+            # Pass keypoints for alignment
+            return self._face_rec.recognize(frame, [x, y, face_w, face_h], keypoints=kp)
         return None
 
 

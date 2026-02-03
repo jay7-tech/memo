@@ -93,7 +93,7 @@ class FaceRecognizer:
         self._migrate_legacy()
     
     def _load_users(self):
-        """Load users from disk."""
+        """Load users from disk with migration support."""
         if not os.path.exists(self.users_file):
             return
         
@@ -103,37 +103,95 @@ class FaceRecognizer:
             
             for name, meta in user_meta.items():
                 emb_file = os.path.join(self.embeddings_dir, f"{name}.npy")
+                
+                embeddings_list = []
                 if os.path.exists(emb_file):
-                    embedding = np.load(emb_file)
+                    data = np.load(emb_file)
+                    # Migration: Single vector (512,) -> Multi vector (N, 512)
+                    if data.ndim == 1:
+                        data = data.reshape(1, -1)
+                    
+                    filters_passed = 0
+                    for vec in data:
+                        embeddings_list.append(vec)
+                        filters_passed += 1
+
+                if embeddings_list:
                     self.users[name] = {
-                        'embedding': embedding,
+                        'embeddings': embeddings_list,
                         'registered': meta.get('registered', 0)
                     }
             
-            print(f"[FaceRec] ✓ Loaded {len(self.users)} users: {list(self.users.keys())}")
+            print(f"[FaceRec] ✓ Loaded {len(self.users)} users (Multi-Vector Enabled)")
             
         except Exception as e:
             print(f"[FaceRec] Error loading users: {e}")
+            import traceback
+            traceback.print_exc()
     
     def _save_users(self):
-        """Save users to disk."""
+        """Save users to disk (Stacked Embeddings)."""
         try:
-            # Save metadata
             meta = {}
             for name, data in self.users.items():
                 meta[name] = {'registered': data.get('registered', 0)}
                 
-                # Save embedding
-                emb_file = os.path.join(self.embeddings_dir, f"{name}.npy")
-                np.save(emb_file, data['embedding'])
+                # Stack list of arrays -> (N, 512)
+                if data['embeddings']:
+                    stacked = np.vstack(data['embeddings'])
+                    emb_file = os.path.join(self.embeddings_dir, f"{name}.npy")
+                    np.save(emb_file, stacked)
             
             with open(self.users_file, 'w') as f:
                 json.dump(meta, f, indent=2)
             
-            print(f"[FaceRec] ✓ Saved {len(self.users)} users")
+            # print(f"[FaceRec] ✓ Saved DB")
             
         except Exception as e:
             print(f"[FaceRec] Error saving users: {e}")
+
+    def align_face(self, frame, keypoints):
+        """
+        Geometrically align face based on eye position.
+        """
+        if not keypoints: 
+            return frame
+            
+        # Extract eye logic
+        # Expecting keypoints dict with 'LEFT_EYE' and 'RIGHT_EYE'
+        if 'LEFT_EYE' not in keypoints or 'RIGHT_EYE' not in keypoints:
+            return frame
+            
+        left_eye = keypoints['LEFT_EYE']   # (x, y)
+        right_eye = keypoints['RIGHT_EYE'] # (x, y)
+        
+        # Calculate angle
+        dY = right_eye[1] - left_eye[1]
+        dX = right_eye[0] - left_eye[0]
+        angle = np.degrees(np.arctan2(dY, dX))
+        
+        # Eye center
+        eye_center = ((left_eye[0] + right_eye[0]) // 2, (left_eye[1] + right_eye[1]) // 2)
+        
+        # Get rotation matrix (rotate around eye center)
+        M = cv2.getRotationMatrix2D(eye_center, angle, 1.0)
+        
+        # Apply strict rotation
+        h, w = frame.shape[:2]
+        aligned = cv2.warpAffine(frame, M, (w, h), flags=cv2.INTER_CUBIC)
+        
+        # print(f"[FaceRec] Aligned face: {angle:.1f} deg")
+        return aligned
+
+    def check_blur(self, img, threshold=50.0):
+        """
+        Check image variance (Laplacian) to detect blur.
+        Higher threshold = Stricter.
+        """
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        score = cv2.Laplacian(gray, cv2.CV_64F).var()
+        is_blurry = score < threshold
+        return is_blurry, score
     
     def _migrate_legacy(self):
         """Migrate from old single-user format."""
@@ -146,20 +204,13 @@ class FaceRecognizer:
                 with open(legacy_name, 'r') as f:
                     name = f.read().strip()
                 
-                if name and name not in self.users:
-                    self.users[name] = {
-                        'embedding': embedding,
-                        'registered': os.path.getmtime(legacy_emb)
-                    }
+                if name:
+                    if name not in self.users:
+                        self.users[name] = {'embeddings': [], 'registered': os.path.getmtime(legacy_emb)}
+                    self.users[name]['embeddings'].append(embedding)
                     self._save_users()
                     print(f"[FaceRec] ✓ Migrated legacy user: {name}")
-                
-                # Optionally remove legacy files
-                # os.remove(legacy_emb)
-                # os.remove(legacy_name)
-                
-            except Exception as e:
-                print(f"[FaceRec] Legacy migration failed: {e}")
+            except: pass
     
     def get_embedding(self, face_crop: np.ndarray) -> Optional[np.ndarray]:
         """
@@ -202,120 +253,170 @@ class FaceRecognizer:
         self,
         frame: np.ndarray,
         bbox: List[int],
-        name: str = "User"
+        name: str = "User",
+        keypoints: Optional[Dict] = None
     ) -> bool:
         """
-        Register a new user's face.
-        
-        Args:
-            frame: Full BGR video frame
-            bbox: Face bounding box [x, y, width, height]
-            name: User's name
-        
-        Returns:
-            True if registration successful
+        Register a user face with Alignment and Quality Checks.
+        Appends to existing memory bank.
         """
-        if self.model is None:
-            print("[FaceRec] Model not available")
-            return False
+    def check_head_pose(self, keypoints, threshold=0.6):
+        """
+        Check if face is frontal using eye-nose symmetry.
+        Returns: True if frontal, False if profile/missing features.
+        """
+        if not keypoints: return True # No pose data, rely on L2 check
+        
+        # FAIL-CLOSE: If eyes are missing, it's likely a profile view -> REJECT
+        if 'LEFT_EYE' not in keypoints or 'RIGHT_EYE' not in keypoints:
+            # print("[FaceRec] Rejected: Missing eyes (Profile)")
+            return False 
             
-        if frame is None:
-            print("[FaceRec] Cannot register face: No frame provided")
-            return False
+        if 'NOSE' not in keypoints:
+            return True 
             
-        # Extract face crop
+        nose = keypoints['NOSE']
+        l_eye = keypoints['LEFT_EYE']
+        r_eye = keypoints['RIGHT_EYE']
+        
+        # Distances
+        d_left = abs(nose[0] - l_eye[0])
+        d_right = abs(nose[0] - r_eye[0])
+        total = d_left + d_right
+        if total == 0: return True
+        
+        symmetry = abs(d_left - d_right) / total
+        return symmetry < threshold
+
+    def register_face(
+        self,
+        frame: np.ndarray,
+        bbox: List[int],
+        name: str = "User",
+        keypoints: Optional[Dict] = None
+    ) -> bool:
+        """
+        Register a user face with Alignment and Quality Checks.
+        """
+        if self.model is None: return False
+        if frame is None: return False
+        
+        # 0. Pose Check (Frontal Only for Registration)
+        if keypoints and not self.check_head_pose(keypoints, threshold=0.4): # Strict for Reg
+            print(f"[FaceRec] ⚠️ Look straight at camera (Profile detected)")
+            return False
+
+        # 1. Alignment (if pose data allows)
+        work_frame = frame
+        if keypoints:
+            work_frame = self.align_face(frame, keypoints)
+            
+        # 2. Extract Crop
         x, y, w, h = map(int, bbox)
-        h_img, w_img = frame.shape[:2]
+        h_img, w_img = work_frame.shape[:2]
+        x, y = max(0, x), max(0, y)
+        w, h = min(w, w_img - x), min(h, h_img - y)
         
-        # Clamp to image bounds
-        x = max(0, x)
-        y = max(0, y)
-        w = min(w, w_img - x)
-        h = min(h, h_img - y)
-        
-        if w < 30 or h < 30:
-            print("[FaceRec] Face too small")
+        if w < 40 or h < 40: # Stricter size
+            print(f"[FaceRec] ⚠️ Face too small to register ({w}x{h})")
             return False
+            
+        crop = work_frame[y:y+h, x:x+w]
         
-        crop = frame[y:y+h, x:x+w]
+        # 3. Blur Check
+        is_blurry, score = self.check_blur(crop)
+        if is_blurry:
+            print(f"[FaceRec] ⚠️ Image too blurry (Score: {score:.1f})")
+            return False
+            
+        # 4. Get Embedding
         embedding = self.get_embedding(crop)
+        if embedding is None: return False
         
-        if embedding is None:
-            print("[FaceRec] Could not extract embedding")
-            return False
-        
-        # Store user
+        # 5. Store in Memory Bank
         import time
-        self.users[name] = {
-            'embedding': embedding,
-            'registered': time.time()
-        }
+        if name not in self.users:
+            self.users[name] = {'embeddings': [], 'registered': time.time()}
+            
+        # Avoid duplicates (Dot product > 0.95 considered same vector)
+        is_duplicate = False
+        for existing in self.users[name]['embeddings']:
+            sim = np.dot(existing, embedding) / (np.linalg.norm(existing) * np.linalg.norm(embedding))
+            if sim > 0.95:
+                is_duplicate = True
+                break
         
-        self._save_users()
-        print(f"[FaceRec] ✓ Registered: {name}")
-        return True
+        if not is_duplicate:
+            self.users[name]['embeddings'].append(embedding)
+            # Cap at 10 embeddings per user (FIFO if needed, but for now just cap)
+            if len(self.users[name]['embeddings']) > 10:
+                self.users[name]['embeddings'].pop(0) # Remove oldest
+                
+            self._save_users()
+            count = len(self.users[name]['embeddings'])
+            print(f"[FaceRec] ✓ Registered '{name}' (Sample #{count})")
+            return True
+        else:
+            print(f"[FaceRec] Sample skipped (Duplicate angle)")
+            return True # Treat as success since we already know this angle
     
     def recognize(
         self,
         frame: np.ndarray,
-        bbox: List[int]
+        bbox: List[int],
+        keypoints: Optional[Dict] = None
     ) -> Optional[str]:
         """
-        Recognize a face and return the user's name.
-        
-        Args:
-            frame: Full BGR video frame
-            bbox: Face bounding box [x, y, width, height]
-        
-        Returns:
-            User's name if recognized, None otherwise
+        Recognize using L2 Euclidean Distance (Standard).
         """
         if self.model is None or not self.users:
-            return None
+            return None, 0.0
+            
+        # 0. Strict Pose Check
+        if keypoints and not self.check_head_pose(keypoints, threshold=0.6):
+            return None, 0.0
+            
+        # 1. Align
+        work_frame = frame
+        if keypoints:
+            work_frame = self.align_face(frame, keypoints)
         
-        # Extract face crop
+        # 2. Crop
         x, y, w, h = map(int, bbox)
-        h_img, w_img = frame.shape[:2]
+        h_img, w_img = work_frame.shape[:2]
+        x, y = max(0, x), max(0, y)
+        w, h = min(w, w_img - x), min(h, h_img - y)
         
-        # Clamp to bounds
-        x = max(0, x)
-        y = max(0, y)
-        w = min(w, w_img - x)
-        h = min(h, h_img - y)
+        if w < 20 or h < 20: return None, 0.0
         
-        if w < 20 or h < 20:
-            return None
-        
-        crop = frame[y:y+h, x:x+w]
+        crop = work_frame[y:y+h, x:x+w]
         embedding = self.get_embedding(crop)
+        if embedding is None: return None, 0.0
         
-        if embedding is None:
-            return None
-        
-        # Compare with all users
+        # 3. L2 Distance Match
         best_match = None
-        best_similarity = 0.0
-        
-        # Normalize query embedding
-        emb_norm = embedding / (np.linalg.norm(embedding) + 1e-8)
+        best_dist = 10.0 # High init
         
         for name, data in self.users.items():
-            known_emb = data['embedding']
-            known_norm = known_emb / (np.linalg.norm(known_emb) + 1e-8)
-            
-            # Cosine similarity
-            similarity = float(np.dot(emb_norm, known_norm))
-            
-            if similarity > best_similarity:
-                best_similarity = similarity
-                best_match = name
+            for known_emb in data['embeddings']:
+                # Euclidean Distance: sqrt(sum((a-b)^2))
+                dist = float(np.linalg.norm(embedding - known_emb))
+                
+                if dist < best_dist:
+                    best_dist = dist
+                    best_match = name
         
-        if best_similarity >= self.threshold:
-            # print(f"[FaceRec] MATCH: {best_match} ({best_similarity:.3f})")
-            return best_match, best_similarity
+        # Threshold: Lower is better. 
+        # < 0.9 is strong match. > 1.1 is different person.
+        l2_threshold = 0.95 
+        
+        if best_dist < l2_threshold:
+            # Convert to "Confidence" for UI (Inverse of distance)
+            # 0.0 dist -> 1.0 conf. 1.0 dist -> 0.0 conf.
+            confidence = max(0.0, 1.0 - (best_dist / 1.2))
+            return best_match, confidence
         else:
-            # print(f"[FaceRec] Ignored: {best_match} ({best_similarity:.3f}) < {self.threshold}")
-            return None, best_similarity
+            return None, 0.0
     
     def list_users(self) -> List[str]:
         """Get list of registered users."""
@@ -353,20 +454,16 @@ class FaceRecognizer:
 # Backward compatibility: maintain old function signatures
 def load_user() -> Tuple[Optional[np.ndarray], str]:
     """Legacy function for backward compatibility."""
-    recognizer = FaceRecognizer()
-    if recognizer.users:
-        first_user = list(recognizer.users.keys())[0]
-        return recognizer.users[first_user]['embedding'], first_user
     return None, "User"
 
 
 # Quick test
 if __name__ == "__main__":
-    print("Testing FaceRecognizer...")
+    print("Testing Updated FaceRecognizer...")
     
-    face_rec = FaceRecognizer()
-    print(f"Registered users: {face_rec.list_users()}")
-    print(f"User count: {face_rec.get_user_count()}")
+    fr = FaceRecognizer()
+    print(f"Users: {fr.list_users()}")
+    print(f"User count: {fr.get_user_count()}")
     
     # Test with webcam
     cap = cv2.VideoCapture(0)
@@ -378,8 +475,8 @@ if __name__ == "__main__":
             bbox = [w//4, h//4, w//2, h//2]
             
             # Test recognition
-            result = face_rec.recognize(frame, bbox)
-            print(f"Recognition result: {result}")
+            result, similarity = fr.recognize(frame, bbox)
+            print(f"Recognition result: {result}, Similarity: {similarity:.3f}")
         
         cap.release()
     

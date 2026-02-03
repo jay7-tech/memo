@@ -454,7 +454,8 @@ class MEMOApp:
                         
                         success = self.perception._face_rec.register_face(
                             clean_frame, [x, y, 200, 240],
-                            name=self.scene_state.register_name
+                            name=self.scene_state.register_name,
+                            keypoints=kp
                         )
                         
                         if success:
