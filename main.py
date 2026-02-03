@@ -345,7 +345,7 @@ class MEMOApp:
              # In burst mode, we want maximum accuracy when awake
              run_face = run_detection
         else:
-             run_face = self.frame_count % 10 == 0  # Legacy mode
+             run_face = self.frame_count % 25 == 0  # Legacy mode
         
         # Run perception
         result = self.perception.process(

@@ -183,7 +183,7 @@ class FaceRecognizer:
         # print(f"[FaceRec] Aligned face: {angle:.1f} deg")
         return aligned
 
-    def check_blur(self, img, threshold=50.0):
+    def check_blur(self, img, threshold=18.0):
         """
         Check image variance (Laplacian) to detect blur.
         Higher threshold = Stricter.
@@ -326,7 +326,7 @@ class FaceRecognizer:
         # 3. Blur Check
         is_blurry, score = self.check_blur(crop)
         if is_blurry:
-            print(f"[FaceRec] ⚠️ Image too blurry (Score: {score:.1f})")
+            print(f"[FaceRec] ⚠️ Image too blurry (Score: {score:.1f} < {threshold})")
             return False
             
         # 4. Get Embedding
