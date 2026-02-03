@@ -1,11 +1,11 @@
 # Computer Vision & AI
-opencv-python>=4.8.0
-numpy<2.0           # CRITICAL: faster-whisper requires numpy<2.0
+opencv-python-headless>=4.8.0 # Headless is safer for Pi/Server
+numpy               # Let pip resolve best version (usually system numpy on Pi)
 torch
 torchvision
 # facenet-pytorch         # Face Rec (Optional)
-mediapipe>=0.10.0       # Hand gestures
-ultralytics>=8.0.0      # YOLOv8 for Object/Pose
+mediapipe               # Removed Strict Version (Pi compatibility)
+ultralytics             # YOLOv8
 
 # Audio & Speech
 pyttsx3                 # Text-to-Speech (Legacy Offline)
