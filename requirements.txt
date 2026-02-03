@@ -33,6 +33,10 @@ pyyaml>=6.0
 psutil>=5.9.0           
 python-dotenv           
 
+# Hardware (Raspberry Pi Only - auto-skipped on Windows)
+# RPi.GPIO; sys_platform == 'linux'
+# spidev; sys_platform == 'linux'
+
 # AI & LLM
 google-generativeai     # Gemini
 ollama                  # Local LLM Interface
