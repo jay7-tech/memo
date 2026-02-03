@@ -418,25 +418,16 @@ class AIPersonality:
                 "memo news"
             ]
             if any(t in prompt_lower for t in NEWS_TRIGGERS):
-                updates = self.get_personalized_updates()
-
-                if not updates:
-                    return "Nothing big yet, but I'm watching."
-
-                # Create a rich prompt for the anchor persona
+                # Shuffle and limit to top 8 to fit context
+                random.shuffle(updates)
+                updates = updates[:8]
                 joined_updates = "\n".join(updates)
+                # Simplify for Phi-3 (Avoid roleplay hallucinations)
                 summary_prompt = (
-                    "You are a tech news anchor. Summarize these raw items into a brisk, exciting 3-sentence spoken update.\n"
-                    "Include:\n"
-                    "1. One major tech launch or AI news.\n"
-                    "2. One trending tool or repo.\n"
-                    "3. One career/internship opportunity if listed.\n\n"
-                    "Rules:\n"
-                    "- Answer in ONE paragraph, not a list.\n"
-                    "- No URLs, no code syntax, no markdown.\n"
-                    "- Do NOT cut off sentences.\n"
-                    "- Keep it under 50 words.\n\n"
-                    f"Raw Data:\n{joined_updates}"
+                    "Here are fresh tech news headlines. Select the top 3 most interesting ones.\n"
+                    "Output a short spoken update summarizing them.\n"
+                    "Start with 'Here is the latest buzz...'\n\n"
+                    f"Headlines:\n{joined_updates}"
                 )
                 
                 # Generate and then sanitize
