@@ -571,7 +571,12 @@ class AIPersonality:
                         "[MEMO]:",
                         "example",
                         "Example",
-                        "Sure"
+                        "Sure",
+                        "Instruction:",
+                        "### Instruction",
+                        "<|end|>",
+                        "<|user|>",
+                        "<|system|>"
                      ]
                 },
                 "keep_alive": "60m" # Keep model loaded in RAM

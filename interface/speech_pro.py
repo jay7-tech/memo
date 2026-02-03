@@ -29,11 +29,13 @@ import pyaudio
 import wave
 
 # Audio Processing
+HAS_VAD = False
 try:
     import webrtcvad
     from scipy import signal
+    HAS_VAD = True
 except ImportError:
-    print("[SpeechPro] Missing dependencies. Run: pip install webrtcvad scipy")
+    print("[SpeechPro] VAD/Scipy missing. Using Energy VAD fallback.")
 
 # Optimize environment for reduced latency
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -45,22 +47,24 @@ class AudioPreprocessor:
     
     def __init__(self, rate=16000):
         self.rate = rate
-        # Bandpass filter for human voice (300Hz - 3400Hz)
-        self.sos = signal.butter(10, [300, 3400], 'bandpass', fs=rate, output='sos')
+        self.sos = None
+        if HAS_VAD:
+            try:
+                # Bandpass filter for human voice (300Hz - 3400Hz)
+                self.sos = signal.butter(10, [300, 3400], 'bandpass', fs=rate, output='sos')
+            except:
+                pass
 
     def process(self, audio_data: bytes) -> np.ndarray:
         """Apply bandpass filter and normalize audio."""
+        if not self.sos:
+            return np.frombuffer(audio_data, dtype=np.int16)
+            
         # Convert bytes to float32 numpy array
         audio_np = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32)
         
-        # Normalize to -1.0 ... 1.0 (prevents clipping issues options)
-        # However, for filtering we keep it in usable range then convert back
-        
         # Apply precise bandpass filter
         filtered = signal.sosfilt(self.sos, audio_np)
-        
-        # Audio cleaning: simple noise gate (silence really quiet sounds)
-        # filtered[np.abs(filtered) < 100] = 0
         
         return filtered.astype(np.int16)
 
@@ -75,7 +79,7 @@ class HighFidelityTranscriber:
                  callback_func=None,
                  wake_word: str = "computer",
                  use_offline: bool = True,
-                 model_path: str = None, # Kept for signature compatibility
+                 model_path: str = None, 
                  model_size: str = "tiny.en", 
                  device: str = "auto",
                  compute_type: str = "int8"):
@@ -93,8 +97,14 @@ class HighFidelityTranscriber:
         self.audio_queue = queue.Queue()
         self.text_queue = queue.Queue()
         
-        # VAD - Level 3 is most aggressive (filters most noise)
-        self.vad = webrtcvad.Vad(3)
+        # VAD Init
+        self.vad = None
+        if HAS_VAD:
+            try:
+                self.vad = webrtcvad.Vad(3)
+            except:
+                pass
+                
         self.preprocessor = AudioPreprocessor(self.rate)
         
         # Init Model Strategy
@@ -129,7 +139,8 @@ class HighFidelityTranscriber:
                 print("[SpeechPro] ✓ OpenAI Whisper Ready")
             except Exception as e2:
                 print(f"[SpeechPro] Standard Whisper failed: {e2}")
-                raise RuntimeError("No speech engine available. Install faster-whisper or openai-whisper.")
+                # Don't raise error, just fallback to dummy mode or allow retry
+                print("!! CRITICAL: No Speech Engine. Voice will be disabled.")
 
     def _audio_callback(self, in_data, frame_count, time_info, status):
         """PyAudio callback - critical path - keep extremely fast."""
@@ -187,11 +198,20 @@ class HighFidelityTranscriber:
             except queue.Empty:
                 continue
                 
-            # 1. VAD Check (Fastest Filter)
-            try:
-                is_speech = self.vad.is_speech(chunk, self.rate)
-            except:
-                is_speech = False
+            # 1. VAD Check (Hybrid)
+            is_speech = False
+            
+            if self.vad:
+                try:
+                    is_speech = self.vad.is_speech(chunk, self.rate)
+                except:
+                    is_speech = False
+            else:
+                # Energy Fallback
+                import numpy as np
+                amp = np.frombuffer(chunk, dtype=np.int16)
+                if np.abs(amp).mean() > 300: # Threshold needs tuning
+                    is_speech = True
             
             # 2. Logic to build sentences
             if not triggered:
@@ -219,7 +239,8 @@ class HighFidelityTranscriber:
                 # End of sentence detection
                 if silence_counter > limit_chunks:
                     triggered = False
-                    self._transcribe(b''.join(speech_frames))
+                    if speech_frames:
+                        self._transcribe(b''.join(speech_frames))
                     speech_frames = []
                     silence_counter = 0
                     # print("[<] Voice End")

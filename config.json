@@ -9,7 +9,7 @@
   "perception": {
     "yolo_model": "yolov8n.pt",
     "pose_model": "yolov8n-pose.pt",
-    "face_threshold": 0.45,
+    "face_threshold": 0.65,
     "object_confidence": 0.4,
     "phone_confidence": 0.6,
     "frame_skip": 2,
