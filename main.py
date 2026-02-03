@@ -687,10 +687,11 @@ class MEMOApp:
                 print(f"[Voice] Ignored too short: '{text}'")
                 return
                 
-            self.event_bus.publish(Event(
+            # V5.6 Fix: Offload to prevent blocking audio thread
+            threading.Thread(target=lambda: self.event_bus.publish(Event(
                 EventType.VOICE_COMMAND,
                 {'text': text}
-            ))
+            )), daemon=True).start()
         
         self._init_voice(on_voice)
         
