@@ -21,7 +21,7 @@ echo "Starting MEMO..."
 # Check for libcamerify (Fix for /dev/video0 error on Bookworm)
 if command -v libcamerify &> /dev/null; then
     echo "Running with libcamerify wrapper..."
-    libcamerify python main.py "$@"
+    libcamerify python main.py 0 "$@"
 else
-    python main.py "$@"
+    python main.py 0 "$@"
 fi

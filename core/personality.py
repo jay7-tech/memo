@@ -418,6 +418,11 @@ class AIPersonality:
                 "memo news"
             ]
             if any(t in prompt_lower for t in NEWS_TRIGGERS):
+                updates = self.get_personalized_updates()
+                
+                if not updates:
+                    return "Nothing big yet, but I'm watching."
+
                 # Shuffle and limit to top 8 to fit context
                 random.shuffle(updates)
                 updates = updates[:8]
