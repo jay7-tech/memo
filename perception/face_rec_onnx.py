@@ -68,10 +68,20 @@ class FaceRecONNX:
                         # Ensure 2D array
                         if embeddings.ndim == 1: 
                             embeddings = embeddings.reshape(1, -1)
-                        self.users[name] = {
-                            'embeddings': list(embeddings),
-                            'registered': data.get('registered', 0)
-                        }
+                        
+                        # Filter out embeddings with wrong dimension (SFace expects 128)
+                        valid_embs = []
+                        for emb in embeddings:
+                             if emb.size == 128:
+                                 valid_embs.append(emb)
+                        
+                        if valid_embs:
+                            self.users[name] = {
+                                'embeddings': valid_embs,
+                                'registered': data.get('registered', 0)
+                            }
+                        else:
+                            print(f"[Face] Warning: User {name} has invalid embeddings (size != 128). Skipping.")
                 print(f"[Face] Loaded {len(self.users)} users.")
              except Exception as e:
                  print(f"[Face] Load error: {e}")
@@ -212,10 +222,18 @@ class FaceRecONNX:
             for known_emb in data['embeddings']:
                 # Ensure shapes match (1, 128)
                 curr_emb_reshaped = current_emb.reshape(1, -1)
+                
+                # Check for incompatible embeddings (e.g. from old model)
+                if known_emb.size != current_emb.size:
+                     continue # Skip mismatched dimensions
+                     
                 known_emb_reshaped = known_emb.reshape(1, -1)
                 
-                score = self.recognizer.match(curr_emb_reshaped, known_emb_reshaped, cv2.FaceRecognizerSF_FR_COSINE)
-                if score > local_best: local_best = score
+                try:
+                    score = self.recognizer.match(curr_emb_reshaped, known_emb_reshaped, cv2.FaceRecognizerSF_FR_COSINE)
+                    if score > local_best: local_best = score
+                except cv2.error:
+                    pass # Ignore OpenCV matching errors
             
             if local_best > best_score:
                 best_score = local_best
