@@ -341,13 +341,12 @@ class MEMOApp:
         except Exception as e:
             print(f"[Dashboard] Init failed: {e}")
     
-        if self.perception._face_rec:
-             count = len(self.perception._face_rec.known_face_encodings)
-             print(f"[Face] Loaded {count} known users.")
-             if count == 0:
-                 print("[Face] ⚠️ No users registered! Run: 'register <name>'")
+    def _process_frame(self, frame) -> Optional[Dict[str, Any]]:
+        """
+        Process a single frame through the perception pipeline.
         
-        return result
+        Uses adaptive processing based on system load.
+        """
         self.frame_count += 1
         self.perf_monitor.record_frame()
         
