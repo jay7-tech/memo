@@ -14,7 +14,7 @@ PIN_CS = 8  # SPI0 CE0
 # SPI Configuration
 SPI_BUS = 0
 SPI_DEVICE = 0
-SPI_SPEED_HZ = 40000000 # ST7735 usually handles up to ~30-40MHz
+SPI_SPEED_HZ = 16000000 # Lowered to 16MHz for stability (40MHz is too fast for jumper wires)
 
 class LCD_ST7735:
     def __init__(self, width=128, height=128, rotation=90):
@@ -93,6 +93,9 @@ class LCD_ST7735:
         # DISPON
         self.write_cmd(0x29)
         time.sleep(0.100)
+        
+        # INVON (Inversion On) - Many ST7735 panels need this to fix "White/Washed out" look
+        self.write_cmd(0x21)
 
     def set_window(self, x_start, y_start, x_end, y_end):
         # Adjust for offset
