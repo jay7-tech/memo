@@ -22,8 +22,8 @@ class TouchManager:
         self.is_pressed = False
         
         # Config
-        self.tap_gap_ms = 800 # Increased to 800ms (Generous window)
-        self.min_press_ms = 0.15 # 150ms min duration (Must be a deliberate press)
+        self.tap_gap_ms = 800 
+        self.min_press_ms = 0.05 # Lowered to 50ms (Persistence filter handles noise now)
         self.hold_ms = 1000 # Time for HOLD event? (Future)
         
         # Try Loading Driver
@@ -57,15 +57,28 @@ class TouchManager:
 
     def _run_loop(self):
         print(f"[Touch] Entering poll loop. Keys at start: {self.driver.read_keys()}")
+        consecutive_presses = 0
+        REQUIRED_PERSISTENCE = 2 # Must read "Pressed" 2 times in a row (approx 100ms)
+        
         while self.running:
             keys = self.driver.read_keys()
             now = time.time()
             
-            # Simple "Any Key" logic
-            pressed = (keys > 0)
+            raw_pressed = (keys > 0)
             
+            # 1. NOISE FILTER (PERSISTENCE)
+            if raw_pressed:
+                consecutive_presses += 1
+            else:
+                consecutive_presses = 0
+                
+            # Only count as "Pressed" if held for N cycles
+            pressed = (consecutive_presses >= REQUIRED_PERSISTENCE)
+            
+            # 2. STATE LOGIC
             # DEBUG: Print press state changes
             if pressed and not self.is_pressed:
+                # Potential PRESS
                 # Potential PRESS
                 if not self.in_transaction:
                     # Clean start

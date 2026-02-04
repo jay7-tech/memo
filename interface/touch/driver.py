@@ -75,12 +75,10 @@ class QT2120:
             self.connected = False
 
     def set_threshold(self, value):
-        """Set detection threshold (0-255). reg 0x10 seems to be Key0 or Global Thresh."""
-        print(f"[Touch] Setting threshold to {value}")
-        # User snippet: I2Cwrite_Multibyte(.., 0x10, &dat1, 0x01)
-        # We'll write to 0x10. If there are multiple keys, they might be 0x10, 0x11...
-        # Let's write to 0x10 through 0x14 just to be safe for first few keys
-        for reg in range(0x10, 0x14): 
+        """Set detection threshold (0-255). Registers 0x10-0x1B imply Keys 0-11."""
+        print(f"[Touch] Setting threshold to {value} for ALL keys")
+        # Write to 0x10 (Key 0) through 0x1B (Key 11)
+        for reg in range(0x10, 0x1C): 
             self.write_reg(reg, value)
 
     def read_reg(self, reg):
