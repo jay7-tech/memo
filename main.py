@@ -433,22 +433,43 @@ class MEMOApp:
         
         # --- FOCUS MODE LOGIC ---
         if self.scene_state.focus_mode:
-            # Check for distractions (Cell Phone)
-            distractions = ['cell phone']
-            detected_distractions = [d['label'] for d in detections if d['label'] in distractions]
-            
-            if detected_distractions:
-                current_time = time.time()
-                # 15 second cooldown
-                if current_time - self.scene_state.last_distraction_alert > 15.0:
-                    self.scene_state.last_distraction_alert = current_time
+            # Check for distractions (cell phone)
+            is_distracted = False
+            if 'cell phone' in self.scene_state.objects:
+                phone_state = self.scene_state.objects['cell phone']
+                # If seen recently (< 2 seconds ago)
+                if timestamp - phone_state['last_seen'] < 2.0:
+                    is_distracted = True
                     
-                    # Publish Alert Event (Handled by _on_distraction)
-                    self.event_bus.publish(Event(
-                        EventType.DISTRACTION_DETECTED,
-                        {'object': 'cell phone'}
-                    ))
+            if is_distracted:
+                # 1. VISUAL STATE: Warning
+                # Only switch if not already playing warning
+                # (LCD Manager handles deduplication usually, but clear naming helps)
+                if timestamp - self.scene_state.last_distraction_alert > 5.0:
+                    # New distraction event
                     print(f">> FOCUS: Distraction Detected (Cooldown Reset)")
+                    speak("Focus mode! Put that phone away!")
+                    self.event_bus.publish(Event(
+                        EventType.SYSTEM_ALERT,
+                        {'action': 'focus_alert'}
+                    ))
+                    # Trigger Warning Animation (Looping?)
+                    # If we want it to persist while phone is visible:
+                    self.lcd.play("focus_warning", loop=True, fps_ms=100)
+                    self.scene_state.last_distraction_alert = timestamp
+                else:
+                    # Maintain warning loop
+                    self.lcd.play("focus_warning", loop=True, fps_ms=100)
+                    
+            else:
+                # 2. VISUAL STATE: Scanning
+                # If no distraction, show Scanning eyes
+                # Only if not doing something else (like speaking)
+                # Ideally, focus_scan should be the "Idle" state when in Focus Mode.
+                # But LCD manager 'fallback_to_idle' goes to 'idle_center'.
+                # We need to inform LCD Manager that the "Base State" is Focus.
+                # For now, explicit call:
+                self.lcd.play("focus_scan", loop=True, fps_ms=60)
         persisted_id = self.scene_state.human.get('identity')
         if persisted_id and identity and identity != persisted_id:
              # Wait, this logic is tricky if identity is None but persisted is set.
@@ -668,6 +689,17 @@ class MEMOApp:
                     print(">> SYSTEM: Voice input DISABLED")
                     speak_now("Voice input stopped.")
                 
+                elif cmd_lower == 'focus on':
+                    self.scene_state.focus_mode = True
+                    print(">> SYSTEM: Focus Mode ENABLED")
+                    speak("Entering the zone! No distractions allowed!")
+                    self.lcd.play("focus_scan", loop=True, fps_ms=60) # Start scanning immediately
+                elif cmd_lower == 'focus off':
+                    self.scene_state.focus_mode = False
+                    print(">> SYSTEM: Focus Mode DISABLED")
+                    speak("Chill mode! Scroll away my friend 📱")
+                    self.lcd.play("idle_center", loop=True) # Reset to normal eyes
+                    
                 elif cmd_lower == 'logs on':
                     self.verbose_logging = True
                     print(">> SYSTEM: Verbose logging ENABLED")

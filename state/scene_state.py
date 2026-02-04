@@ -117,7 +117,8 @@ class SceneState:
                 with open("memory.json", "r") as f:
                     data = json.load(f)
                     self.objects = data.get('objects', {})
-                    self.focus_mode = data.get('focus_mode', False)
+                    # self.focus_mode = data.get('focus_mode', False) # Don't persist focus mode
+                    self.focus_mode = False # Always start OFF
                     # We don't load 'human' state as that is real-time
                 print("[System] Memory loaded.")
             except Exception as e:

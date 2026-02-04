@@ -50,6 +50,7 @@ class LCDManager:
         # Animation State
         self.anims: Dict[str, List[Image.Image]] = {}
         self.current_frames = []
+        self.current_anim_name = ""
         self.frame_idx = 0
         self.fps_ms = 100
         self.loop = True
@@ -113,20 +114,34 @@ class LCDManager:
             # Map common variants
             if name == "happy": name = "laugh"
             
+            # Optimization: If already playing this LOOPING animation, don't reset
+            if loop and self.mode == "ANIMATING" and self.current_anim_name == name:
+                return
+
             if name not in self.anims:
                 print(f"[LCD] ⚠️ Animation '{name}' not found! Available: {list(self.anims.keys())}")
                 return 
 
             self.current_frames = self.anims[name]
+            self.current_anim_name = name
             self.frame_idx = 0
             self.fps_ms = fps_ms
             self.loop = loop
             self.fallback_to_idle = fallback_to_idle
-            self.mode = "ANIMATING" if not loop else "IDLE"
+            self.mode = "ANIMATING" if not loop else "IDLE" # Wait, if loop is True, mode should be animating?
+            # Actually logic in run_loop line 210 resets mode to IDLE only if fallback triggers
+            # But line 125 says: self.mode = "ANIMATING" if not loop else "IDLE" ??
+            # If loop=True, we WANT mode=ANIMATING so it keeps playing. 
+            # If mode=IDLE, run_loop line 223 executes idle logic random moves. 
+            # So for Loop=True, mode must be ANIMATING?
+            # Let's fix that too.
+            self.mode = "ANIMATING"
             
             if "idle" in name:
+                # If we explicitly play an idle anim, maybe allow idle logic?
                 self.idle_variant = name.replace("idle_", "")
                 self.last_idle_move = time.time()
+                if loop: self.mode = "IDLE" # Restore original behavior for idle anims
 
     # --- High Level Behaviors ---
     
