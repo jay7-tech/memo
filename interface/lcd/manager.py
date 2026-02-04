@@ -12,10 +12,12 @@ import random
 try:
     from .driver import LCD_ST7735
     HARDWARE_AVAILABLE = True
-except ImportError:
+except ImportError as e:
+    print(f"[LCD] ⚠️ Hardware Driver Missing: {e}")
+    print("[LCD] Ensuring Simulation Mode.")
     HARDWARE_AVAILABLE = False
 except Exception as e:
-    print(f"[LCD] Driver Error: {e}")
+    print(f"[LCD] Driver Critical Error: {e}")
     HARDWARE_AVAILABLE = False
 
 class LCDManager:

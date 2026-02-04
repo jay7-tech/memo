@@ -157,13 +157,8 @@ class VoiceListener:
                         if self.on_wake:
                             self.on_wake()
 
-                        # Audio Cue (Windows only)
-                        # Audio Cue (Windows only)
-                        try:
-                            import winsound
-                            winsound.Beep(1000, 200) # High beep
-                        except Exception as e:
-                            print(f"[Voice] Wake Beep Error: {e}")
+                        # Audio Beep
+                        play_wake_beep()
                             
                         self._listen_for_command(stream)
 
