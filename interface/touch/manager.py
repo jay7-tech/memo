@@ -1,7 +1,12 @@
-
 import time
 import threading
-from ...core.engine import get_event_bus, Event, EventType
+import sys
+import os
+
+# Ensure root is in path
+sys.path.append(os.getcwd())
+
+from core.engine import get_event_bus, Event, EventType
 
 class TouchManager:
     def __init__(self):
@@ -50,12 +55,17 @@ class TouchManager:
             self.driver.close()
 
     def _run_loop(self):
+        print(f"[Touch] Entering poll loop. Keys at start: {self.driver.read_keys()}")
         while self.running:
             keys = self.driver.read_keys()
             now = time.time()
             
             # Simple "Any Key" logic
             pressed = (keys > 0)
+            
+            # DEBUG: Print press state changes
+            if pressed and not self.is_pressed:
+                print(f"[Touch] DEBUG: Key Pressed! (Mask: {keys})")
             
             if pressed and not self.is_pressed:
                 # PRESS EVENT

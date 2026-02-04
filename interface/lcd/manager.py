@@ -115,6 +115,7 @@ class LCDManager:
         with self.lock:
             # Map common variants
             if name == "happy": name = "laugh"
+            if name == "love": name = "wink" # Fallback since we didn't generate love assets yet
             
             # Optimization: If already playing this LOOPING animation, don't reset
             if loop and self.mode == "ANIMATING" and self.current_anim_name == name:
