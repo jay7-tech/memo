@@ -37,3 +37,4 @@ python-dotenv
 # Hardware (Raspberry Pi)
 spidev
 rpi-lgpio
+smbus2

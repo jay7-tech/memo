@@ -104,6 +104,15 @@ class MEMOApp:
         self.terminal_thread = threading.Thread(target=self._terminal_input_loop, daemon=True)
         self.terminal_thread.start()
         
+        # Touch Sensor (New)
+        try:
+            from interface.touch.manager import TouchManager
+            self.touch_manager = TouchManager()
+            self.touch_manager.start()
+        except Exception as e:
+            print(f"[Touch] Init skipped: {e}")
+            self.touch_manager = None
+        
         # Stats
         self.frame_count = 0
         
@@ -204,6 +213,18 @@ class MEMOApp:
                 status = "ENABLED" if new_state else "DISABLED"
                 speak(f"Voice {status}")
                 self.lcd.play("listening" if new_state else "silence", loop=False)
+
+        elif action == 'toggle_focus':
+            # Toggle Focus Mode (Tap 1)
+            new_state = not self.scene_state.focus_mode
+            self.event_bus.publish(Event(EventType.FOCUS_MODE_CHANGED, {'enabled': new_state}))
+            
+        elif action == 'sleep_mode':
+            # Sleep Mode (Tap 3)
+            print(">> SYSTEM: Manual Sleep Mode Triggered")
+            self.scene_state.sleep_request = True
+            self.lcd.play("sleep", loop=False)
+            speak("Going to sleep. Goodnight.")
     
     def _on_voice_command(self, event: Event):
         """Handle voice commands."""
