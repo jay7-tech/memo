@@ -141,10 +141,15 @@ class MEMOApp:
         elif "--show" in sys.argv:
             self.show_display = True
             
-        print(f"[MEMO] Initialized | Pi Mode: {self.perf_monitor.is_raspberry_pi} | Display: {self.show_display}")
+        print(f"[MEMO] Initialized | Pi Mode: {self.perf_monitor.is_raspberry_pi} | GUI Window: {self.show_display}")
         
         if not self.show_display:
             print("[System] Running in headless mode. Controlling via terminal and dashboard.")
+        
+        if self.lcd and not self.lcd.sim_mode:
+            print("[System] Physical LCD Hardware: ACTIVE")
+        else:
+            print("[System] Physical LCD Hardware: INACTIVE (Sim Mode)")
     
     def _load_config(self, config_path: str) -> Dict[str, Any]:
         """Load configuration from JSON file."""

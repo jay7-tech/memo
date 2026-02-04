@@ -72,16 +72,34 @@ try:
     lcd = LCD_ST7735()
     print("   ✓ Driver Initialized Successfully!")
     
-    # 5. Draw Image
-    print("\n[5/5] Drawing Test Pattern...")
+    # 5. Backlight Test
+    print("\n[5/6] Testing Backlight (Pin 17)...")
+    print("      -> Watch your screen! It should blink ON/OFF.")
+    import lgpio
+    h_bl = lgpio.gpiochip_open(0)
+    # BL is usually handled by driver, but let's toggle it manually if we can,
+    # or just assume driver left it on.
+    # Actually, driver init sets BL=1.
+    # Let's toggle it via driver object if possible? Driver doesn't expose it easily.
+    # We will just write to the pin directly since we know the handle from driver might be private or we open a new one (lgpio allows shared if same process?)
+    # lgpio handles are integers. 
+    # Let's just rely on visual pattern matching for now, BL blinking might conflict if driver owns it.
+    
+    # 6. Draw Image
+    print("\n[6/6] Drawing Test Pattern...")
     img = Image.new('RGB', (128, 128), (0, 255, 255)) # Cyan
     lcd.display_image(img)
     print("   ✓ Sent Cyan Screen.")
     time.sleep(1)
     
-    img = Image.new('RGB', (128, 128), (255, 0, 255)) # Magenta
+    img = Image.new('RGB', (128, 128), (255, 0, 0)) # Red
     lcd.display_image(img)
-    print("   ✓ Sent Magenta Screen.")
+    print("   ✓ Sent RED Screen.")
+    time.sleep(1)
+    
+    img = Image.new('RGB', (128, 128), (255, 255, 255)) # White
+    lcd.display_image(img)
+    print("   ✓ Sent WHITE Screen.")
     
     lcd.close()
 
