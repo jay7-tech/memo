@@ -178,10 +178,104 @@ def anim_warn(draw, i, total, layer='core'):
     if layer == 'core':
         pulse = (math.sin(i*0.5)+1)*0.5 # 0-1
         scale = 1.0 + pulse * 0.1
-        
-        # Draw No Phone
-        # White Phone, Red Slash
         draw_no_phone_icon(draw, 256, 256, scale, COLOR_WHITE)
+
+def anim_listening(draw, i, total, layer='core'):
+    # Pulse size rapidly
+    pulse = math.sin((i/total) * math.pi * 4) # Fast pulse
+    scale = 1.0 + (pulse * 0.05)
+    
+    w = 180 * scale
+    h = 240 * scale
+    
+    fill = COLOR_CYAN
+    if layer == 'glow':
+        fill = (0, 255, 255, 100)
+        w += 20
+        h += 20
+    else:
+         fill = (0, 255, 255, 255)
+         
+    draw_vector_eye(draw, 140, 256, w, h, fill, mood='neutral')
+    draw_vector_eye(draw, 372, 256, w, h, fill, mood='neutral')
+
+def anim_thinking(draw, i, total, layer='core'):
+    # Eyes look up/around
+    # Use Sine to move pupils/eyes? 
+    # Just moving the whole eye shape for vector style
+    
+    dx = math.sin((i/total) * math.pi * 2) * 20
+    dy = math.cos((i/total) * math.pi * 4) * 15 # Faster vertical
+    
+    w = 180
+    h = 240
+    
+    fill = COLOR_BLUE
+    if layer == 'glow':
+        fill = (0, 120, 255, 100)
+        w += 20
+        h += 20
+    else:
+        fill = (0, 120, 255, 255)
+        
+    # Asymmetric movement? No, look together
+    draw_vector_eye(draw, 140+dx, 256-dy, w, h, fill, mood='neutral')
+    draw_vector_eye(draw, 372+dx, 256-dy, w, h, fill, mood='neutral')
+
+def anim_blink(draw, i, total, layer='core'):
+    # 0-10: Open
+    # 10-15: Closing
+    # 15-20: Closed
+    # 20-25: Opening
+    # 25-30: Open
+    
+    h_scale = 1.0
+    if 10 <= i < 15:
+        h_scale = 1.0 - ((i-10)/5.0)
+    elif 15 <= i < 20:
+        h_scale = 0.1 # Flat line
+    elif 20 <= i < 25:
+        h_scale = 0.1 + ((i-20)/5.0)
+        
+    w = 180
+    h = 240 * h_scale
+    if h < 10: h = 10
+    
+    fill = COLOR_CYAN
+    if layer == 'glow':
+        fill = (0, 255, 255, 100)
+        w += 20
+        h += 20
+    else:
+        fill = (0, 255, 255, 255)
+        
+    draw_vector_eye(draw, 140, 256, w, h, fill)
+    draw_vector_eye(draw, 372, 256, w, h, fill)
+
+def anim_wink(draw, i, total, layer='core'):
+    # Right eye blinks (Wink)
+    h_scale = 1.0
+    if 5 <= i < 15: # Close
+        h_scale = 0.1
+        
+    w = 180
+    h = 240
+    
+    fill = COLOR_CYAN
+    if layer == 'glow':
+        fill = (0, 255, 255, 100)
+        w += 20
+        h += 20
+    else:
+        fill = (0, 255, 255, 255)
+        
+    # Left logic (Open)
+    draw_vector_eye(draw, 140, 256, w, h, fill)
+    
+    # Right logic (Blink)
+    h_right = h * h_scale
+    if h_right < 10: h_right = 10
+    draw_vector_eye(draw, 372, 256, w, h_right, fill)
 
 def generate():
     print("Generating Glow-Enhanced Ultimate Assets...")
@@ -199,6 +293,26 @@ def generate():
     d = ensure_clean_dir("focus_warning")
     for i in range(20):
         img = render_frame_with_glow(anim_warn, i, 20)
+        img.save(os.path.join(d, f"frame_{i:03d}.png"))
+        
+    d = ensure_clean_dir("thinking")
+    for i in range(30):
+        img = render_frame_with_glow(anim_thinking, i, 30)
+        img.save(os.path.join(d, f"frame_{i:03d}.png"))
+        
+    d = ensure_clean_dir("listening")
+    for i in range(20):
+        img = render_frame_with_glow(anim_listening, i, 20)
+        img.save(os.path.join(d, f"frame_{i:03d}.png"))
+        
+    d = ensure_clean_dir("blink")
+    for i in range(30):
+        img = render_frame_with_glow(anim_blink, i, 30)
+        img.save(os.path.join(d, f"frame_{i:03d}.png"))
+        
+    d = ensure_clean_dir("wink")
+    for i in range(20): # Short
+        img = render_frame_with_glow(anim_wink, i, 20)
         img.save(os.path.join(d, f"frame_{i:03d}.png"))
         
     print("Done.")

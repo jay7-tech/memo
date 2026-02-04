@@ -33,3 +33,7 @@ colorlog>=6.8.0
 pyyaml>=6.0
 psutil>=5.9.0
 python-dotenv
+
+# Hardware (Raspberry Pi)
+spidev
+rpi-lgpio
