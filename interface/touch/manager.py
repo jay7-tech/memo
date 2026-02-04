@@ -22,7 +22,8 @@ class TouchManager:
         self.is_pressed = False
         
         # Config
-        self.tap_gap_ms = 400 # Max time between taps to count as sequence
+        self.tap_gap_ms = 700 # Increased from 400ms to allow easier double taps
+        self.min_press_ms = 0.05 # 50ms min duration to ignore "table bumps"
         self.hold_ms = 1000 # Time for HOLD event? (Future)
         
         # Try Loading Driver
@@ -65,24 +66,47 @@ class TouchManager:
             
             # DEBUG: Print press state changes
             if pressed and not self.is_pressed:
-                print(f"[Touch] DEBUG: Key Pressed! (Mask: {keys})")
+                # Potential PRESS
+                if not self.in_transaction:
+                    # Clean start
+                    print(f"[Touch] DEBUG: Key Pressed! (Mask: {keys})")
+                    self.is_pressed = True
+                    self.tap_count += 1
+                    self.last_tap_time = now
+                    self.in_transaction = True
+                else:
+                    # Part of sequence
+                    self.is_pressed = True
+                    self.last_tap_time = now # Update time on press for gap measurement?
+                    # Usually gap is measured from Release. Let's keep it simple: Reset timer on fresh press.
+                    print(f"[Touch] DEBUG: Key Pressed Again! (Mask: {keys})")
             
-            if pressed and not self.is_pressed:
-                # PRESS EVENT
-                self.is_pressed = True
-                self.tap_count += 1
-                self.last_tap_time = now
-                self.in_transaction = True
-                # print(f"[Touch] Press! (Count: {self.tap_count})")
-                
+            elif pressed and self.is_pressed:
+                 # Holding...
+                 pass
+
             elif not pressed and self.is_pressed:
                 # RELEASE EVENT
                 self.is_pressed = False
+                # Check for "blip"
+                press_duration = now - self.last_tap_time
+                if press_duration < self.min_press_ms:
+                    print(f"[Touch] Ignored short spike ({press_duration:.3f}s)")
+                    if self.tap_count > 0: self.tap_count -= 1 # Undo the count
+                    if self.tap_count == 0: self.in_transaction = False
+                else:
+                    # Valid release
+                    # If this was a new press in a transaction, count incremented above.
+                    # Wait for timeout.
+                    pass
                 
             # Check Timeout for Tap Transaction
-            if self.in_transaction and (now - self.last_tap_time > (self.tap_gap_ms / 1000.0)):
-                if not self.is_pressed: # Only fire if released
-                    self._fire_gesture(self.tap_count)
+            # We check timeout from the LAST ACTION (meaning, give user time to press again)
+            # If released, and time > gap -> FIRE.
+            if self.in_transaction and not self.is_pressed:
+                 if (now - self.last_tap_time > (self.tap_gap_ms / 1000.0)):
+                    if self.tap_count > 0:
+                        self._fire_gesture(self.tap_count)
                     self.tap_count = 0
                     self.in_transaction = False
             

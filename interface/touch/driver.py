@@ -41,6 +41,16 @@ class QT2120:
         if not I2C_AVAILABLE:
             return
 
+class QT2120:
+    def __init__(self, bus_id=1, address=QT2120_ADDRESS):
+        self.bus_id = bus_id
+        self.address = address
+        self.bus = None
+        self.connected = False
+        
+        if not I2C_AVAILABLE:
+            return
+
         try:
             self.bus = SMBus(bus_id)
             # Check Chip ID
@@ -50,12 +60,27 @@ class QT2120:
                 print("[Touch] ✓ QT2120 Connected")
                 self.connected = True
                 self.reset()
+                # Set Thresholds (Based on user C++ snippet using Reg 0x10)
+                # Lower = More Sensitive? Higher = Less Sensitive?
+                # Usually Threshold = Signal Delta. False positives = Noise > Threshold.
+                # So we need to INCREASE threshold to reduce false positives.
+                # Default might be 10-20. Let's try 30 (0x1E).
+                self.set_threshold(30) 
                 self.calibrate()
             else:
                 print(f"[Touch] ❌ ID Mismatch (Exp 0x3E, Got 0x{chip_id:02X}). Wiring issue?")
         except Exception as e:
             print(f"[Touch] Init Error: {e}")
             self.connected = False
+
+    def set_threshold(self, value):
+        """Set detection threshold (0-255). reg 0x10 seems to be Key0 or Global Thresh."""
+        print(f"[Touch] Setting threshold to {value}")
+        # User snippet: I2Cwrite_Multibyte(.., 0x10, &dat1, 0x01)
+        # We'll write to 0x10. If there are multiple keys, they might be 0x10, 0x11...
+        # Let's write to 0x10 through 0x14 just to be safe for first few keys
+        for reg in range(0x10, 0x14): 
+            self.write_reg(reg, value)
 
     def read_reg(self, reg):
         try:
