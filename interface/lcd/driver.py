@@ -69,7 +69,7 @@ class LCD_ST7735:
             self.spi.writebytes([data])
 
     def init_display(self):
-        """Initialize ST7735 display"""
+        """Initialize ST7735 display (Green Tab 128x128 Standard)"""
         # SWRESET
         self.write_cmd(0x01)
         time.sleep(0.150)
@@ -78,24 +78,79 @@ class LCD_ST7735:
         self.write_cmd(0x11)
         time.sleep(0.200)
         
+        # FRMCTR1 (Frame Rate Control) - Standard values
+        self.write_cmd(0xB1)
+        self.write_data([0x01, 0x2C, 0x2D])
+        
+        # FRMCTR2
+        self.write_cmd(0xB2)
+        self.write_data([0x01, 0x2C, 0x2D])
+        
+        # FRMCTR3
+        self.write_cmd(0xB3)
+        self.write_data([0x01, 0x2C, 0x2D, 0x01, 0x2C, 0x2D])
+        
+        # INVCTR (Display Inversion Control)
+        self.write_cmd(0xB4)
+        self.write_data(0x07)
+        
+        # PWCTR1 (Power Control 1)
+        self.write_cmd(0xC0)
+        self.write_data([0xA2, 0x02, 0x84])
+        
+        # PWCTR2 (Power Control 2)
+        self.write_cmd(0xC1)
+        self.write_data(0xC5)
+        
+        # PWCTR3 (Power Control 3)
+        self.write_cmd(0xC2)
+        self.write_data([0x0A, 0x00])
+        
+        # PWCTR4 (Power Control 4)
+        self.write_cmd(0xC3)
+        self.write_data([0x8A, 0x2A])
+        
+        # PWCTR5 (Power Control 5)
+        self.write_cmd(0xC4)
+        self.write_data([0x8A, 0xEE])
+        
+        # VMCTR1 (VCOM Control 1)
+        self.write_cmd(0xC5)
+        self.write_data(0x0E)
+        
+        # INVOFF (Inversion Off) - Correct for Green Tab? Usually off.
+        # Use 0x20 for Off, 0x21 for On. User reported white, so try Inv On first?
+        # Let's stick to standard Green Tab which usually needs Inversion OFF (0x20)
+        # BUT many clones need Inversion ON (0x21). I'll default to 0x21 (On) as it fixes the 'White Ghost'
+        self.write_cmd(0x21) 
+        
+        # MADCTL - Memory Access Control (BGR color)
+        self.write_cmd(0x36)
+        self.write_data(0xC8) # 0xC8 = MY, MX, BGR
+        
         # COLMOD - 16-bit color
         self.write_cmd(0x3A)
         self.write_data(0x05) 
         
-        # MADCTL - Memory Access Control
-        self.write_cmd(0x36)
-        self.write_data(0xC8) # default BGR
+        # CASET (Column Address Set)
+        self.write_cmd(0x2A)
+        self.write_data([0x00, 0x02, 0x00, 0x81]) # 2 to 129 (128w)
         
-        # GAMSET (Gamma) - Default curve 1
-        self.write_cmd(0x26)
-        self.write_data(0x01)
+        # RASET (Row Address Set)
+        self.write_cmd(0x2B)
+        self.write_data([0x00, 0x01, 0x00, 0x80]) # 1 to 128 (128h)
+        
+        # GMCTRP1 (Gamma)
+        self.write_cmd(0xE0)
+        self.write_data([0x02, 0x1C, 0x07, 0x12, 0x37, 0x32, 0x29, 0x2D, 0x29, 0x25, 0x2B, 0x39, 0x00, 0x01, 0x03, 0x10])
+        
+        # GMCTRN1 (Gamma)
+        self.write_cmd(0xE1)
+        self.write_data([0x03, 0x1D, 0x07, 0x06, 0x2E, 0x2C, 0x29, 0x2D, 0x2E, 0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10])
         
         # DISPON
         self.write_cmd(0x29)
         time.sleep(0.100)
-        
-        # INVON (Inversion On) - Many ST7735 panels need this to fix "White/Washed out" look
-        self.write_cmd(0x21)
 
     def set_window(self, x_start, y_start, x_end, y_end):
         # Adjust for offset
