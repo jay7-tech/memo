@@ -23,7 +23,7 @@ class TouchManager:
         
         # Config
         self.tap_gap_ms = 700 # Increased from 400ms to allow easier double taps
-        self.min_press_ms = 0.05 # 50ms min duration to ignore "table bumps"
+        self.min_press_ms = 0.1 # 100ms min duration to ignore "table bumps" (Up from 50ms)
         self.hold_ms = 1000 # Time for HOLD event? (Future)
         
         # Try Loading Driver

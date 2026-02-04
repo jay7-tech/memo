@@ -84,7 +84,11 @@ class EventBus:
                 
                 # Execute each callback in the thread pool
                 for callback in callbacks:
-                    self._executor.submit(self._safe_execute, callback, event)
+                    if not self._running: break # Prevent scheduling after stop
+                    try:
+                        self._executor.submit(self._safe_execute, callback, event)
+                    except RuntimeError:
+                        pass # Executor closed
                     
             except queue.Empty:
                 continue
