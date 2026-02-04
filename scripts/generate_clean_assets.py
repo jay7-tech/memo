@@ -6,9 +6,11 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageOps
 
 # Config
+# Config
 TARGET_SIZE = (128, 128)
 CANVAS_SIZE = (512, 512) # 4x Supersampling for Crisp Look
-ASSETS_DIR = r"c:\Users\JAYADEEP GOWDA K B\Desktop\MEMO\interface\lcd\assets"
+# Use relative path compatible with both Windows and Pi
+ASSETS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "interface", "lcd", "assets"))
 
 # Palette (Clean Vector Aesthetic)
 BG_COLOR = (20, 20, 25)       # Matte Dark

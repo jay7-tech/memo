@@ -5,7 +5,7 @@ import random
 from PIL import Image, ImageDraw, ImageFont
 
 # Config
-ASSET_DIR = r"c:\Users\JAYADEEP GOWDA K B\Desktop\MEMO\interface\lcd\assets\selfie_cam"
+ASSET_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "interface", "lcd", "assets", "selfie_cam"))
 TARGET_SIZE = (128, 128)
 CANVAS_SIZE = (512, 512) # 4x Supersampling for Vector Look
 

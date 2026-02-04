@@ -6,9 +6,12 @@ import random
 from PIL import Image, ImageDraw, ImageFilter
 
 # Config
+# Config
 TARGET_SIZE = (128, 128)
 CANVAS_SIZE = (512, 512) # 4x Supersampling
-ASSETS_DIR = r"c:\Users\JAYADEEP GOWDA K B\Desktop\MEMO\interface\lcd\assets"
+# Use relative path compatible with both Windows and Pi
+params_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "interface", "lcd", "assets"))
+ASSETS_DIR = params_path
 
 # Palette (Ultimate Aesthetic)
 BG_COLOR = (10, 10, 15)       # Almost Black
