@@ -19,24 +19,51 @@ REG_KEY_STATUS_1 = 0x03
 
 def check_i2c():
     """Scan simple I2C."""
-    print("\n[Hardware] Scanning I2C Bus 1...")
+    print("\n[Hardware] Scanning I2C Bus 1 for ANY devices...")
     bus = SMBus(1)
-    found = False
-    try:
-        # Try reading Chip ID
-        chip_id = bus.read_byte_data(QT2120_ADDRESS, REG_CHIP_ID)
-        print(f"   -> Read Address 0x{QT2120_ADDRESS:02X} => Chip ID: 0x{chip_id:02X}")
-        if chip_id == 0x3E:
-            print("   ✓ QT2120 Touch Sensor DETECTED!")
-            found = True
+    found_addr = None
+    
+    # SCANNER LOOP
+    print("      00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f")
+    for row in range(0, 128, 16):
+        sys.stdout.write(f"   {row:02x}:")
+        for col in range(16):
+            addr = row + col
+            if addr < 0x03 or addr > 0x77:
+                sys.stdout.write("   ")
+                continue
+            
+            try:
+                # Try reading a byte
+                bus.read_byte(addr)
+                sys.stdout.write(f" {addr:02X}")
+                found_addr = addr
+            except OSError:
+                sys.stdout.write(" --")
+        sys.stdout.write("\n")
+        
+    if found_addr:
+        print(f"\n   ✨ Found Device at: 0x{found_addr:02X}")
+        if found_addr == QT2120_ADDRESS:
+            print("      (Matches Default QT2120 Address!)")
+            # Try Chip ID check only if address matches or we force it
+            try:
+                chip_id = bus.read_byte_data(found_addr, REG_CHIP_ID)
+                print(f"      Chip ID: 0x{chip_id:02X}")
+            except:
+                print("      Could not read Chip ID.")
+            return True
         else:
-            print(f"   ⚠️ Device found but ID mismatch (Expected 0x3E).")
-    except Exception as e:
-        print(f"   ❌ Failed to read 0x{QT2120_ADDRESS:02X}: {e}")
-        print("      (Check SDA=Pin3, SCL=Pin5, VCC=3.3V, GND=Pin6)")
+            print(f"      ⚠️ Address mismatch (Expected 0x{QT2120_ADDRESS:02X})")
+            print(f"      Please update driver.py to use address 0x{found_addr:02X}")
+            return False
+    else:
+        print("\n   ❌ No devices found on bus.")
+        print("      Check Wiring: SDA->Pin3, SCL->Pin5")
+        return False
     
     bus.close()
-    return found
+    return False
 
 def run_tap_test():
     """Run a loop to detect taps."""

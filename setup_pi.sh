@@ -13,7 +13,20 @@ if grep -q "dtparam=spi=on" /boot/config.txt; then
 else
     echo "   + Enabling SPI interface..."
     echo "dtparam=spi=on" | sudo tee -a /boot/config.txt > /dev/null
-    echo "   ⚠️ SPI Enabled. A REBOOT will be required after this script finishes!"
+    echo "   ⚠️ SPI Enabled."
+    NEED_REBOOT=true
+fi
+
+# 1.5 Enable I2C Interface (Touch Sensor)
+echo "[1/4b] Checking Hardware Config (I2C)..."
+if grep -q "dtparam=i2c_arm=on" /boot/config.txt; then
+    echo "   ✓ I2C is already enabled."
+else
+    echo "   + Enabling I2C interface..."
+    echo "dtparam=i2c_arm=on" | sudo tee -a /boot/config.txt > /dev/null
+    # Also load module now if possible
+    sudo modprobe i2c-dev
+    echo "   ⚠️ I2C Enabled. REBOOT required."
     NEED_REBOOT=true
 fi
 
