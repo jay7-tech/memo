@@ -269,20 +269,25 @@ speech.Speak text
             import comtypes.client
             
             # Initialize COM object (Thread-local)
-            if not hasattr(self, '_sapi_speaker'):
+            if not hasattr(self, '_sapi_speaker') or self._sapi_speaker is None:
                 print("[TTS] Initializing SAPI COM...")
-                self._sapi_speaker = comtypes.client.CreateObject("SAPI.SpVoice")
-                
-                # Select Zira voice
-                voices = self._sapi_speaker.GetVoices()
-                for i in range(voices.Count):
-                    voice = voices.Item(i)
-                    if "Zira" in voice.GetDescription() or "Eva" in voice.GetDescription():
-                        self._sapi_speaker.Voice = voice
-                        break
-                        
-                self._sapi_speaker.Rate = 1  # Moderate speed
-                self._sapi_speaker.Volume = 100
+                try:
+                    self._sapi_speaker = comtypes.client.CreateObject("SAPI.SpVoice")
+                    
+                    # Select Zira voice
+                    voices = self._sapi_speaker.GetVoices()
+                    for i in range(voices.Count):
+                        voice = voices.Item(i)
+                        if "Zira" in voice.GetDescription() or "Eva" in voice.GetDescription():
+                            self._sapi_speaker.Voice = voice
+                            break
+                            
+                    self._sapi_speaker.Rate = 1  # Moderate speed
+                    self._sapi_speaker.Volume = 100
+                except Exception as e:
+                    print(f"[TTS] SAPI Init Failed: {e}")
+                    self._sapi_speaker = None
+                    raise # Trigger fallback
                 
             # Clean text
             speech_text = self._clean_text(text)
@@ -294,9 +299,20 @@ speech.Speak text
             self._sapi_speaker.Speak(speech_text)
             
         except Exception as e:
-            print(f"[TTS SAPI Direct error] {e}")
+            print(f"[TTS SAPI Direct Error] {e} -> Fallback to VBScript")
+            # Force re-init next time
+            self._sapi_speaker = None
             # Fallback
             self._speak_sapi(text)
+
+    def stop_current(self):
+        """Stop current speech and clear queue."""
+        # Clear queue
+        with self.queue.mutex:
+            self.queue.queue.clear()
+        print("[TTS] Queue cleared.")
+        # Note: Interrupting SAPI synchronous speak from another thread is hard with COM.
+        # We rely on short sentences.
     
     def speak(self, text: str):
         """Queue text to be spoken (non-blocking)."""

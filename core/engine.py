@@ -194,6 +194,8 @@ class PerceptionPipeline:
         # Cached results
         self._last_detections = []
         self._last_pose = None
+        self._last_all_poses = [] 
+        self._last_primary_bbox = None # Spatial Tracker
         self._last_identity = None
         self._last_face_score = 0.0
         
@@ -300,34 +302,137 @@ class PerceptionPipeline:
                 
             if 'pose' in futures:
                 try:
-                    results['pose'] = futures['pose'].result(timeout=0.1)
-                    self._last_pose = results['pose']
+                    all_poses = futures['pose'].result(timeout=0.1)
+                    # Cache all poses for next face rec cycle
+                    self._last_all_poses = all_poses
+                    
+                    # Default primary pose = Largest (index 0 due to sorting in PoseEstimator?) 
+                    # Actually PoseEstimator just appends. Let's start with first.
+                    if all_poses:
+                        # Sort by area
+                        sorted_poses = sorted(all_poses, key=lambda x: x.get('area',0), reverse=True)
+                        self._last_pose = sorted_poses[0] # Default to largest
+                    else:
+                        self._last_pose = None
+                        
+                    results['pose'] = self._last_pose
                 except concurrent.futures.TimeoutError:
                     pass
                 
             if 'identity' in futures:
                 try:
-                    res = futures['identity'].result(timeout=0.1) # Increased timeout for CPU calculation
+                    # Async Face Rec returns (Name, Score, MatchingPose)
+                    res = futures['identity'].result(timeout=0.2)
+                    
                     if res:
-                         self._last_identity, self._last_face_score = res
+                        # 1. Strong Match Found
+                        name, score, matching_pose = res
+                        self._last_identity = name
+                        self._last_face_score = score
+                        self._last_pose = matching_pose
+                        
+                        # Update tracking bbox
+                        try:
+                            kp = matching_pose['keypoints']
+                            xs = [p[0] for p in kp.values()]
+                            ys = [p[1] for p in kp.values()]
+                            self._last_primary_bbox = [min(xs), min(ys), max(xs)-min(xs), max(ys)-min(ys)]
+                        except:
+                            self._last_primary_bbox = None
+                            
                     else:
-                         self._last_identity, self._last_face_score = None, 0.0
+                        # 2. No Match Found (Blur/Angle) -> Fallback to Spatial Tracking
+                        self._last_identity = None
+                        self._last_face_score = 0.0
+                        
+                        # Try to recover the Primary Person using spatial tracking (IOU)
+                        if self._last_primary_bbox and self._last_all_poses:
+                            bx, by, bw, bh = self._last_primary_bbox
+                            best_iou = 0.0
+                            tracked_pose = None
+                            
+                            for pose in self._last_all_poses:
+                                try:
+                                    kp = pose['keypoints']
+                                    pxs = [p[0] for p in kp.values()]
+                                    pys = [p[1] for p in kp.values()]
+                                    pw, ph = max(pxs)-min(pxs), max(pys)-min(pys)
+                                    px, py = min(pxs), min(pys)
+                                    
+                                    # IOU
+                                    ix1 = max(bx, px)
+                                    iy1 = max(by, py)
+                                    ix2 = min(bx+bw, px+pw)
+                                    iy2 = min(by+bh, py+ph)
+                                    
+                                    if ix2 > ix1 and iy2 > iy1:
+                                        inter = (ix2-ix1)*(iy2-iy1)
+                                        union = (bw*bh) + (pw*ph) - inter
+                                        iou = inter / union
+                                        if iou > best_iou:
+                                            best_iou = iou
+                                            tracked_pose = pose
+                                except:
+                                    continue
+                            
+                            if best_iou > 0.3: # Decent overlap maintenance
+                                self._last_pose = tracked_pose
+                                # Update tracking bbox (drift)
+                                try:
+                                    kp = tracked_pose['keypoints']
+                                    pxs = [p[0] for p in kp.values()]
+                                    pys = [p[1] for p in kp.values()]
+                                    self._last_primary_bbox = [min(pxs), min(pys), max(pxs)-min(pxs), max(pys)-min(pys)]
+                                except:
+                                    pass
+                            else:
+                                # Tracking lost
+                                self._last_primary_bbox = None
                     
                     results['identity'] = self._last_identity
                     results['face_score'] = self._last_face_score
+                    results['pose'] = self._last_pose # Ensure this overrides the default
+                    
                 except concurrent.futures.TimeoutError:
                     pass
                     
         except Exception as e:
             # Outer catch for unexpected implementation errors
-            print(f"[Perception] Pipeline error: {e}")
+            print(f"[Perception] Pipeline error: {e}") 
             
         return results
     
-    def _async_face_rec(self, frame) -> Optional[str]:
-        """Helper for parallel face recognition."""
-        if self._last_pose:
-            return self._recognize_face(frame, self._last_pose)
+    def _async_face_rec(self, frame) -> Optional[tuple]:
+        """
+        Helper for parallel face recognition.
+        Iterates through ALL tracked poses to find a registered user.
+        Returns: (Identity, Score, MatchingPoseDict) or None
+        """
+        if not self._last_all_poses: # Use the full list!
+            return None
+            
+        poses = self._last_all_poses
+        
+        best_match = None
+        best_score = 0.0
+        best_pose = None
+        
+        for pose in poses:
+            # Run Face Rec on this pose
+            res = self._recognize_face(frame, pose)
+            if res:
+                name, score = res
+                # Logic: Prioritize registered users over unknown
+                # If we find a registered user, that's our Primary Human.
+                if score > self.config.get('face_threshold', 0.6):
+                    if score > best_score:
+                        best_score = score
+                        best_match = name
+                        best_pose = pose
+        
+        if best_match:
+            return best_match, best_score, best_pose
+            
         return None
 
     def _recognize_face(self, frame, pose_data) -> Optional[tuple]:
@@ -339,28 +444,24 @@ class PerceptionPipeline:
         if 'NOSE' not in kp:
             return None
         
-        # Construct face bounding box from keypoints
+        # BBox estimation from Ear/Nose
         nose = kp['NOSE']
-        
-        # Use ear distance for face width if available
         if 'LEFT_EAR' in kp and 'RIGHT_EAR' in kp:
             l_ear = kp['LEFT_EAR']
             r_ear = kp['RIGHT_EAR']
             ear_dist = abs(l_ear[0] - r_ear[0])
-            # v1.1 Accuracy Fix: Widen crop to include full head context
             face_w = int(ear_dist * 2.5) 
         else:
-            face_w = 180  # Slightly larger default
+            face_w = 180 
 
-        face_h = int(face_w * 1.4) # Capture more chin/forehead
+        face_h = int(face_w * 1.4) 
         x = int(nose[0]) - face_w // 2
         y = int(nose[1]) - face_h // 2
         
         if self._face_rec:
-            # Pass keypoints for alignment
-            return self._face_rec.recognize(frame, [x, y, face_w, face_h], keypoints=kp)
+            # Pass bbox to restrict recognition to this person
+            return self._face_rec.recognize(frame, bbox=[x, y, face_w, face_h])
         return None
-
 
 class CommandProcessor:
     """

@@ -523,7 +523,14 @@ class MEMOApp:
                             print(">> SYSTEM: Registration failed. Look closer.")
         
         # Selfie trigger
+        # Only capture if both Trigger is ON AND we have passed the scheduled time
+        # (This allows the animation to play the 'Flash' first)
         if self.scene_state.selfie_trigger:
+            current_time = time.time()
+            if self.scene_state.selfie_scheduled_time > 0 and current_time < self.scene_state.selfie_scheduled_time:
+                # Wait for animation...
+                return
+                
             clean_frame = frame.copy()
             timestamp_str = time.strftime("%Y%m%d-%H%M%S")
             filename = f"selfie_{timestamp_str}.jpg"
@@ -531,6 +538,7 @@ class MEMOApp:
             print(f">> SYSTEM: Saved {filename}")
             speak("Great shot! Photo saved.")
             self.scene_state.selfie_trigger = False
+            self.scene_state.selfie_scheduled_time = 0.0
     
     def _draw_overlay(self, frame, perception_result):
         """Draw debug overlay on frame."""
@@ -545,18 +553,46 @@ class MEMOApp:
             
             color = (0, 255, 0)  # Green
             
-            # Show Identity on Person Box
+            # Show Identity on Person Box - ONLY if it matches the tracked Primary Human
             if label == 'person':
-                identity = self.scene_state.human.get('identity')
-                face_score = self.scene_state.human.get('face_score', 0.0) # Need to ensure this is stored
-                
-                # Retrieve score if available (It might be in perception result or state)
-                # Actually scene_state stores 'identity' but not explicitly 'face_score' in the human dict usually?
-                # Let's check update_state.
-                if identity:
-                     # If we have a cached score, show it
-                    label = f"{identity} ({face_score:.2f})"
-                    color = (0, 255, 255) # Yellow for recognized
+                # Check match with scene_state.human
+                is_primary_human = False
+                if self.scene_state.human['present'] and self.scene_state.human['keypoints']:
+                    # Reconstruct bbox from keypoints to compare
+                    kp = self.scene_state.human['keypoints']
+                    try:
+                        xs = [p[0] for p in kp.values()]
+                        ys = [p[1] for p in kp.values()]
+                        hx1, hy1 = min(xs), min(ys)
+                        hx2, hy2 = max(xs), max(ys)
+                        
+                        # Compare with current detection bbox (x, y, w, h)
+                        dx1, dy1 = x, y
+                        dx2, dy2 = x+w, y+h
+                        
+                        # IOU Calc
+                        ix1 = max(hx1, dx1)
+                        iy1 = max(hy1, dy1)
+                        ix2 = min(hx2, dx2)
+                        iy2 = min(hy2, dy2)
+                        
+                        if ix2 > ix1 and iy2 > iy1:
+                            inter = (ix2-ix1)*(iy2-iy1)
+                            union = ((hx2-hx1)*(hy2-hy1)) + (w*h) - inter
+                            if (inter / union) > 0.3: # Loose overlap threshold
+                                is_primary_human = True
+                    except:
+                        pass
+
+                if is_primary_human:
+                    identity = self.scene_state.human.get('identity')
+                    face_score = self.scene_state.human.get('face_score', 0.0)
+                    
+                    if identity:
+                        label = f"{identity} ({face_score:.2f})"
+                        color = (0, 255, 255) # Yellow for recognized
+                    else:
+                        label = f"Person (Primary)"
                 else:
                     label = f"Person ({conf:.2f})"
             elif label == 'cell phone' and self.scene_state.focus_mode:
@@ -674,7 +710,21 @@ class MEMOApp:
                         break
                     except:
                         pass
-                
+
+                elif cmd_lower == 's' or cmd_lower == 'selfie' or cmd_lower == 'cheese':
+                    print("\n>> SYSTEM: Triggering Selfie Mode 📸")
+                    
+                    # Schedule capture for 3.0s (50 frames * ~60ms)
+                    self.scene_state.selfie_trigger = True
+                    self.scene_state.selfie_scheduled_time = time.time() + 3.0
+                    
+                    self.event_bus.publish(Event(
+                        EventType.SYSTEM_ALERT,
+                        {'action': 'take_selfie'} # Just for logging/other listeners
+                    ))
+                    # Trigger LCD immediately
+                    self.lcd.trigger_selfie()
+                    
                 else:
                     # Process as command
                     # Process as command
@@ -689,9 +739,11 @@ class MEMOApp:
                             speak(response)
                     else:
                         # Pass to query handler (Pass personality for LLM fallback)
+                        self.lcd.set_thinking()
                         response = self.query_handler.handle_query(user_input, self.scene_state, personality=self.personality)
                         if response:
                             print(f">> MEMO: {response}")
+                            self.lcd.set_speaking()
                             speak(response)
                             # Log to dashboard
                             from interface.dashboard import add_log
@@ -845,6 +897,8 @@ class MEMOApp:
                     ))
                 elif key == ord('s'):
                     self.scene_state.selfie_trigger = True
+                    self.scene_state.selfie_scheduled_time = time.time() + 3.0
+                    self.lcd.trigger_selfie()
                 elif key == ord('v') and self.voice_input:
                     new_state = not self.voice_input.is_listening_active
                     self.voice_input.set_active(new_state)

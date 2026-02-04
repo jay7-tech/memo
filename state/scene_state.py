@@ -88,6 +88,7 @@ class SceneState:
         self.verbose_logging = False # Toggle dashboard/terminal logs
         
         self.selfie_trigger = False # Flag for snapshot
+        self.selfie_scheduled_time = 0.0 # Delay for animation sync
         self.last_distraction_alert = 0.0 # Cooldown for focus mode nagging
         
         # Dashboard communication

@@ -158,13 +158,50 @@ class FaceRecONNX:
         return True
 
     def recognize(self, frame, bbox=None, keypoints=None):
-        """Recognize face in frame."""
+        """
+        Recognize face in frame.
+        Args:
+            frame: Image
+            bbox: Optional [x, y, w, h] target area (e.g. from tracker/pose) to limit recognition.
+        """
         faces = self.detect(frame)
-        if faces is None: return None, 0.0
+        if faces is None or len(faces) == 0: return None, 0.0
         
-        best_face = sorted(faces, key=lambda x: x[2]*x[3], reverse=True)[0]
+        target_face = None
         
-        current_emb = self.get_features(frame, best_face)
+        if bbox:
+            # Find face matching the provided bbox (IOU)
+            bx, by, bw, bh = bbox
+            max_iou = 0.0
+            
+            for face in faces:
+                # face: [x, y, w, h, ...]
+                fx, fy, fw, fh = face[:4]
+                
+                # Calculate IOU
+                ix = max(bx, fx)
+                iy = max(by, fy)
+                iw = min(bx+bw, fx+fw) - ix
+                ih = min(by+bh, fy+fh) - iy
+                
+                if iw > 0 and ih > 0:
+                    inter = iw * ih
+                    union = (bw*bh) + (fw*fh) - inter
+                    iou = inter / union
+                    if iou > max_iou:
+                        max_iou = iou
+                        target_face = face
+                        
+            if max_iou < 0.1: # Threshold IOU
+                # print(f"No matching face for bbox found (Max IoU: {max_iou:.2f})")
+                return None, 0.0
+        else:
+            # Default: Largest face
+            target_face = sorted(faces, key=lambda x: x[2]*x[3], reverse=True)[0]
+            
+        if target_face is None: return None, 0.0
+        
+        current_emb = self.get_features(frame, target_face)
         
         best_name = None
         best_score = 0.0
@@ -180,15 +217,11 @@ class FaceRecONNX:
                 score = self.recognizer.match(curr_emb_reshaped, known_emb_reshaped, cv2.FaceRecognizerSF_FR_COSINE)
                 if score > local_best: local_best = score
             
-            # Debug: View raw score
-            # print(f"Checking {name}: {local_best:.3f}")
-            
             if local_best > best_score:
                 best_score = local_best
                 best_name = name
         
         if best_score > self.threshold:
-            # print(f"MATCH: {best_name} ({best_score:.3f})")
             return best_name, best_score
         
         return None, best_score

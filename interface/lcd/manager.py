@@ -88,7 +88,7 @@ class LCDManager:
                         pass
                 if frames:
                     self.anims[folder.name] = frames
-                    # print(f"  - Loaded {folder.name} ({len(frames)} frames)")
+                    print(f"  - Loaded {folder.name} ({len(frames)} frames)")
         
         # Set default
         self.current_frames = self.anims.get("idle_center", [])
@@ -114,6 +114,7 @@ class LCDManager:
             if name == "happy": name = "laugh"
             
             if name not in self.anims:
+                print(f"[LCD] ⚠️ Animation '{name}' not found! Available: {list(self.anims.keys())}")
                 return 
 
             self.current_frames = self.anims[name]
