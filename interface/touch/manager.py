@@ -22,8 +22,8 @@ class TouchManager:
         self.is_pressed = False
         
         # Config
-        self.tap_gap_ms = 700 # Increased from 400ms to allow easier double taps
-        self.min_press_ms = 0.1 # 100ms min duration to ignore "table bumps" (Up from 50ms)
+        self.tap_gap_ms = 800 # Increased to 800ms (Generous window)
+        self.min_press_ms = 0.15 # 150ms min duration (Must be a deliberate press)
         self.hold_ms = 1000 # Time for HOLD event? (Future)
         
         # Try Loading Driver
@@ -77,9 +77,9 @@ class TouchManager:
                 else:
                     # Part of sequence
                     self.is_pressed = True
-                    self.last_tap_time = now # Update time on press for gap measurement?
-                    # Usually gap is measured from Release. Let's keep it simple: Reset timer on fresh press.
-                    print(f"[Touch] DEBUG: Key Pressed Again! (Mask: {keys})")
+                    self.tap_count += 1 # FIX: Increment count for 2nd, 3rd taps!
+                    self.last_tap_time = now 
+                    print(f"[Touch] DEBUG: Key Pressed Again! (Count: {self.tap_count})")
             
             elif pressed and self.is_pressed:
                  # Holding...
@@ -96,8 +96,6 @@ class TouchManager:
                     if self.tap_count == 0: self.in_transaction = False
                 else:
                     # Valid release
-                    # If this was a new press in a transaction, count incremented above.
-                    # Wait for timeout.
                     pass
                 
             # Check Timeout for Tap Transaction

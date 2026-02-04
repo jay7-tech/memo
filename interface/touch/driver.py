@@ -65,8 +65,8 @@ class QT2120:
                 # Usually Threshold = Signal Delta. False positives = Noise > Threshold.
                 # So we need to INCREASE threshold to reduce false positives.
                 # Default might be 10-20. User reported 30 still triggered by table bumps.
-                # Increasing to 60 (Medium-Heavy press required).
-                self.set_threshold(60) 
+                # Increasing to 100 (Heavy press required).
+                self.set_threshold(100) 
                 self.calibrate()
             else:
                 print(f"[Touch] ❌ ID Mismatch (Exp 0x3E, Got 0x{chip_id:02X}). Wiring issue?")
