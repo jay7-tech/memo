@@ -58,13 +58,24 @@ class TouchManager:
     def _run_loop(self):
         print(f"[Touch] Entering poll loop. Keys at start: {self.driver.read_keys()}")
         consecutive_presses = 0
-        REQUIRED_PERSISTENCE = 2 # Must read "Pressed" 2 times in a row (approx 100ms)
+        REQUIRED_PERSISTENCE = 2 # 2 cycles (~100ms)
         
         while self.running:
             keys = self.driver.read_keys()
+            
+            # KEY MASKING (CRITICAL FIX)
+            # Unconnected pins float and cause "Ghost Taps".
+            # We assume user is using Key 0 (Pad 1).
+            # Mask = 0x01 (Key 0 only). 
+            # If user uses Key 1, this needs to be 0x02. 
+            # Let's try 0x0F (Keys 0-3) to be safe but stricter than 0xFF.
+            # Actually, user snippet loop went index 0..11. 
+            # Let's start STRICT: 0x07 (Keys 0, 1, 2).
+            masked_keys = keys & 0x07 
+            
             now = time.time()
             
-            raw_pressed = (keys > 0)
+            raw_pressed = (masked_keys > 0)
             
             # 1. NOISE FILTER (PERSISTENCE)
             if raw_pressed:
@@ -101,15 +112,11 @@ class TouchManager:
             elif not pressed and self.is_pressed:
                 # RELEASE EVENT
                 self.is_pressed = False
-                # Check for "blip"
-                press_duration = now - self.last_tap_time
-                if press_duration < self.min_press_ms:
-                    print(f"[Touch] Ignored short spike ({press_duration:.3f}s)")
-                    if self.tap_count > 0: self.tap_count -= 1 # Undo the count
-                    if self.tap_count == 0: self.in_transaction = False
-                else:
-                    # Valid release
-                    pass
+                # Valid release
+                # If this was a new press in a transaction, count incremented above.
+                # Wait for timeout.
+                print(f"[Touch] Release recognized. Waiting for next tap or timeout...")
+                pass
                 
             # Check Timeout for Tap Transaction
             # We check timeout from the LAST ACTION (meaning, give user time to press again)
