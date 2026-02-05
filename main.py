@@ -584,8 +584,39 @@ class MEMOApp:
             cv2.imwrite(filename, clean_frame)
             print(f">> SYSTEM: Saved {filename}")
             speak("Great shot! Photo saved.")
-            self.scene_state.selfie_trigger = False
             self.scene_state.selfie_scheduled_time = 0.0
+
+    def _process_dashboard_commands(self):
+        """Process commands from the dashboard queue."""
+        try:
+            while not self.scene_state.pending_commands.empty():
+                cmd = self.scene_state.pending_commands.get_nowait()
+                print(f"[Dashboard] Executing: {cmd}")
+                
+                # Special handling for toggle logic controlled here
+                if cmd == 'voice toggle':
+                     if self.voice_input:
+                         new_state = not self.voice_input.is_listening_active
+                         self.voice_input.set_active(new_state)
+                         self.scene_state.voice_active = new_state
+                         status = "enabled" if new_state else "disabled"
+                         print(f">> SYSTEM: Voice {status} via Dashboard")
+                         if new_state: self.lcd.play("listening", loop=True)
+                         else: self.lcd.play("silence", loop=True)
+                     return
+
+                # Route through command processor
+                executed, response = self.command_processor.process(
+                    cmd,
+                    {'scene_state': self.scene_state}
+                )
+                
+                if response:
+                    print(f">> MEMO: {response}")
+                    speak(response)
+                    
+        except Exception as e:
+            print(f"[Error] Dashboard processing: {e}")
     
     def _draw_overlay(self, frame, perception_result):
         """Draw debug overlay on frame."""
