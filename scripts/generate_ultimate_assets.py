@@ -398,6 +398,32 @@ def anim_confused(draw, i, total, layer='core'):
     # Right Squinted & Raised
     draw_vector_eye(draw, 372, 230, w, h*0.6, fill)
 
+def anim_sleep(draw, i, total, layer='core'):
+    # Zzz Animation
+    # Eyes closed (Lines)
+    w = 180
+    h = 20 # Flat line
+    y = 256 + 20
+    
+    fill = COLOR_CYAN
+    if layer == 'glow': fill = (0, 255, 255, 100); w+=20; h+=20;
+    else: fill = (0, 255, 255, 255)
+    
+    draw_vector_eye(draw, 140, y, w, h, fill)
+    draw_vector_eye(draw, 372, y, w, h, fill)
+    
+    if layer == 'core':
+        # Floating Zs
+        phase = (i / total) 
+        # Z1
+        z_y = 200 - (phase * 50)
+        z_x = 350 + (math.sin(phase * 4) * 10)
+        if phase < 0.8:
+            opacity = 255
+            if phase > 0.6: opacity = int(255 * (1 - (phase-0.6)*5))
+            # Draw Z (Simple path)
+            draw.text((z_x, z_y), "Z", fill=(255, 255, 255, opacity), font_size=40)
+
 def generate():
     print("Generating Glow-Enhanced Ultimate Assets...")
     
@@ -465,6 +491,11 @@ def generate():
     d = ensure_clean_dir("confused")
     for i in range(1): # Static-ish
         img = render_frame_with_glow(anim_confused, i, 1)
+        img.save(os.path.join(d, f"frame_{i:03d}.png"))
+        
+    d = ensure_clean_dir("sleep")
+    for i in range(60): # Slow Zzz loop
+        img = render_frame_with_glow(anim_sleep, i, 60)
         img.save(os.path.join(d, f"frame_{i:03d}.png"))
 
     print("Done.")

@@ -275,14 +275,19 @@ def index():
 
                 <!-- Controls -->
                 <div class="card stat-block">
-                    <div class="stat-header">MANUAL OVERRIDE</div>
+                    <div class="stat-header">COMMAND CENTER</div>
                     <div class="control-grid">
-                        <button id="btn-wake" class="c-btn" onclick="sendCmd('scan')">WAKE VISION</button>
-                        <button id="btn-sleep" class="c-btn danger" onclick="sendCmd('stop scan')">SLEEP</button>
+                        <button id="btn-wake" class="c-btn" onclick="sendCmd('scan')">VISION WAKE</button>
+                        <button id="btn-stop-scan" class="c-btn danger" onclick="sendCmd('stop scan')">VISION SLEEP</button>
+                        
+                        <button id="btn-voice" class="c-btn" onclick="sendCmd('voice toggle')">VOICE INPUT</button>
+                        <button id="btn-buzz" class="c-btn" style="background:#fce7f3; color:#ec4899; border-color:#fbcfe8;" onclick="sendCmd('buzz')">⚡ BUZZ NEWS</button>
+
+                        <button id="btn-sleep" class="c-btn danger" onclick="sendCmd('sleep')">SYSTEM SLEEP 💤</button>
+                        <button id="btn-logs" class="c-btn" onclick="sendCmd('logs on')">DEBUG LOGS</button>
+                        
                         <button id="btn-focus-on" class="c-btn" onclick="sendCmd('focus on')">FOCUS ON</button>
                         <button id="btn-focus-off" class="c-btn" onclick="sendCmd('focus off')">FOCUS OFF</button>
-                        <button id="btn-logs" class="c-btn" onclick="sendCmd('logs on')">DEBUG LOGS</button>
-                        <button class="c-btn danger" onclick="sendCmd('quit')">SHUTDOWN</button>
                     </div>
                 </div>
 
@@ -406,7 +411,29 @@ def index():
                 
                 // Update Button States
                 toggleBtn('btn-wake', data.vision_active);
-                toggleBtn('btn-sleep', !data.vision_active);
+                toggleBtn('btn-stop-scan', !data.vision_active);
+                toggleBtn('btn-voice', data.voice_active);
+                
+                // System Sleep: If Vision OFF and Voice OFF? Or explicit state?
+                // For simplicity, let's say if Vision is OFF, we might be sleeping.
+                // But better: Check if both are off?
+                const isSystemSleep = (!data.vision_active && !data.voice_active);
+                const sleepBtn = document.getElementById('btn-sleep');
+                if (isSystemSleep) {
+                     sleepBtn.classList.add('active');
+                     sleepBtn.innerText = "WAKE UP ☀️";
+                     sleepBtn.onclick = () => sendCmd('wake');
+                     sleepBtn.classList.remove('danger'); // Make it Green
+                     sleepBtn.style.background = "#10b981";
+                     sleepBtn.style.color = "white";
+                } else {
+                     sleepBtn.classList.remove('active');
+                     sleepBtn.innerText = "SYSTEM SLEEP 💤";
+                     sleepBtn.onclick = () => sendCmd('sleep');
+                     sleepBtn.classList.add('danger');
+                     sleepBtn.style.background = ""; // Reset
+                     sleepBtn.style.color = "";
+                }
                 
                 toggleBtn('btn-focus-on', data.focus_mode);
                 toggleBtn('btn-focus-off', !data.focus_mode);
@@ -494,7 +521,8 @@ def start_server():
                     'identity': scene_state_ref.human['identity'],
                     'focus_mode': scene_state_ref.focus_mode,
                     'vision_active': getattr(scene_state_ref, 'vision_active', True),
-                    'verbose_logging': getattr(scene_state_ref, 'verbose_logging', False), # Added
+                    'voice_active': getattr(scene_state_ref, 'voice_active', True), # UPDATED
+                    'verbose_logging': getattr(scene_state_ref, 'verbose_logging', False),
                     'objects': list(scene_state_ref.objects.keys()),
                     'cpu': stats['cpu'],
                     'fps': stats['fps']

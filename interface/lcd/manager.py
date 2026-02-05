@@ -3,6 +3,7 @@ import threading
 import os
 import cv2
 import numpy as np
+import math
 from pathlib import Path
 from PIL import Image
 from typing import Dict, List, Optional
@@ -117,8 +118,8 @@ class LCDManager:
         """Thread-safe request to play animation."""
         with self.lock:
             # Map common variants
-            if name == "happy": name = "laugh"
-            if name == "love": name = "wink" # Fallback since we didn't generate love assets yet
+            # if name == "happy": name = "laugh"  # Now we have real happy
+            # if name == "love": name = "wink"    # Now we have real love
             
             # Optimization: If already playing this LOOPING animation, don't reset
             if loop and self.mode == "ANIMATING" and self.current_anim_name == name:
@@ -232,6 +233,41 @@ class LCDManager:
                                 frame_img = self.current_frames[-1]
 
             # 2. Render Hardware (Sim handled externally)
+            # If CLOCK mode, override frame_img with dynamic clock
+            if self.mode == "CLOCK":
+                from datetime import datetime
+                from PIL import ImageDraw, ImageFont
+                
+                # Create base image (Cyan on Black)
+                frame_img = Image.new("RGB", (128, 128), (0, 0, 0))
+                draw = ImageDraw.Draw(frame_img)
+                
+                # Time
+                now = datetime.now()
+                time_str = now.strftime("%I:%M")
+                ampm = now.strftime("%p")
+                
+                # Draw Time (Large) - Manual center roughly
+                # Defaults PIL font
+                try:
+                    # Try to use a better font if available, or load default
+                    # font = ImageFont.truetype("arial.ttf", 40)
+                    font = ImageFont.load_default()
+                    # Scale handling basic
+                except:
+                    font = None
+                    
+                # We'll use simple text for resilience since fonts might be missing on Pi
+                # Or use existing assets?
+                # Let's draw standard text. 
+                draw.text((15, 40), time_str, fill=(0, 255, 255), font_size=30 if hasattr(draw, 'textbbox') else None)
+                draw.text((80, 55), ampm, fill=(0, 200, 200))
+                
+                # Draw Zzz Icon (Pulse)
+                pulse = abs(math.sin(time.time() * 2)) 
+                z_color = (int(0 + 100*pulse), int(255*pulse), int(255*pulse))
+                draw.text((50, 90), "zZZ", fill=z_color)
+                
             if frame_img:
                 self.last_frame_sim = frame_img # Store for main thread
                 if self.lcd:
@@ -249,3 +285,12 @@ class LCDManager:
             elapsed = (time.time() - start_time) * 1000
             wait_ms = max(10, self.fps_ms - elapsed)
             time.sleep(wait_ms / 1000.0)
+            
+    def set_clock_mode(self, active: bool):
+        with self.lock:
+            if active:
+                self.mode = "CLOCK"
+                self.fps_ms = 1000 # Update every second
+            else:
+                self.mode = "ANIMATING"
+                self.play("idle_center", loop=True)

@@ -712,13 +712,37 @@ class MEMOApp:
                 # Process other commands
                 elif cmd_lower == 'voice on' and self.voice_input:
                     self.voice_input.set_active(True)
+                    self.scene_state.voice_active = True # Sync state
                     print(">> SYSTEM: Voice input ENABLED")
                     speak_now("Voice input enabled. I'm listening.")
+                    self.lcd.play("listening", loop=True) # Feedback
                     
                 elif cmd_lower == 'voice off' and self.voice_input:
                     self.voice_input.set_active(False)
+                    self.scene_state.voice_active = False # Sync state
                     print(">> SYSTEM: Voice input DISABLED")
                     speak_now("Voice input stopped.")
+                    self.lcd.play("silence", loop=True)   # Show Mute Icon
+                
+                elif cmd_lower == 'sleep':
+                    print(">> SYSTEM: Entering SLEEP (Clock Mode)")
+                    # Deep Sleep Sequence
+                    self.vision_active = False
+                    self.voice_input.set_active(False)
+                    self.scene_state.voice_active = False
+                    
+                    self.lcd.set_clock_mode(True)
+                    speak("Going to sleep. Goodnight!")
+                    
+                elif cmd_lower == 'wake' or cmd_lower == 'wakeup':
+                     print(">> SYSTEM: Waking up from Sleep!")
+                     # Wake Sequence
+                     self.vision_active = True
+                     self.voice_input.set_active(True)
+                     self.scene_state.voice_active = True
+                     
+                     self.lcd.set_clock_mode(False) # Auto plays idle
+                     speak("Hey yo! I'm back!")
                 
                 elif cmd_lower == 'focus on':
                     self.scene_state.focus_mode = True
@@ -806,7 +830,30 @@ class MEMOApp:
                         response = self.query_handler.handle_query(user_input, self.scene_state, personality=self.personality)
                         if response:
                             print(f">> MEMO: {response}")
-                            self.lcd.set_speaking()
+                            
+                            # Simple Emotion Analysis
+                            text_lower = response.lower()
+                            anim_played = False
+                            
+                            if any(w in text_lower for w in ['love', 'heart', '❤️', 'favorite', 'cute']):
+                                self.lcd.play("love", fps_ms=80)
+                                anim_played = True
+                            elif any(w in text_lower for w in ['happy', 'haha', 'lol', 'good', 'awesome', 'great', 'cool', 'joke']):
+                                self.lcd.play("happy", fps_ms=60)
+                                anim_played = True
+                            elif any(w in text_lower for w in ['sad', 'sorry', 'bad', 'unfortunately', 'oh no']):
+                                self.lcd.play("sad", fps_ms=100)
+                                anim_played = True
+                            elif any(w in text_lower for w in ['wow', 'whoa', 'omg', 'surprise', 'really?']):
+                                self.lcd.play("surprised", fps_ms=50)
+                                anim_played = True
+                            elif any(w in text_lower for w in ['what?', 'huh', 'confused', 'weird']):
+                                self.lcd.play("confused", fps_ms=100)
+                                anim_played = True
+                                
+                            if not anim_played:
+                                self.lcd.set_speaking()
+                                
                             speak(response)
                             # Log to dashboard
                             from interface.dashboard import add_log
@@ -920,6 +967,9 @@ class MEMOApp:
             
             # Handle triggers (Pass frame directly, it's still clean here)
             self._handle_triggers(frame)
+            
+            # handle dashboard commands 
+            self._process_dashboard_commands()
             
             # Draw overlay only if needed (for display or dashboard update)
             should_draw = self.show_display or (self.dashboard and self.frame_count % 5 == 0)

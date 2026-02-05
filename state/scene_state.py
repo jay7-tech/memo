@@ -80,6 +80,7 @@ class SceneState:
         # System flags
         self.focus_mode = False 
         self.vision_active = True # Track if vision is awake or sleeping
+        self.voice_active = True  # Track if voice/mic is enabled
         self.register_trigger = False
         self.register_name = "User"
         
