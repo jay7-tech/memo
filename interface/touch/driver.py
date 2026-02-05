@@ -60,13 +60,10 @@ class QT2120:
                 print("[Touch] ✓ QT2120 Connected")
                 self.connected = True
                 self.reset()
-                # Set Thresholds (Based on user C++ snippet using Reg 0x10)
-                # Lower = More Sensitive? Higher = Less Sensitive?
-                # Usually Threshold = Signal Delta. False positives = Noise > Threshold.
-                # So we need to INCREASE threshold to reduce false positives.
                 # Default might be 10-20. User reported 30 still triggered by table bumps.
-                # Increasing to 100 (Heavy press required).
-                self.set_threshold(100) 
+                # Increasing to 120 (Halfway). 
+                # This should stop table vibration false positives.
+                self.set_threshold(120) 
                 self.calibrate()
             else:
                 print(f"[Touch] ❌ ID Mismatch (Exp 0x3E, Got 0x{chip_id:02X}). Wiring issue?")
