@@ -283,7 +283,7 @@ def index():
                         <button id="btn-voice" class="c-btn" onclick="sendCmd('voice toggle')">VOICE INPUT</button>
                         <button id="btn-buzz" class="c-btn" style="background:#fce7f3; color:#ec4899; border-color:#fbcfe8;" onclick="sendCmd('buzz')">⚡ BUZZ NEWS</button>
 
-                        <button id="btn-idle" class="c-btn danger" onclick="sendCmd('idle')">🌑 IDLE MODE (CLOCK)</button>
+                        <button id="btn-idle" class="c-btn danger" onclick="toggleSystemIdle()">🌑 IDLE MODE (CLOCK)</button>
                         <button id="btn-logs" class="c-btn" onclick="sendCmd('logs on')">DEBUG LOGS</button>
                         
                         <button id="btn-focus-on" class="c-btn" onclick="sendCmd('focus on')">FOCUS ON</button>

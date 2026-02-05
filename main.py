@@ -595,7 +595,7 @@ class MEMOApp:
                 if not raw_cmd: continue
                 
                 cmd = str(raw_cmd).strip().lower()
-                print(f"[Dashboard] Executing: '{cmd}' (Raw: '{raw_cmd}')")
+                print(f"[Dashboard] DEBUG: Processing '{cmd}' (Type: {type(cmd)}, Repr: {repr(cmd)})")
                 
                 # Special handling for toggle logic controlled here
                 if cmd == 'voice toggle':
