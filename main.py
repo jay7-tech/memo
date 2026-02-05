@@ -610,13 +610,13 @@ class MEMOApp:
                      return
 
                 # --- Handle System Commands ---
-                if cmd == 'sleep':
-                    print(">> SYSTEM: Entering SLEEP (Clock Mode)")
+                if cmd == 'idle':
+                    print(">> SYSTEM: Entering IDLE MODE (Clock)")
                     self.vision_active = False
                     self.voice_input.set_active(False)
                     self.scene_state.voice_active = False
                     self.lcd.set_clock_mode(True)
-                    speak("Going to sleep. Goodnight!")
+                    speak("Entering Idle Mode. Time to chill.")
                     return
                     
                 if cmd in ['wake', 'wakeup']:
@@ -797,15 +797,15 @@ class MEMOApp:
                     speak_now("Voice input stopped.")
                     self.lcd.play("silence", loop=True)   # Show Mute Icon
                 
-                elif cmd_lower == 'sleep':
-                    print(">> SYSTEM: Entering SLEEP (Clock Mode)")
-                    # Deep Sleep Sequence
+                elif cmd_lower == 'idle':
+                    print(">> SYSTEM: Entering IDLE MODE (Clock)")
+                    # Idle Mode Sequence
                     self.vision_active = False
                     self.voice_input.set_active(False)
                     self.scene_state.voice_active = False
                     
                     self.lcd.set_clock_mode(True)
-                    speak("Going to sleep. Goodnight!")
+                    speak("Entering Idle Mode. Time to chill.")
                     
                 elif cmd_lower == 'wake' or cmd_lower == 'wakeup':
                      print(">> SYSTEM: Waking up from Sleep!")
