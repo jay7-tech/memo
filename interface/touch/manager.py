@@ -8,144 +8,152 @@ sys.path.append(os.getcwd())
 
 from core.engine import get_event_bus, Event, EventType
 
-class TouchManager:
-    def __init__(self):
-        self.running = False
-        self.thread = None
-        self.driver = None
-        self.event_bus = get_event_bus()
-        
-        # Logic State
+class TouchChannel:
+    """Helper to manage state for a single sensor."""
+    def __init__(self, name, driver):
+        self.name = name
+        self.driver = driver
         self.tap_count = 0
         self.last_tap_time = 0
         self.in_transaction = False
         self.is_pressed = False
+        self.consecutive_presses = 0
+        self.required_persistence = 3 # Stricter: 3 cycles (~150ms) to ignore table bumps
+        
+    def poll(self, now, tap_gap_ms):
+        if not self.driver or not self.driver.connected:
+            return 0
+            
+        keys = self.driver.read_keys()
+        # Mask inputs (Keys 0-2 only)
+        masked_keys = keys & 0x07
+        raw_pressed = (masked_keys > 0)
+        
+        # 1. Noise Filter
+        if raw_pressed:
+            self.consecutive_presses += 1
+        else:
+            self.consecutive_presses = 0
+            
+        pressed = (self.consecutive_presses >= self.required_persistence)
+        
+        # 2. State Machine
+        if pressed and not self.is_pressed:
+            # PRESS START
+            if not self.in_transaction:
+                self.in_transaction = True
+                self.tap_count = 1
+                self.last_tap_time = now
+                print(f"[{self.name}] Tap 1 Started")
+            else:
+                self.tap_count += 1
+                self.last_tap_time = now
+                print(f"[{self.name}] Tap {self.tap_count} Started")
+            self.is_pressed = True
+            
+        elif not pressed and self.is_pressed:
+            # RELEASE
+            self.is_pressed = False
+            print(f"[{self.name}] Release. Waiting...")
+            
+        # 3. Transaction Timeout (Fire Event)
+        if self.in_transaction and not self.is_pressed:
+             if (now - self.last_tap_time > (tap_gap_ms / 1000.0)):
+                 result = self.tap_count
+                 self.tap_count = 0
+                 self.in_transaction = False
+                 return result
+                 
+        return 0
+
+class TouchManager:
+    def __init__(self):
+        self.running = False
+        self.thread = None
+        self.event_bus = get_event_bus()
         
         # Config
-        self.tap_gap_ms = 800 
-        self.min_press_ms = 0.05 # Lowered to 50ms (Persistence filter handles noise now)
-        self.hold_ms = 1000 # Time for HOLD event? (Future)
+        self.tap_gap_ms = 700 
+        self.left = None
+        self.right = None
         
-        # Try Loading Driver
+        # Initialize Dual Drivers
         try:
             from .driver import QT2120
-            self.driver = QT2120()
-            if not self.driver.connected:
-                print("[Touch] Driver failed connection. Touch disabled.")
-                self.driver = None
+            
+            # Left Sensor (Bus 1)
+            print("[Touch] Init Left Sensor (Bus 1)...")
+            driver_l = QT2120(bus_id=1)
+            if driver_l.connected:
+                 self.left = TouchChannel("Touch_Left", driver_l)
+            else:
+                 print("[Touch] Left Sensor NOT found.")
+            
+            # Right Sensor (Bus 3 - Software I2C)
+            # Make sure overlay is loaded!
+            print("[Touch] Init Right Sensor (Bus 3)...")
+            driver_r = QT2120(bus_id=3)
+            if driver_r.connected:
+                self.right = TouchChannel("Touch_Right", driver_r)
+            else:
+                print("[Touch] Right Sensor NOT found (Did you run enable_dual_touch.sh and reboot?).")
+            
+            if not self.left and not self.right:
+                print("[Touch] No sensors connected. Touch Disabled.")
+            else:
+                print(f"[Touch] Ready.")
+
         except Exception as e:
-            print(f"[Touch] Manager Init Error: {e}")
-            self.driver = None
+            print(f"[Touch] Init Error: {e}")
 
     def start(self):
-        if not self.driver: 
-            return
-        if self.running: 
-            return
-            
+        if self.running: return
         self.running = True
         self.thread = threading.Thread(target=self._run_loop, daemon=True)
         self.thread.start()
-        print("[Touch] Manager Started (Listening for Taps).")
+        print("[Touch] Manager Started (Dual Channel).")
 
     def stop(self):
         self.running = False
-        if self.thread:
-            self.thread.join(timeout=1.0)
-        if self.driver:
-            self.driver.close()
+        if self.thread: self.thread.join(timeout=1.0)
+        # Close drivers
+        if self.left and self.left.driver: self.left.driver.close()
+        if self.right and self.right.driver: self.right.driver.close()
 
     def _run_loop(self):
-        print(f"[Touch] Entering poll loop. Keys at start: {self.driver.read_keys()}")
-        consecutive_presses = 0
-        REQUIRED_PERSISTENCE = 2 # 2 cycles (~100ms)
-        
         while self.running:
-            keys = self.driver.read_keys()
-            
-            # KEY MASKING (CRITICAL FIX)
-            # Unconnected pins float and cause "Ghost Taps".
-            # We assume user is using Key 0 (Pad 1).
-            # Mask = 0x01 (Key 0 only). 
-            # If user uses Key 1, this needs to be 0x02. 
-            # Let's try 0x0F (Keys 0-3) to be safe but stricter than 0xFF.
-            # Actually, user snippet loop went index 0..11. 
-            # Let's start STRICT: 0x07 (Keys 0, 1, 2).
-            masked_keys = keys & 0x07 
-            
             now = time.time()
             
-            raw_pressed = (masked_keys > 0)
-            
-            # 1. NOISE FILTER (PERSISTENCE)
-            if raw_pressed:
-                consecutive_presses += 1
-            else:
-                consecutive_presses = 0
+            # Poll Left
+            if self.left:
+                gest = self.left.poll(now, self.tap_gap_ms)
+                if gest > 0: self._handle_gesture("left", gest)
                 
-            # Only count as "Pressed" if held for N cycles
-            pressed = (consecutive_presses >= REQUIRED_PERSISTENCE)
-            
-            # 2. STATE LOGIC
-            # DEBUG: Print press state changes
-            if pressed and not self.is_pressed:
-                # Potential PRESS
-                # Potential PRESS
-                if not self.in_transaction:
-                    # Clean start
-                    print(f"[Touch] DEBUG: Key Pressed! (Mask: {keys})")
-                    self.is_pressed = True
-                    self.tap_count += 1
-                    self.last_tap_time = now
-                    self.in_transaction = True
-                else:
-                    # Part of sequence
-                    self.is_pressed = True
-                    self.tap_count += 1 # FIX: Increment count for 2nd, 3rd taps!
-                    self.last_tap_time = now 
-                    print(f"[Touch] DEBUG: Key Pressed Again! (Count: {self.tap_count})")
-            
-            elif pressed and self.is_pressed:
-                 # Holding...
-                 pass
+            # Poll Right
+            if self.right:
+                gest = self.right.poll(now, self.tap_gap_ms)
+                if gest > 0: self._handle_gesture("right", gest)
+                
+            time.sleep(0.05) # 20Hz
 
-            elif not pressed and self.is_pressed:
-                # RELEASE EVENT
-                self.is_pressed = False
-                # Valid release
-                # If this was a new press in a transaction, count incremented above.
-                # Wait for timeout.
-                print(f"[Touch] Release recognized. Waiting for next tap or timeout...")
-                pass
-                
-            # Check Timeout for Tap Transaction
-            # We check timeout from the LAST ACTION (meaning, give user time to press again)
-            # If released, and time > gap -> FIRE.
-            if self.in_transaction and not self.is_pressed:
-                 if (now - self.last_tap_time > (self.tap_gap_ms / 1000.0)):
-                    if self.tap_count > 0:
-                        self._fire_gesture(self.tap_count)
-                    self.tap_count = 0
-                    self.in_transaction = False
-            
-            # Reset crazy counts
-            if self.tap_count > 5: 
-                self.tap_count = 0
-                self.in_transaction = False
-                
-            time.sleep(0.05) # 20Hz polling
-
-    def _fire_gesture(self, count):
-        print(f"[Touch] Gesture Detected: {count} Taps")
+    def _handle_gesture(self, side, count):
+        print(f"[Touch] {side.upper()} Sensor: {count} Taps")
         
-        # Map to specific events based on user plan
-        # 1 Tap: Toggle Focus Mode
-        # 2 Taps: Selfie
-        # 3 Taps: Sleep Mode
+        if side == "left":
+            # Original Controls
+            if count == 1:
+                self.event_bus.publish(Event(EventType.SYSTEM_ALERT, {'action': 'toggle_focus'}))
+            elif count == 2:
+                self.event_bus.publish(Event(EventType.SYSTEM_ALERT, {'action': 'selfie'}))
+            elif count == 3:
+                self.event_bus.publish(Event(EventType.SYSTEM_ALERT, {'action': 'sleep_mode'}))
         
-        if count == 1:
-            self.event_bus.publish(Event(EventType.SYSTEM_ALERT, {'action': 'toggle_focus'}))
-        elif count == 2:
-            self.event_bus.publish(Event(EventType.SYSTEM_ALERT, {'action': 'selfie'}))
-        elif count == 3:
-            self.event_bus.publish(Event(EventType.SYSTEM_ALERT, {'action': 'sleep_mode'}))
+        elif side == "right":
+            # New Secondary Controls
+            # 1 Tap: Toggle Voice (Mute/Unmute)
+            if count == 1:
+                print(">> [Action] Right Tap 1: Toggle Voice")
+                self.event_bus.publish(Event(EventType.SYSTEM_ALERT, {'action': 'toggle_voice'}))
+            # 2 Taps: Logs Toggle?
+            elif count == 2:
+                 print(">> [Action] Right Tap 2: Toggle Logs (Future)")
