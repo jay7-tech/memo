@@ -698,6 +698,11 @@ class MEMOApp:
                 cmd = user_input # Use original case for command processor
                 cmd_lower = user_input.lower()
                 
+                cmd_lower = user_input.strip().lower()
+                # DEBUG: Trace input source
+                if cmd_lower:
+                     print(f"DEBUG: Console Input: '{cmd_lower}' (Bytes: {[ord(c) for c in cmd_lower]})")
+                
                 # STRICT quit matching to avoid false positives (e.g. "stop scan")
                 if cmd_lower in ['quit', 'exit', 'shutdown', 'q']:
                     print(">> SYSTEM: Quit command received")

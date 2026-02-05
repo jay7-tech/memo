@@ -245,7 +245,9 @@ class VoiceListener:
         
         # Set Threshold (Noise + Margin)
         # Margin ensures we don't trigger on air conditioner hum
-        self.energy_threshold = max(300, avg_noise * 1.5)  # Minimum 300 to avoid super-sensitivity
+        # User reported 1.5x was still triggering on 546 noise floor.
+        # Increasing to 3.0x (Significant jump required).
+        self.energy_threshold = max(500, avg_noise * 3.0)  
         print(f"[Voice] Noise Floor: {avg_noise:.1f} | Threshold Set: {self.energy_threshold:.1f}")
         return self.energy_threshold
 
