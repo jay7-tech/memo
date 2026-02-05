@@ -63,6 +63,7 @@ class LCDManager:
         self.mode = "IDLE" # IDLE, ANIMATING
         self.last_idle_move = time.time()
         self.last_frame_sim = None # Buffer for main thread rendering
+        self.paused = False # Fix: Initialize paused state
         
         # Preload Assets
         self._load_assets()
