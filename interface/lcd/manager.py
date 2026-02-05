@@ -210,27 +210,31 @@ class LCDManager:
             # 1. Get current frame
             frame_img = None
             with self.lock:
-                if self.current_frames:
-                    if self.frame_idx < len(self.current_frames):
-                        frame_img = self.current_frames[self.frame_idx]
-                        self.frame_idx += 1
-                    else:
-                        # Animation ended
-                        if self.loop:
-                            self.frame_idx = 0
-                            frame_img = self.current_frames[0]
-                        else:
-                            # End of oneshot
-                            if self.fallback_to_idle:
-                                # Switch to idle immediately
-                                var = f"idle_{self.idle_variant}"
-                                self.current_frames = self.anims.get(var, [])
-                                self.loop = True
+                # 1. Update Animation State
+                if not self.paused:
+                    if self.current_frames:
+                        # Update index based on FPS
+                        elapsed = (time.time() - start_time) * 1000
+                        if elapsed > self.fps_ms:
+                            self.frame_idx += 1
+                            start_time = time.time()
+                        
+                        # Wrap or Stop
+                        if self.frame_idx >= len(self.current_frames):
+                            if self.loop:
                                 self.frame_idx = 0
-                                self.mode = "IDLE"
                             else:
-                                # Hold last frame
-                                frame_img = self.current_frames[-1]
+                                self.frame_idx = len(self.current_frames) - 1
+                                # Check fallback
+                                if self.fallback_to_idle:
+                                    self.mode = "IDLE"
+                                else:
+                                    # Hold last frame
+                                    frame_img = self.current_frames[-1]
+                        
+                        # Set frame if not holding (and not wrapped yet if just reset)
+                        if self.frame_idx < len(self.current_frames):
+                            frame_img = self.current_frames[self.frame_idx]
 
             # 2. Render Hardware (Sim handled externally)
             # If CLOCK mode, override frame_img with dynamic clock
@@ -243,30 +247,30 @@ class LCDManager:
                 draw = ImageDraw.Draw(frame_img)
                 
                 # Time
-                now = datetime.now()
-                time_str = now.strftime("%I:%M")
-                ampm = now.strftime("%p")
-                
-                # Draw Time (Large) - Manual center roughly
-                # Defaults PIL font
                 try:
-                    # Try to use a better font if available, or load default
-                    # font = ImageFont.truetype("arial.ttf", 40)
-                    font = ImageFont.load_default()
-                    # Scale handling basic
-                except:
-                    font = None
+                    # Time
+                    now = datetime.now()
+                    time_str = now.strftime("%I:%M")
+                    ampm = now.strftime("%p")
                     
-                # We'll use simple text for resilience since fonts might be missing on Pi
-                # Or use existing assets?
-                # Let's draw standard text. 
-                draw.text((15, 40), time_str, fill=(0, 255, 255), font_size=30 if hasattr(draw, 'textbbox') else None)
-                draw.text((80, 55), ampm, fill=(0, 200, 200))
-                
-                # Draw Zzz Icon (Pulse)
-                pulse = abs(math.sin(time.time() * 2)) 
-                z_color = (int(0 + 100*pulse), int(255*pulse), int(255*pulse))
-                draw.text((50, 90), "zZZ", fill=z_color)
+                    # Draw Time (Large)
+                    try:
+                        # Try loading a bolder font if possible, else default
+                        font = ImageFont.truetype("arial.ttf", 36)
+                    except:
+                        font = ImageFont.load_default()
+
+                    # Draw text (Handle old Pillow that crashes on size argument)
+                    # We manually scale or just accept default size if load_default used
+                    draw.text((20, 45), time_str, fill=(0, 255, 255), font=font)
+                    draw.text((90, 60), ampm, fill=(0, 200, 200), font=font)
+                    
+                    # Draw Zzz Icon (Pulse)
+                    pulse = abs(math.sin(time.time() * 2)) 
+                    z_color = (int(0 + 100*pulse), int(255*pulse), int(255*pulse))
+                    draw.text((55, 90), "zZZ", fill=z_color, font=font)
+                except Exception as e:
+                    print(f"[LCD] Clock Error: {e}")
                 
             if frame_img:
                 self.last_frame_sim = frame_img # Store for main thread

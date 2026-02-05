@@ -288,6 +288,8 @@ def index():
                         
                         <button id="btn-focus-on" class="c-btn" onclick="sendCmd('focus on')">FOCUS ON</button>
                         <button id="btn-focus-off" class="c-btn" onclick="sendCmd('focus off')">FOCUS OFF</button>
+                        
+                        <button id="btn-quit" class="c-btn danger" style="grid-column: span 2; margin-top: 8px;" onclick="sendCmd('quit')">🔴 SHUTDOWN SYSTEM</button>
                     </div>
                 </div>
 

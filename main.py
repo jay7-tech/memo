@@ -606,6 +606,44 @@ class MEMOApp:
                          else: self.lcd.play("silence", loop=True)
                      return
 
+                # --- Handle System Commands ---
+                if cmd == 'sleep':
+                    print(">> SYSTEM: Entering SLEEP (Clock Mode)")
+                    self.vision_active = False
+                    self.voice_input.set_active(False)
+                    self.scene_state.voice_active = False
+                    self.lcd.set_clock_mode(True)
+                    speak("Going to sleep. Goodnight!")
+                    return
+                    
+                if cmd in ['wake', 'wakeup']:
+                    print(">> SYSTEM: Waking up from Sleep!")
+                    self.vision_active = True
+                    self.voice_input.set_active(True)
+                    self.scene_state.voice_active = True
+                    self.lcd.set_clock_mode(False)
+                    speak("Hey yo! I'm back!")
+                    return
+
+                if cmd == 'focus on':
+                    self.scene_state.focus_mode = True
+                    print(">> SYSTEM: Focus Mode ENABLED")
+                    speak("Entering the zone! No distractions allowed!")
+                    self.lcd.play("focus_scan", loop=True, fps_ms=60)
+                    return
+                    
+                if cmd == 'focus off':
+                    self.scene_state.focus_mode = False
+                    print(">> SYSTEM: Focus Mode DISABLED")
+                    speak("Chill mode! Scroll away my friend 📱")
+                    self.lcd.play("idle_center", loop=True)
+                    return
+                    
+                if cmd == 'quit':
+                    print(">> SYSTEM: Remote Shutdown Request")
+                    speak("Shutting down. See ya!")
+                    self.running = False
+                    return
                 # Route through command processor
                 executed, response = self.command_processor.process(
                     cmd,
