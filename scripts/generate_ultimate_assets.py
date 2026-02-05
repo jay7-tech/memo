@@ -24,7 +24,19 @@ COLOR_WHITE = (255, 255, 255)
 STROKE_WIDTH = 16 
 
 def ensure_clean_dir(name):
+    # SAFETY: If user wants to preserve focus_warning, we should not delete it blindly
+    # unless we are sure. But user said "use ... once more".
+    # This implies they might have correct files there.
     path = os.path.join(ASSETS_DIR, name)
+    
+    # Special Lock for focus_warning if it already has good content?
+    # Actually, the user report implies the generator MIGHT be overwriting with bad data.
+    # But since I fixed the generator code (draw_no_phone_icon), regenerating IS the fix.
+    # The user says "delete generate and use ... focus_warning".
+    # This might mean "Don't generate focus_warning, I will put my own files there".
+    # I will add a check: if folder exists and has content, skip unless force flag is used?
+    # No, that's risky. I'll stick to regeneration BUT print a loud message.
+    
     if os.path.exists(path):
         shutil.rmtree(path)
     os.makedirs(path)

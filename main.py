@@ -612,24 +612,9 @@ class MEMOApp:
                 )
 
                 # --- Handle System Commands ---
-                if cmd == 'idle':
-                    print(">> SYSTEM: Entering IDLE MODE (Clock)")
-                    self.vision_active = False
-                    self.voice_input.set_active(False)
-                    self.scene_state.voice_active = False
-                    self.lcd.set_clock_mode(True)
-                    speak("Entering Idle Mode. Time to chill.")
-                    return
-                    
                 if response:
                     print(f">> MEMO: {response}")
                     speak(response)
-                if cmd == 'focus on':
-                    self.scene_state.focus_mode = True
-                    print(">> SYSTEM: Focus Mode ENABLED")
-                    speak("Entering the zone! No distractions allowed!")
-                    self.lcd.play("focus_scan", loop=True, fps_ms=60)
-                    return
                     
                 if cmd == 'focus off':
                     self.scene_state.focus_mode = False
