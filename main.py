@@ -580,10 +580,10 @@ class MEMOApp:
                 
             clean_frame = frame.copy()
             timestamp_str = time.strftime("%Y%m%d-%H%M%S")
-            filename = f"selfie_{timestamp_str}.jpg"
             cv2.imwrite(filename, clean_frame)
             print(f">> SYSTEM: Saved {filename}")
             speak("Great shot! Photo saved.")
+            self.scene_state.selfie_trigger = False # FIXED: Restore this line!
             self.scene_state.selfie_scheduled_time = 0.0
 
     def _process_dashboard_commands(self):
