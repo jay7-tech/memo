@@ -63,7 +63,7 @@ class QT2120:
                 # Default might be 10-20. User reported 30 still triggered by table bumps.
                 # Increasing to 120 (Halfway). 
                 # This should stop table vibration false positives.
-                self.set_threshold(120) 
+                self.set_threshold(1000) 
                 self.calibrate()
             else:
                 print(f"[Touch] ❌ ID Mismatch (Exp 0x3E, Got 0x{chip_id:02X}). Wiring issue?")
