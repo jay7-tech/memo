@@ -597,17 +597,19 @@ class MEMOApp:
                 cmd = str(raw_cmd).strip().lower()
                 print(f"[Dashboard] DEBUG: Processing '{cmd}' (Type: {type(cmd)}, Repr: {repr(cmd)})")
                 
-                # Special handling for toggle logic controlled here
-                if cmd == 'voice toggle':
-                     if self.voice_input:
-                         new_state = not self.voice_input.is_listening_active
-                         self.voice_input.set_active(new_state)
-                         self.scene_state.voice_active = new_state
-                         status = "enabled" if new_state else "disabled"
-                         print(f">> SYSTEM: Voice {status} via Dashboard")
-                         if new_state: self.lcd.play("listening", loop=True)
-                         else: self.lcd.play("silence", loop=True)
-                     return
+                cmd = str(raw_cmd).strip().lower()
+                print(f"[Dashboard] Processing: '{cmd}'")
+                
+                # Delegate to Central Handler
+                # Pass 'self' (MEMOApp instance) so it can modify state
+                if SystemCommandHandler.handle_system_command(self, cmd):
+                    continue
+
+                # Fallback: Query Handler
+                executed, response = self.command_processor.process(
+                    cmd,
+                    {'scene_state': self.scene_state}
+                )
 
                 # --- Handle System Commands ---
                 if cmd == 'idle':
@@ -619,15 +621,9 @@ class MEMOApp:
                     speak("Entering Idle Mode. Time to chill.")
                     return
                     
-                if cmd in ['wake', 'wakeup']:
-                    print(">> SYSTEM: Waking up from Sleep!")
-                    self.vision_active = True
-                    self.voice_input.set_active(True)
-                    self.scene_state.voice_active = True
-                    self.lcd.set_clock_mode(False)
-                    speak("Hey yo! I'm back!")
-                    return
-
+                if response:
+                    print(f">> MEMO: {response}")
+                    speak(response)
                 if cmd == 'focus on':
                     self.scene_state.focus_mode = True
                     print(">> SYSTEM: Focus Mode ENABLED")
