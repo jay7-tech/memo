@@ -591,8 +591,11 @@ class MEMOApp:
         """Process commands from the dashboard queue."""
         try:
             while not self.scene_state.pending_commands.empty():
-                cmd = self.scene_state.pending_commands.get_nowait()
-                print(f"[Dashboard] Executing: {cmd}")
+                raw_cmd = self.scene_state.pending_commands.get_nowait()
+                if not raw_cmd: continue
+                
+                cmd = str(raw_cmd).strip().lower()
+                print(f"[Dashboard] Executing: '{cmd}' (Raw: '{raw_cmd}')")
                 
                 # Special handling for toggle logic controlled here
                 if cmd == 'voice toggle':
