@@ -103,12 +103,20 @@ class VoiceListener:
     def _init_stt(self, vosk_path):
         """Load STT engines."""
         # 1. Faster-Whisper (Command Transcription)
+        # Using base.en for better accuracy on Pi 5 (it has the RAM)
+        print("[Voice] Initializing Speech-to-Text Engines...")
         try:
             from faster_whisper import WhisperModel
-            self.whisper_model = WhisperModel("tiny.en", device="cpu", compute_type="int8")
-            print("[Voice] ✓ Faster-Whisper (Tiny) Loaded")
+            model_size = "base.en" 
+            print(f"[Voice] Attempting to load Faster-Whisper ({model_size})...")
+            self.whisper_model = WhisperModel(model_size, device="cpu", compute_type="int8")
+            print(f"[Voice] ✓ Faster-Whisper ({model_size}) Ready")
+        except ImportError:
+             print("[Voice] ❌ Faster-Whisper library NOT found. 'pip install faster-whisper' to fix.")
+             print("[Voice] Falling back to Vosk (Lower accuracy for dictation).")
         except Exception as e:
-            print(f"[Voice] Faster-Whisper unavailable ({e}). Fallback to Vosk.")
+            print(f"[Voice] ❌ Faster-Whisper load failed: {e}")
+            print("[Voice] Falling back to Vosk.")
 
         # 2. Vosk (Wake Word & Fallback)
         if os.path.exists(vosk_path):
@@ -127,8 +135,45 @@ class VoiceListener:
             except Exception as e:
                 print(f"[Voice] Vosk Error: {e}")
 
+    def _play_beep(self):
+        """Play a beep sound using PyAudio (Cross-platform)."""
+        try:
+            import math
+            import struct
+            
+            # Generate tone
+            duration = 0.15 # seconds
+            freq = 550.0 # Hz
+            samples = int(self.RATE * duration)
+            
+            # Generate samples
+            audio_data = []
+            for n in range(samples):
+                val = math.sin(2 * math.pi * freq * n / self.RATE)
+                audio_data.append(int(val * 32767.0 * 0.3)) # 0.3 volume
+                
+            # Pack
+            packed_data = struct.pack(f'{len(audio_data)}h', *audio_data)
+            
+            # Play
+            stream = self.audio.open(
+                format=self.FORMAT, channels=self.CHANNELS,
+                rate=self.RATE, output=True
+            )
+            stream.write(packed_data)
+            stream.stop_stream()
+            stream.close()
+        except Exception as e:
+            print(f"[Voice] Beep failed: {e}")
+
     def _run_loop(self):
         """Main loop: Wake Word -> Command."""
+        try:
+             # Calibrate on startup
+             self.calibrate_mic()
+        except:
+             pass
+
         stream = self.audio.open(
             format=self.FORMAT, channels=self.CHANNELS,
             rate=self.RATE, input=True,
@@ -158,7 +203,7 @@ class VoiceListener:
                             self.on_wake()
 
                         # Audio Beep
-                        play_wake_beep()
+                        self._play_beep()
                             
                         self._listen_for_command(stream)
 
@@ -170,8 +215,43 @@ class VoiceListener:
                         print("[Voice] 👂 Listening for Wake Word...")
                         
             except Exception as e:
-                # print(f"[Voice] Loop Error: {e}")
+                print(f"[Voice] Loop Error: {e}")
                 pass
+
+    def calibrate_mic(self, seconds=1.0):
+        """Measure ambient noise level to set dynamic threshold."""
+        print(f"[Voice] 🎤 Calibrating microphone ({seconds}s)...")
+        stream = self.audio.open(
+            format=self.FORMAT, channels=self.CHANNELS,
+            rate=self.RATE, input=True,
+            frames_per_buffer=self.CHUNK
+        )
+        
+        buffer = []
+        import math
+        import numpy as np
+
+        chunks = int(self.RATE * seconds / self.CHUNK)
+        for _ in range(chunks):
+            data = stream.read(self.CHUNK, exception_on_overflow=False)
+            buffer.append(data)
+            
+        stream.stop_stream()
+        stream.close()
+        
+        # Calculate Energy
+        energies = []
+        for chunk in buffer:
+            amp = np.frombuffer(chunk, dtype=np.int16)
+            energies.append(np.abs(amp).mean())
+            
+        avg_noise = sum(energies) / len(energies) if energies else 0
+        
+        # Set Threshold (Noise + Margin)
+        # Margin ensures we don't trigger on air conditioner hum
+        self.energy_threshold = max(300, avg_noise * 1.5)  # Minimum 300 to avoid super-sensitivity
+        print(f"[Voice] Noise Floor: {avg_noise:.1f} | Threshold Set: {self.energy_threshold:.1f}")
+        return self.energy_threshold
 
     def _listen_for_command(self, stream):
         """Record and process command after wake word."""
@@ -180,6 +260,9 @@ class VoiceListener:
         silence_frames = 0
         speech_started = False
         max_duration_frames = int(10 * self.RATE / self.CHUNK) # 10s max
+        
+        # Dynamic Threshold (Use calibrated value)
+        THRESHOLD = getattr(self, 'energy_threshold', 400)
         
         for _ in range(max_duration_frames):
             data = stream.read(self.CHUNK, exception_on_overflow=False)
@@ -190,9 +273,6 @@ class VoiceListener:
             amp = np.frombuffer(data, dtype=np.int16)
             energy = np.abs(amp).mean()
             
-            # Dynamic Threshold (adjust based on your mic)
-            THRESHOLD = 150 
-            
             if energy > THRESHOLD:
                 speech_started = True
                 silence_frames = 0
@@ -201,22 +281,18 @@ class VoiceListener:
             
             # Logic:
             # 1. Wait up to 3s for speech to START
+            # If threshold is high, speech_started never becomes True -> Timeout
             if not speech_started and len(audio_buffer) > (3 * self.RATE / self.CHUNK):
-                print("[Voice] Timeout: No speech detected.")
+                print(f"[Voice] Timeout: Energy {energy:.1f} < Threshold {THRESHOLD:.1f}")
                 return
                 
             # 2. Stop if 1.0s silence AFTER speech started
             if speech_started and silence_frames > (1.0 * self.RATE / self.CHUNK):
-                # print("[Voice] End of speech detected.")
                 break
         
         if speech_started:
             # Play stop-listening beep
-            try:
-                import winsound
-                winsound.Beep(800, 150) # Lower beep
-            except Exception as e:
-                print(f"[Voice] Beep Error: {e}")
+            self._play_beep()
             self._process_command(b''.join(audio_buffer))
 
     def _process_command(self, audio_data):

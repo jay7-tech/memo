@@ -189,6 +189,7 @@ class PerceptionPipeline:
     - Parallel execution via ThreadPoolExecutor
     - Asynchronous face recognition
     - Result caching and lazy initialization
+    - Non-blocking "Fire-and-Forget" pattern
     """
     
     def __init__(self, config: Dict[str, Any] = None):
@@ -210,6 +211,13 @@ class PerceptionPipeline:
         
         # Parallel executor (Separate threads for Detection, Pose, and Face)
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
+        
+        # Active Futures
+        self._futures = {
+            'detections': None,
+            'pose': None,
+            'identity': None
+        }
         
         # Timing
         self._last_detection_time = 0
@@ -243,9 +251,10 @@ class PerceptionPipeline:
             try:
                 # Use the new ONNX engine (Aliased as FaceRecognizer in perception/__init__.py)
                 from perception import FaceRecognizer
-                threshold = self.config.get('face_threshold', 0.6)
+                # Increase default threshold to 0.75 for stricter matching (prevents false positives)
+                threshold = self.config.get('face_threshold', 0.75) 
                 self._face_rec = FaceRecognizer(threshold=threshold)
-                print("[Perception] Face recognition initialized")
+                print(f"[Perception] Face recognition initialized (Threshold: {threshold})")
             except Exception as e:
                 print(f"[Perception] Face rec unavailable: {e}")
                 self._face_rec = False  # Mark as unavailable
@@ -266,156 +275,189 @@ class PerceptionPipeline:
     def process(self, frame, run_detection=True, run_pose=True, run_face=False) -> Dict[str, Any]:
         """
         Process a frame through the perception pipeline in parallel.
+        Non-blocking: Returns buffered results immediately. checks for updates.
         """
-        futures = {}
         
-        # Start tasks in parallel
-        if run_detection:
-            self._init_detector()
-            futures['detections'] = self.executor.submit(self._detector.detect, frame)
-            
-        if run_pose:
-            self._init_pose()
-            futures['pose'] = self.executor.submit(self._pose_estimator.estimate, frame)
-            
-        if run_face and self._face_rec is not False:
-            self._init_face_rec()
-            if self._face_rec:
-                # Face recognition depends on pose results, but we can attempt it 
-                # on the *previous* frame's pose or run it as a follow-on.
-                # Here we submit it as a task that will wait if needed.
-                # Optimization: Face rec is expensive, run only if person is present.
-                futures['identity'] = self.executor.submit(self._async_face_rec, frame)
-
-        # Gather results with timeouts
-        results = {
-            'detections': self._last_detections,
-            'pose': self._last_pose,
-            'identity': self._last_identity,
-            'face_score': self._last_face_score
-        }
-        
+        # 1. CHECK & RETRIEVE COMPLETED TASKS
         try:
-            # Each result call is protected by a small timeout
-            if 'detections' in futures:
+            # Detections
+            if self._futures['detections'] and self._futures['detections'].done():
                 try:
-                    results['detections'] = futures['detections'].result(timeout=0.1)
-                    self._last_detections = results['detections']
-                except concurrent.futures.TimeoutError:
-                    pass
-                
-            if 'pose' in futures:
+                    self._last_detections = self._futures['detections'].result()
+                except Exception as e:
+                    print(f"[Perception] Detection error: {e}")
+                finally:
+                    self._futures['detections'] = None # Clear for next run
+            
+            # Pose
+            if self._futures['pose'] and self._futures['pose'].done():
                 try:
-                    all_poses = futures['pose'].result(timeout=0.1)
-                    # Cache all poses for next face rec cycle
+                    all_poses = self._futures['pose'].result()
                     self._last_all_poses = all_poses
                     
-                    # Default primary pose = Largest (index 0 due to sorting in PoseEstimator?) 
-                    # Actually PoseEstimator just appends. Let's start with first.
                     if all_poses:
-                        # Sort by area
                         sorted_poses = sorted(all_poses, key=lambda x: x.get('area',0), reverse=True)
-                        self._last_pose = sorted_poses[0] # Default to largest
+                        self._last_pose = sorted_poses[0]
                     else:
                         self._last_pose = None
-                        
-                    results['pose'] = self._last_pose
-                except concurrent.futures.TimeoutError:
-                    pass
-                
-            if 'identity' in futures:
+                except Exception as e:
+                    print(f"[Perception] Pose error: {e}")
+                finally:
+                    self._futures['pose'] = None
+
+            # Identity
+            if self._futures['identity'] and self._futures['identity'].done():
                 try:
-                    # Async Face Rec returns (Name, Score, MatchingPose)
-                    res = futures['identity'].result(timeout=0.2)
-                    
+                    res = self._futures['identity'].result()
                     if res:
-                        # 1. Strong Match Found
                         name, score, matching_pose = res
                         self._last_identity = name
                         self._last_face_score = score
-                        self._last_pose = matching_pose
+                        self._last_pose = matching_pose # Sync pose
                         
-                        # Update tracking bbox
+                        # Update tracker
                         try:
                             kp = matching_pose['keypoints']
                             xs = [p[0] for p in kp.values()]
                             ys = [p[1] for p in kp.values()]
                             self._last_primary_bbox = [min(xs), min(ys), max(xs)-min(xs), max(ys)-min(ys)]
                         except:
-                            self._last_primary_bbox = None
-                            
+                            pass
                     else:
-                        # 2. No Match Found (Blur/Angle) -> Fallback to Spatial Tracking
-                        self._last_identity = None
-                        self._last_face_score = 0.0
+                        # No face match -> Fallback to Spatial Tracking
+                        self._spatial_track_identity()
                         
-                        # Try to recover the Primary Person using spatial tracking (IOU)
-                        if self._last_primary_bbox and self._last_all_poses:
-                            bx, by, bw, bh = self._last_primary_bbox
-                            best_iou = 0.0
-                            tracked_pose = None
-                            
-                            for pose in self._last_all_poses:
-                                try:
-                                    kp = pose['keypoints']
-                                    pxs = [p[0] for p in kp.values()]
-                                    pys = [p[1] for p in kp.values()]
-                                    pw, ph = max(pxs)-min(pxs), max(pys)-min(pys)
-                                    px, py = min(pxs), min(pys)
-                                    
-                                    # IOU
-                                    ix1 = max(bx, px)
-                                    iy1 = max(by, py)
-                                    ix2 = min(bx+bw, px+pw)
-                                    iy2 = min(by+bh, py+ph)
-                                    
-                                    if ix2 > ix1 and iy2 > iy1:
-                                        inter = (ix2-ix1)*(iy2-iy1)
-                                        union = (bw*bh) + (pw*ph) - inter
-                                        iou = inter / union
-                                        if iou > best_iou:
-                                            best_iou = iou
-                                            tracked_pose = pose
-                                except:
-                                    continue
-                            
-                            if best_iou > 0.3: # Decent overlap maintenance
-                                self._last_pose = tracked_pose
-                                # Update tracking bbox (drift)
-                                try:
-                                    kp = tracked_pose['keypoints']
-                                    pxs = [p[0] for p in kp.values()]
-                                    pys = [p[1] for p in kp.values()]
-                                    self._last_primary_bbox = [min(pxs), min(pys), max(pxs)-min(pxs), max(pys)-min(pys)]
-                                except:
-                                    pass
-                            else:
-                                # Tracking lost
-                                self._last_primary_bbox = None
-                    
-                    results['identity'] = self._last_identity
-                    results['face_score'] = self._last_face_score
-                    results['pose'] = self._last_pose # Ensure this overrides the default
-                    
-                except concurrent.futures.TimeoutError:
-                    pass
+                except Exception as e:
+                    print(f"[Perception] Identity error: {e}")
+                finally:
+                    self._futures['identity'] = None
                     
         except Exception as e:
-            # Outer catch for unexpected implementation errors
-            print(f"[Perception] Pipeline error: {e}") 
+            print(f"[Perception] Future retrieval error: {e}")
+
+        # 2. SUBMIT NEW TASKS (Only if idle AND enough time has passed)
+        # We need a copy of the frame for threaded processing to avoid race conditions
+        # if the main loop modifies 'frame' (draws on it) while inference runs.
+        # But copying is expensive (10ms+ for 1080p).
+        # Assuming 'frame' passed here is safe or effectively immutable for the duration of submit.
+        # Ideally, main.py should pass a copy or not modify the buffer it passes.
+        
+        now = time.time()
+        
+        # Throttling intervals (seconds)
+        # Vision is heavy! We don't need 100 FPS inference.
+        # 0.07s = ~14 FPS for detection (plenty for smooth tracking)
+        # 0.20s = 5 FPS for face rec (enough to catch you)
+        DETECTION_INTERVAL = 0.07 
+        FACE_REC_INTERVAL = 0.20
+        
+        should_run_det = run_detection and (now - self._last_detection_time > DETECTION_INTERVAL)
+        should_run_face = run_face and (now - self._last_face_time > FACE_REC_INTERVAL)
+        
+        if should_run_det and self._futures['detections'] is None:
+            self._init_detector()
+            # Shallow copy or assumes safe usage.
+            # Use frame.copy() if you see tearing.
+            self._futures['detections'] = self.executor.submit(self._detector.detect, frame.copy())
+            self._last_detection_time = now
             
-        return results
+        if run_pose and self._futures['pose'] is None:
+            # Pose is tied to detection usually, but let's just run it if free.
+            # Pose is relatively cheap on OAK, but expensive on CPU. Throttle match detection.
+            if now - self._last_detection_time > DETECTION_INTERVAL:
+                self._init_pose()
+                self._futures['pose'] = self.executor.submit(self._pose_estimator.estimate, frame.copy())
+            
+        if should_run_face and self._face_rec is not False and self._futures['identity'] is None:
+            self._init_face_rec()
+            if self._face_rec:
+                # Face rec runs on the frame + the MOST RECENT poses we have
+                # This introduces a slight lag (Face Rec runs on Frame N using Poses from Frame N-1 or N-x)
+                # But it's better than blocking.
+                if self._last_all_poses:
+                   self._futures['identity'] = self.executor.submit(self._async_face_rec, frame.copy(), self._last_all_poses)
+                   self._last_face_time = now
+
+        # 3. RETURN BUFFERED RESULTS
+        return {
+            'detections': self._last_detections,
+            'pose': self._last_pose,
+            'identity': self._last_identity,
+            'face_score': self._last_face_score
+        }
+
+    def _spatial_track_identity(self):
+        """
+        Attempt to maintain identity via spatial tracking (IOU) when face rec fails/skips.
+        Prevents 'Sticky Identity' by expiring tracker quickly if no face is seen.
+        """
+        self._last_identity = None
+        self._last_face_score = 0.0
+        
+        if self._last_primary_bbox and self._last_all_poses:
+            bx, by, bw, bh = self._last_primary_bbox
+            best_iou = 0.0
+            tracked_pose = None
+            
+            for pose in self._last_all_poses:
+                try:
+                    kp = pose['keypoints']
+                    pxs = [p[0] for p in kp.values()]
+                    pys = [p[1] for p in kp.values()]
+                    pw, ph = max(pxs)-min(pxs), max(pys)-min(pys)
+                    px, py = min(pxs), min(pys)
+                    
+                    # IOU
+                    ix1 = max(bx, px)
+                    iy1 = max(by, py)
+                    ix2 = min(bx+bw, px+pw)
+                    iy2 = min(by+bh, py+ph)
+                    
+                    if ix2 > ix1 and iy2 > iy1:
+                        inter = (ix2-ix1)*(iy2-iy1)
+                        union = (bw*bh) + (pw*ph) - inter
+                        iou = inter / union
+                        if iou > best_iou:
+                            best_iou = iou
+                            tracked_pose = pose
+                except:
+                    continue
+            
+            # Strict IOU threshold to prevent jumping
+            if best_iou > 0.4:
+                # We track the POSE, but we DO NOT assume identity persists indefinitely.
+                # If face rec failed (blur/angle), we can keep identity for a short 
+                # "grace period" (e.g. 5-10 frames), but here we are stateless between calls 
+                # except for self._last_identity which was just cleared.
+                
+                # FIX: Do NOT restore self._last_identity blindly.
+                # If we are here, it means Face Rec returned NOTHING (or wasn't run).
+                # We should only return 'Unknown' or 'Person' to avoid false positives.
+                # The SceneState in main.py has its own persistence logic (1.0s) 
+                # which is better suited for 'flicker' prevention.
+                # So here, we just track the BBOX so that when face IS seen, we know who it is.
+                
+                self._last_pose = tracked_pose
+                # Update bbox
+                try:
+                    kp = tracked_pose['keypoints']
+                    pxs = [p[0] for p in kp.values()]
+                    pys = [p[1] for p in kp.values()]
+                    self._last_primary_bbox = [min(pxs), min(pys), max(pxs)-min(pxs), max(pys)-min(pys)]
+                except:
+                    pass
+            else:
+                self._last_primary_bbox = None
+
     
-    def _async_face_rec(self, frame) -> Optional[tuple]:
+    def _async_face_rec(self, frame, poses) -> Optional[tuple]:
         """
         Helper for parallel face recognition.
         Iterates through ALL tracked poses to find a registered user.
         Returns: (Identity, Score, MatchingPoseDict) or None
         """
-        if not self._last_all_poses: # Use the full list!
+        if not poses: # Use the provided poses!
             return None
-            
-        poses = self._last_all_poses
         
         best_match = None
         best_score = 0.0

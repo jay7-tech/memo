@@ -964,8 +964,15 @@ class MEMOApp:
                     speak(f"Voice {status}")
             else:
                 # Still check if we should quit via console or other events
-                # Just a tiny sleep to keep CPU sane
-                time.sleep(0.01)
+                if not self.vision_active:
+                     time.sleep(0.05) # Sleep more if vision sleeping
+            
+            # --- CAP FPS to 30 ---
+            elapsed = time.time() - now
+            target_fps = 30
+            time_per_frame = 1.0 / target_fps
+            if elapsed < time_per_frame:
+                time.sleep(time_per_frame - elapsed)
         
         # Cleanup
         print("\n[MEMO] Shutting down...")
