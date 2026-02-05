@@ -327,7 +327,7 @@ def anim_silence(draw, i, total, layer='core'):
 
 def anim_happy(draw, i, total, layer='core'):
     # Bouncing
-    bounce = math.abs(math.sin((i/total) * math.pi * 2)) * 20
+    bounce = abs(math.sin((i/total) * math.pi * 2)) * 20
     y = 256 - bounce
     w = 180
     h = 240
