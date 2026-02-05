@@ -141,18 +141,20 @@ def anim_scan(draw, i, total, layer='core'):
         draw.line([512-m, 512-m, 512-m, 512-m-l], fill=(0, 120, 255, 255), width=8)
 
 def draw_no_phone_icon(draw, cx, cy, scale, fill):
-    # Phone Body
+    # Phone Body (Simple Rect)
     pw, ph = 60*scale, 100*scale
-    draw.rounded_rectangle([cx-pw/2, cy-ph/2, cx+pw/2, cy+ph/2], radius=10*scale, fill=None, outline=fill, width=8)
-    # Screen (Solid)
-    draw.rounded_rectangle([cx-pw/2+8, cy-ph/2+8, cx+pw/2-8, cy+ph/2-8], radius=5*scale, fill=fill)
+    x0, y0 = cx-pw/2, cy-ph/2
+    x1, y1 = cx+pw/2, cy+ph/2
     
-    # Prohibit
+    # Outer Body
+    draw.rectangle([x0, y0, x1, y1], outline=fill, width=8)
+    # Screen (Solid)
+    draw.rectangle([x0+8, y0+8, x1-8, y1-8], fill=fill)
+    
+    # Prohibit Circle
     r = 70 * scale
-    # Circle
     draw.ellipse([cx-r, cy-r, cx+r, cy+r], outline=COLOR_RED, width=10)
     # Slash
-    # 45 deg line
     lx = r * 0.707
     draw.line([cx-lx, cy-lx, cx+lx, cy+lx], fill=COLOR_RED, width=10)
 
