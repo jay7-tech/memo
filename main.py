@@ -885,6 +885,7 @@ class MEMOApp:
         
         # Main loop
         while self.running:
+            now = time.time() # START OF FRAME TIMER
             frame = cam.get_frame()
             if frame is None:
                 time.sleep(0.01)
