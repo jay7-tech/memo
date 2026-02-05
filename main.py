@@ -580,6 +580,7 @@ class MEMOApp:
                 
             clean_frame = frame.copy()
             timestamp_str = time.strftime("%Y%m%d-%H%M%S")
+            filename = f"selfie_{timestamp_str}.jpg"
             cv2.imwrite(filename, clean_frame)
             print(f">> SYSTEM: Saved {filename}")
             speak("Great shot! Photo saved.")

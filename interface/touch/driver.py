@@ -60,17 +60,13 @@ class QT2120:
                 print("[Touch] ✓ QT2120 Connected")
                 self.connected = True
                 self.reset()
-                # User request: "sensitivity make it verryyyy high" (Meaning High Threshold).
-                # User tried 1000, which wraps (1000%256=232). 
-                # We will set MAX stable threshold: 255.
-                # If this trigger false positives, it's electrical noise (antennas).
-                self.set_threshold(50) # Moderate (255 was too high/maybe wrapped?)
-                # Actually user said 255 was least sensitive. Let's try 50 first if 255 was confusing.
-                # Datasheet: Higher val causing less sensitivity?
-                # User tried 255 and got ghosts (but reg was wrong).
-                # Let's set 50 (Verified safe mid-range) + Strong Filter.
-                self.set_threshold(100) 
-                self.set_integrator(10) # 160ms robust filtering
+                # User Request: "verryyyy high" sensitivity (Actually means STABLE from ghosts).
+                # Register Map Fixed (0x06 start).
+                # Threshold: 255 = Least Sensitive (Hardest to press).
+                # Integrator: 20 = Strong Noise Filter.
+                
+                self.set_threshold(255) # Max stability
+                self.set_integrator(20) # Strong filter
                 self.calibrate()
             else:
                 print(f"[Touch] ❌ ID Mismatch (Exp 0x3E, Got 0x{chip_id:02X}). Wiring issue?")
