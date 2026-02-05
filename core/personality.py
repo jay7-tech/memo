@@ -408,7 +408,7 @@ class AIPersonality:
             prompt_lower = prompt.lower().strip()
 
             NEWS_TRIGGERS = [
-                "mino news",
+
                 "buzz",
                 "what's buzz",
                 "whats buzz",

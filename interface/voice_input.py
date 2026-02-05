@@ -66,9 +66,9 @@ class VoiceListener:
         
         # Custom Wake Words (Grammar)
         self.wake_words = [
-            "hey memo", "hey mino", "hey bot",
-            "yo memo", "yo mino", "yo bot",
-            "memo", "mino"
+            "hey memo", "hey bot",
+            "yo memo", "yo bot",
+            "memo"
         ]
         
         # STT Engines

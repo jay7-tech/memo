@@ -277,7 +277,7 @@ class HighFidelityTranscriber:
         # 2. Direct Commands (Bypass Wake Word)
         direct_triggers = [
             "buzz", "focus on", "focus off", "voice off", 
-            "quit", "memo news", "mino news", "updates",
+            "quit", "memo news", "updates",
             "stop", "silence", "pause"
         ]
         

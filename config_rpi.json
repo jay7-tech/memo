@@ -33,7 +33,6 @@
         "enable_voice_input": true,
         "enable_wake_word": false,
         "wake_words": [
-            "hey mino",
             "hey memo"
         ],
         "wake_word_threshold": 0.5,
