@@ -60,14 +60,16 @@ class QT2120:
                 print("[Touch] ✓ QT2120 Connected")
                 self.connected = True
                 self.reset()
-                # User Request: "verryyyy high" sensitivity (Actually means STABLE from ghosts).
-                # Register Map Fixed (0x0A start).
-                # Threshold: 255 = Least Sensitive (Hardest to press).
+                print("[Touch] ✓ QT2120 Connected")
+                self.connected = True
+                self.reset()
                 
-                self.set_threshold(50) 
-                 # 255 might be too high for a valid delta? Let's try 50 (Standard High).
-                 # Wait, user said 255 is least sensitive. Let's try 100.
-                self.set_threshold(100)
+                # --- Configuration for STABILITY ---
+                # 1. Thresholds (NTHR): 255 = Max Resistance to press.
+                #    Registers 0x0A - 0x15
+                self.set_threshold(150) # Start with safe high value (200 might be too hard)
+                 
+                # 2. Calibration
                 self.calibrate()
             else:
                 print(f"[Touch] ❌ ID Mismatch (Exp 0x3E, Got 0x{chip_id:02X}). Wiring issue?")
@@ -84,19 +86,9 @@ class QT2120:
         for reg in range(0x0A, 0x16): 
             self.write_reg(reg, value)
             
-    def set_integrator(self, value):
-        """Set Detection Integrator (Noise Filter). Register 0x0B (DI) on some, but check map."""
-        # QT2120 DI register is actually shared or specific?
-        # Datasheet says "DI" is often global.
-        # Let's assume 0x1C from snippet was close, or 0x05?
-        # Safe bet: Write to known DI if possible. For now, trust snippet 0x1C.
-        # Wait, if map shifts, 0x1C might be wrong.
-        # Disabling integrator write to be safe, stick to thresholds first.
-        # UNLESS we are sure.
-        # Let's comment it out to reduce variables. Pure threshold fix first.
-        pass
-        # value = max(0, min(32, value))
-        # self.write_reg(0x1C, value)
+    # def set_integrator(self, value):
+    #    """Integrator filter (DI). Address uncertain, disabling to prevent issues."""
+    #    pass
 
     def read_reg(self, reg):
         try:
