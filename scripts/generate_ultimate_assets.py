@@ -66,6 +66,217 @@ def draw_vector_eye(draw, cx, cy, w, h, fill, mood='neutral', glow=False):
     gy = cy - h*0.25
     draw.rounded_rectangle([gx, gy, gx+gw, gy+gh], radius=5, fill=COLOR_WHITE)
 
+def render_frame_with_glow(func, idx, total):
+    # Setup RGBA for Glow
+    img = Image.new('RGBA', CANVAS_SIZE, (10, 10, 15, 255))
+    
+    # 1. Glow Layer
+    glow_layer = Image.new('RGBA', CANVAS_SIZE, (0,0,0,0))
+    g_draw = ImageDraw.Draw(glow_layer)
+    func(g_draw, idx, total, layer='glow')
+    
+    # Blur Glow
+    glow_layer = glow_layer.filter(ImageFilter.GaussianBlur(20))
+    
+    # 2. Core Layer
+    core_layer = Image.new('RGBA', CANVAS_SIZE, (0,0,0,0))
+    c_draw = ImageDraw.Draw(core_layer)
+    func(c_draw, idx, total, layer='core')
+    
+    # Composite
+    img = Image.alpha_composite(img, glow_layer)
+    img = Image.alpha_composite(img, core_layer)
+    
+    # Resize
+    img = img.resize(TARGET_SIZE, Image.Resampling.LANCZOS)
+    return img.convert('RGB')
+
+# --- Animation Functions adapted for Layers ---
+
+def anim_idle(draw, i, total, layer='core'):
+    # Breathing scale
+    cycle = math.sin((i / total) * math.pi * 2) 
+    scale = 1.0 + (cycle * 0.02)
+    
+    w = 180 * scale
+    h = 240 * scale 
+    y = 256
+    
+    fill = COLOR_CYAN
+    if layer == 'glow':
+        fill = (0, 255, 255, 100) # Semi-transp/Darker Cyan for glow
+        # Draw slightly larger for glow?
+        w += 20
+        h += 20
+    else:
+        fill = (0, 255, 255, 255)
+        
+    draw_vector_eye(draw, 140, y, w, h, fill, mood='neutral')
+    draw_vector_eye(draw, 372, y, w, h, fill, mood='neutral')
+
+def anim_scan(draw, i, total, layer='core'):
+    pan = math.sin((i/total)*math.pi*2) * 30
+    w = 180
+    h = 200
+    y = 256
+    
+    fill = COLOR_BLUE
+    if layer == 'glow':
+        fill = (0, 120, 255, 100)
+        w += 20
+        h += 20
+    else:
+        fill = (0, 120, 255, 255)
+
+    draw_vector_eye(draw, 140+pan, y, w, h, fill, mood='scan')
+    draw_vector_eye(draw, 372+pan, y, w, h, fill, mood='scan')
+    
+    # HUD (Only on core)
+    if layer == 'core':
+        m = 20
+        l = 40
+        draw.line([m, m, m+l, m], fill=(0, 120, 255, 255), width=8) 
+        draw.line([m, m, m, m+l], fill=(0, 120, 255, 255), width=8)
+        draw.line([512-m, 512-m, 512-m-l, 512-m], fill=(0, 120, 255, 255), width=8)
+        draw.line([512-m, 512-m, 512-m, 512-m-l], fill=(0, 120, 255, 255), width=8)
+
+def draw_no_phone_icon(draw, cx, cy, scale, fill):
+    # Phone Body
+    pw, ph = 60*scale, 100*scale
+    draw.rounded_rectangle([cx-pw/2, cy-ph/2, cx+pw/2, cy+ph/2], radius=10*scale, fill=None, outline=fill, width=8)
+    # Screen (Solid)
+    draw.rounded_rectangle([cx-pw/2+8, cy-ph/2+8, cx+pw/2-8, cy+ph/2-8], radius=5*scale, fill=fill)
+    
+    # Prohibit
+    r = 70 * scale
+    # Circle
+    draw.ellipse([cx-r, cy-r, cx+r, cy+r], outline=COLOR_RED, width=10)
+    # Slash
+    # 45 deg line
+    lx = r * 0.707
+    draw.line([cx-lx, cy-lx, cx+lx, cy+lx], fill=COLOR_RED, width=10)
+
+def anim_warn(draw, i, total, layer='core'):
+    shake = random.randint(-2, 2) if i%2==0 else 0
+    w = 180
+    h = 220
+    y = 256 + shake
+    
+    # Eyes (Bg) - Angry Red
+    fill = COLOR_RED
+    if layer == 'glow':
+        fill = (255, 40, 40, 80) # Dimmers for glow
+        w += 20
+        h += 20
+    else:
+        fill = (255, 40, 40, 255)
+        
+    draw_vector_eye(draw, 140+shake, y, w, h, fill, mood='angry')
+    draw_vector_eye(draw, 372+shake, y, w, h, fill, mood='angry')
+    
+    # Overlay Icon
+    if layer == 'core':
+        pulse = (math.sin(i*0.5)+1)*0.5 # 0-1
+        scale = 1.0 + pulse * 0.1
+        draw_no_phone_icon(draw, 256, 256, scale, COLOR_WHITE)
+
+def anim_listening(draw, i, total, layer='core'):
+    # Pulse size rapidly
+    pulse = math.sin((i/total) * math.pi * 4) # Fast pulse
+    scale = 1.0 + (pulse * 0.05)
+    
+    w = 180 * scale
+    h = 240 * scale
+    
+    fill = COLOR_CYAN
+    if layer == 'glow':
+        fill = (0, 255, 255, 100)
+        w += 20
+        h += 20
+    else:
+         fill = (0, 255, 255, 255)
+         
+    draw_vector_eye(draw, 140, 256, w, h, fill, mood='neutral')
+    draw_vector_eye(draw, 372, 256, w, h, fill, mood='neutral')
+
+def anim_thinking(draw, i, total, layer='core'):
+    # Eyes look up/around
+    # Use Sine to move pupils/eyes? 
+    # Just moving the whole eye shape for vector style
+    
+    dx = math.sin((i/total) * math.pi * 2) * 20
+    dy = math.cos((i/total) * math.pi * 4) * 15 # Faster vertical
+    
+    w = 180
+    h = 240
+    
+    fill = COLOR_BLUE
+    if layer == 'glow':
+        fill = (0, 120, 255, 100)
+        w += 20
+        h += 20
+    else:
+        fill = (0, 120, 255, 255)
+        
+    # Asymmetric movement? No, look together
+    draw_vector_eye(draw, 140+dx, 256-dy, w, h, fill, mood='neutral')
+    draw_vector_eye(draw, 372+dx, 256-dy, w, h, fill, mood='neutral')
+
+def anim_blink(draw, i, total, layer='core'):
+    # 0-10: Open
+    # 10-15: Closing
+    # 15-20: Closed
+    # 20-25: Opening
+    # 25-30: Open
+    
+    h_scale = 1.0
+    if 10 <= i < 15:
+        h_scale = 1.0 - ((i-10)/5.0)
+    elif 15 <= i < 20:
+        h_scale = 0.1 # Flat line
+    elif 20 <= i < 25:
+        h_scale = 0.1 + ((i-20)/5.0)
+        
+    w = 180
+    h = 240 * h_scale
+    if h < 10: h = 10
+    
+    fill = COLOR_CYAN
+    if layer == 'glow':
+        fill = (0, 255, 255, 100)
+        w += 20
+        h += 20
+    else:
+        fill = (0, 255, 255, 255)
+        
+    draw_vector_eye(draw, 140, 256, w, h, fill)
+    draw_vector_eye(draw, 372, 256, w, h, fill)
+
+def anim_wink(draw, i, total, layer='core'):
+    # Right eye blinks (Wink)
+    h_scale = 1.0
+    if 5 <= i < 15: # Close
+        h_scale = 0.1
+        
+    w = 180
+    h = 240
+    
+    fill = COLOR_CYAN
+    if layer == 'glow':
+        fill = (0, 255, 255, 100)
+        w += 20
+        h += 20
+    else:
+        fill = (0, 255, 255, 255)
+        
+    # Left logic (Open)
+    draw_vector_eye(draw, 140, 256, w, h, fill)
+    
+    # Right logic (Blink)
+    h_right = h * h_scale
+    if h_right < 10: h_right = 10
+    draw_vector_eye(draw, 372, 256, w, h_right, fill)
+
 def draw_heart(draw, cx, cy, size, fill):
     # Simple Heart Shape
     # 2 circles + triangle
