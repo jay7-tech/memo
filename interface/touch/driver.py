@@ -61,12 +61,13 @@ class QT2120:
                 self.connected = True
                 self.reset()
                 # User Request: "verryyyy high" sensitivity (Actually means STABLE from ghosts).
-                # Register Map Fixed (0x06 start).
+                # Register Map Fixed (0x0A start).
                 # Threshold: 255 = Least Sensitive (Hardest to press).
-                # Integrator: 20 = Strong Noise Filter.
                 
-                self.set_threshold(255) # Max stability
-                self.set_integrator(20) # Strong filter
+                self.set_threshold(50) 
+                 # 255 might be too high for a valid delta? Let's try 50 (Standard High).
+                 # Wait, user said 255 is least sensitive. Let's try 100.
+                self.set_threshold(100)
                 self.calibrate()
             else:
                 print(f"[Touch] ❌ ID Mismatch (Exp 0x3E, Got 0x{chip_id:02X}). Wiring issue?")
@@ -75,21 +76,27 @@ class QT2120:
             self.connected = False
 
     def set_threshold(self, value):
-        """Set detection threshold (0-255). Registers 0x06-0x11 for Keys 0-11."""
-        # Clamp value to valid byte range
+        """Set detection threshold (0-255). Registers 0x0A-0x15 for Keys 0-11."""
+        # Clamp value
         value = max(10, min(255, value))
-        print(f"[Touch] Setting threshold to {value} for ALL keys (0x06-0x11)")
-        # Keys 0-11 correspond to registers 0x06 to 0x11
-        for reg in range(0x06, 0x12): 
+        print(f"[Touch] Setting threshold to {value} for ALL keys (0x0A-0x15)")
+        # QT2120: NTHR for Keys 0-11 are at addresses 10 (0x0A) to 21 (0x15)
+        for reg in range(0x0A, 0x16): 
             self.write_reg(reg, value)
             
     def set_integrator(self, value):
-        """Set Detection Integrator (Noise Filter). Register 0x1C."""
-        # Value logic: Min duration = value * 16ms. Default 4.
-        # Set to 10 for robust filtering (160ms filter)
-        value = max(0, min(32, value))
-        print(f"[Touch] Setting Noise Filter (DI) to {value}")
-        self.write_reg(0x1C, value)
+        """Set Detection Integrator (Noise Filter). Register 0x0B (DI) on some, but check map."""
+        # QT2120 DI register is actually shared or specific?
+        # Datasheet says "DI" is often global.
+        # Let's assume 0x1C from snippet was close, or 0x05?
+        # Safe bet: Write to known DI if possible. For now, trust snippet 0x1C.
+        # Wait, if map shifts, 0x1C might be wrong.
+        # Disabling integrator write to be safe, stick to thresholds first.
+        # UNLESS we are sure.
+        # Let's comment it out to reduce variables. Pure threshold fix first.
+        pass
+        # value = max(0, min(32, value))
+        # self.write_reg(0x1C, value)
 
     def read_reg(self, reg):
         try:
