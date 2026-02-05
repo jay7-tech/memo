@@ -60,10 +60,11 @@ class QT2120:
                 print("[Touch] ✓ QT2120 Connected")
                 self.connected = True
                 self.reset()
-                # Default might be 10-20. User reported 30 still triggered by table bumps.
-                # Increasing to 120 (Halfway). 
-                # This should stop table vibration false positives.
-                self.set_threshold(1000) 
+                # User request: "sensitivity make it verryyyy high" (Meaning High Threshold).
+                # User tried 1000, which wraps (1000%256=232). 
+                # We will set MAX stable threshold: 255.
+                # If this trigger false positives, it's electrical noise (antennas).
+                self.set_threshold(255) 
                 self.calibrate()
             else:
                 print(f"[Touch] ❌ ID Mismatch (Exp 0x3E, Got 0x{chip_id:02X}). Wiring issue?")
@@ -73,6 +74,8 @@ class QT2120:
 
     def set_threshold(self, value):
         """Set detection threshold (0-255). Registers 0x10-0x1B imply Keys 0-11."""
+        # Clamp value to valid byte range
+        value = max(0, min(255, value))
         print(f"[Touch] Setting threshold to {value} for ALL keys")
         # Write to 0x10 (Key 0) through 0x1B (Key 11)
         for reg in range(0x10, 0x1C): 

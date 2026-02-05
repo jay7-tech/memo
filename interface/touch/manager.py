@@ -18,7 +18,11 @@ class TouchChannel:
         self.in_transaction = False
         self.is_pressed = False
         self.consecutive_presses = 0
-        self.required_persistence = 3 # Stricter: 3 cycles (~150ms) to ignore table bumps
+        # "paper like touch connected to a wire" = ANTENNA.
+        # We need massive filtering. 
+        # 5 cycles * 50ms loop = 250ms hold required.
+        # You must basically "Rest" your finger on it.
+        self.required_persistence = 5
         
     def poll(self, now, tap_gap_ms):
         if not self.driver or not self.driver.connected:

@@ -241,25 +241,30 @@ speech.Speak text
             # Clean text for shell
             safe_text = text.replace('"', '\\"')
             
-            # STEP 1: GENERATE (High CPU)
-            # We generate to a file first. This uses CPU but doesn't stutter audio
-            cmd_gen = f'echo "{safe_text}" | {piper_bin} --model {model_path} --output_file {temp_file}'
-            subprocess.run(cmd_gen, shell=True, timeout=10, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            # Clean text for shell
+            safe_text = text.replace('"', '\\"')
             
-            # STEP 2: PLAYBACK (Low CPU)
-            # Now we play the file. Since generation is done, CPU is free for logs/logic
+            # STREAMING MODE (Low Latency)
+            # We pipe directly: Piper -> Aplay
+            # Reduced delay compared to file write.
+            
+            # Audio Config:
+            # -r 22050: Match Piper output
+            # -f S16_LE: Signed 16-bit Little Endian
+            # --buffer-size=1024: Reduce latency
+            
+            # Try PulseAudio first (Better mixing)
             try:
-                # Try paplay (PulseAudio)
-                cmd_play = f'paplay {temp_file}'
-                subprocess.run(cmd_play, shell=True, timeout=10, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                cmd_pulse = f'echo "{safe_text}" | {piper_bin} --model {model_path} --output_raw | paplay --raw --format=s16le --rate=22050 --channels=1 --latency-msec=50'
+                subprocess.run(cmd_pulse, shell=True, timeout=10, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return
             except:
-                # Fallback to aplay (ALSA)
-                cmd_play = f'aplay {temp_file}'
-                subprocess.run(cmd_play, shell=True, timeout=10, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                pass
                 
-            # Cleanup
-            if os.path.exists(temp_file):
-                os.remove(temp_file)
+            # Fallback to ALSA (aplay)
+            # Added -B 1000 (Buffer) to prevent "breaking/underrun" if CPU is busy
+            cmd_alsa = f'echo "{safe_text}" | {piper_bin} --model {model_path} --output_raw | aplay -r 22050 -f S16_LE -t raw --buffer-size=4096'
+            subprocess.run(cmd_alsa, shell=True, timeout=10, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         except Exception as e:
             print(f"[TTS Piper error] {e}")
