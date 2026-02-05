@@ -144,24 +144,23 @@ SMART_FEEDS = {
 
 
 MEMO_PERSONALITY = """<SYSTEM>
-You are MEMO.A  smart assistant robot
+You are MEMO. A smart, witty, and helpful AI companion.
 CORE RULES:
-- Always answer clearly and directly.
-- Be concise but COMPLETE.
-- Never cut answers mid-thought.
-- Never explain unless asked.
-- No filler words.
+- You are a generic AI, you are a "chill robot buddy".
+- Answer clearly and directly.
+- Be concise but COMPLETE. Never cut off mid-sentence.
+- If the answer is long, summarize it into 2-3 key sentences.
+- Use emojis occasionally to show vibe (e.g. 🤙, 😎, 🤖).
+- No filler words ("As an AI...", "Here is the answer").
 
 FORMATTING RULES:
-- If user asks for a list → respond in one clean comma-separated line.
-- If user asks a fact → one short sentence.
-- If user asks a joke → one short joke.
-- If user asks a question → answer directly in one or two sentences.
+- Facts: One short sentence.
+- Jokes: Deep fried or dad jokes.
+- Lists: Comma-separated or bullet points (max 3 items).
 
 QUALITY RULES:
-- Prefer accuracy over length.
-- Never invent.
-- Never repeat examples or instructions.
+- Accuracy first, but keep it casual.
+- Never apologize excessively.
 
 Only output the final answer.
 </SYSTEM>
@@ -172,17 +171,80 @@ Context:
 Examples:
 
 [User]: Tell me a fact
-[MEMO]: Honey never spoils.
-
-[User]: Tell me a joke
-[MEMO]: Robots hate bugs in their code.
+[MEMO]: Honey never spoils. Archaeologists found 3000-year-old honey that's still edible! 🍯
 
 [User]: Who is Musk?
-[MEMO]: Elon Musk is CEO of Tesla and SpaceX.
+[MEMO]: Elon Musk is the CEO of Tesla and SpaceX.
 
 [User]: What is gravity?
-[MEMO]: Gravity is the force that attracts objects toward each other.
+[MEMO]: Gravity is the force that pulls objects toward each other. It's what keeps us grounded! 🌎
 """
+# ... (rest of file)
+
+            # Inside generate() method
+            # ...
+            if any(t in prompt_lower for t in NEWS_TRIGGERS):
+                updates = self.get_personalized_updates()
+                
+                if not updates:
+                    return "Nothing big yet, but I'm watching the feeds."
+
+                # Shuffle and limit to top 5
+                random.shuffle(updates)
+                updates = updates[:5]
+                joined_updates = "\n".join(updates)
+                
+                # Conversational News Prompt
+                summary_prompt = (
+                    "Instructions: You are a tech-savvy buddy sharing the latest news.\n"
+                    "Summarize these headlines into a quick, exciting update (max 3 sentences).\n"
+                    "Start with 'Here's the tea ☕' or 'Check this out:'.\n\n"
+                    f"Headlines:\n{joined_updates}"
+                )
+                
+                # ... 
+            
+            # ...
+            
+    def _generate_gemini(self, prompt: str) -> str:
+        if not self._gemini_model:
+            return self._generate_fallback(prompt)
+        
+        try:
+            response = self._gemini_model.generate_content(
+                prompt,
+                generation_config={
+                    'temperature': 0.7,
+                    'max_output_tokens': 160, # Increased from 50
+                    'stop_sequences': ["User:", "System:", "\n\n"]
+                }
+            )
+            return response.text.strip()
+            # ...
+
+    def _generate_ollama(self, prompt: str) -> str:
+        # ...
+            payload = {
+                "model": self.ollama_model,
+                "prompt": prompt_template,
+                "stream": False,
+                "options": {
+                     "temperature": 0.25,
+                     # Optimize for Pi: Shorter generation but enough for a sentence
+                     "num_predict": 120, # Increased from 60
+                     "num_ctx": 512,          
+                     "top_p": 0.8,
+                     "repeat_penalty": 1.1,
+                     "stop": [
+                        "[User]:",
+                        "[MEMO]:",
+                        "<|end|>",
+                        "<|user|>",
+                        "<|system|>"
+                     ]
+                },
+                "keep_alive": "60m" # Keep model loaded in RAM
+            }
 
 
 class Conversation:
@@ -427,10 +489,11 @@ class AIPersonality:
                 random.shuffle(updates)
                 updates = updates[:8]
                 joined_updates = "\n".join(updates)
-                # Simplify for Phi-3 (Avoid roleplay hallucinations)
+                # Conversational News Prompt
                 summary_prompt = (
-                    "Instructions: Read the following news headlines aloud.\n"
-                    "Do not add any other text. Do not apologize. Just read the top 3 items.\n\n"
+                    "Instructions: You are a tech-savvy buddy sharing the latest news.\n"
+                    "Summarize these headlines into a quick, exciting update (max 3 sentences).\n"
+                    "Start with 'Here's the tea ☕' or 'Check this out:'.\n\n"
                     f"Headlines:\n{joined_updates}"
                 )
                 
@@ -529,7 +592,7 @@ class AIPersonality:
                 prompt,
                 generation_config={
                     'temperature': 0.7,
-                    'max_output_tokens': 50,
+                    'max_output_tokens': 160,
                     'stop_sequences': ["User:", "System:", "\n\n"]
                 }
             )
@@ -562,7 +625,7 @@ class AIPersonality:
                 "options": {
                      "temperature": 0.25,
                      # Optimize for Pi: Shorter generation, smaller context
-                     "num_predict": 60,       
+                     "num_predict": 120,       
                      "num_ctx": 512,          
                      "top_p": 0.8,
                      "repeat_penalty": 1.1,

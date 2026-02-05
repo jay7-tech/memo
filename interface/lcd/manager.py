@@ -79,9 +79,12 @@ class LCDManager:
         for folder in self.assets_dir.iterdir():
             if folder.is_dir():
                 frames = []
-                # Sort ensuring frame_001, frame_002...
-                sorted_files = sorted(folder.glob("*.png"), key=lambda p: p.name)
-                for fp in sorted_files:
+                # robust loading
+                files = sorted(list(folder.glob("*.png")) + list(folder.glob("*.jpg")) + list(folder.glob("*.jpeg")))
+                # Filter out temp files
+                files = [f for f in files if not f.name.startswith('.')]
+                
+                for fp in files:
                     try:
                         img = Image.open(fp).convert("RGB")
                         if img.size != target_size:

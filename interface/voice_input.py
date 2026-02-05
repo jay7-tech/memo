@@ -136,26 +136,21 @@ class VoiceListener:
                 print(f"[Voice] Vosk Error: {e}")
 
     def _play_beep(self):
-        """Play a beep sound using PyAudio (Cross-platform)."""
+        """Play a beep sound using PyAudio (Silent fail)."""
         try:
             import math
             import struct
             
             # Generate tone
-            duration = 0.15 # seconds
-            freq = 550.0 # Hz
+            duration = 0.15 
+            freq = 550.0 
             samples = int(self.RATE * duration)
-            
-            # Generate samples
             audio_data = []
             for n in range(samples):
                 val = math.sin(2 * math.pi * freq * n / self.RATE)
-                audio_data.append(int(val * 32767.0 * 0.3)) # 0.3 volume
-                
-            # Pack
+                audio_data.append(int(val * 32767.0 * 0.3))
             packed_data = struct.pack(f'{len(audio_data)}h', *audio_data)
             
-            # Play
             stream = self.audio.open(
                 format=self.FORMAT, channels=self.CHANNELS,
                 rate=self.RATE, output=True
@@ -163,8 +158,9 @@ class VoiceListener:
             stream.write(packed_data)
             stream.stop_stream()
             stream.close()
-        except Exception as e:
-            print(f"[Voice] Beep failed: {e}")
+        except Exception:
+            # Silent fail for "No Default Output Device" errors on Pi w/o speakers
+            pass
 
     def _run_loop(self):
         """Main loop: Wake Word -> Command."""

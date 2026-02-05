@@ -317,13 +317,16 @@ speech.Speak text
     def speak(self, text: str):
         """Queue text to be spoken (non-blocking)."""
         if text:
-            print(f"🔊 Speaking: {text}")
+            # Truncate log to prevent console I/O blocking during speech on Windows
+            display_text = (text[:60] + '...') if len(text) > 60 else text
+            print(f"🔊 Speaking: {display_text}")
             self.queue.put(text)
     
     def speak_now(self, text: str):
         """Speak text immediately (blocking)."""
         if text:
-            print(f"🔊 Speaking: {text}")
+            display_text = (text[:60] + '...') if len(text) > 60 else text
+            print(f"🔊 Speaking: {display_text}")
             self._speak_text(text)
     
     def stop(self):
