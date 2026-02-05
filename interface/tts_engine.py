@@ -227,37 +227,39 @@ speech.Speak text
             print(f"🔊 [MEMO]: {text}")
 
     def _speak_piper(self, text: str):
-        """Speak using Piper TTS (High Quality for Pi)."""
+        """Speak using Piper TTS (File-based to prevent distortion)."""
         try:
             # Paths
             piper_bin = "./piper/piper" if os.path.exists("./piper/piper") else "piper"
             model_path = "./piper/models/en_US-lessac-medium.onnx"
+            temp_file = "/tmp/memo_tts.wav"
             
             if not os.path.exists(model_path) and piper_bin == "./piper/piper":
-                # Fallback to espeak if model missing
-                print("[TTS] Piper model missing, falling back to espeak")
                 self._speak_espeak(text)
                 return
 
-            # Construct command: echo "text" | piper ... | aplay
             # Clean text for shell
             safe_text = text.replace('"', '\\"')
             
-            # Determine audio player: try 'paplay' (PulseAudio) first, then 'aplay' (ALSA)
-            # PulseAudio is better for desktop environments; ALSA for headless.
+            # STEP 1: GENERATE (High CPU)
+            # We generate to a file first. This uses CPU but doesn't stutter audio
+            cmd_gen = f'echo "{safe_text}" | {piper_bin} --model {model_path} --output_file {temp_file}'
+            subprocess.run(cmd_gen, shell=True, timeout=10, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             
-            # TRY 1: PulseAudio (paplay)
-            # This is preferred on Raspberry Pi Desktop as it handles mixing and device selection automatically.
+            # STEP 2: PLAYBACK (Low CPU)
+            # Now we play the file. Since generation is done, CPU is free for logs/logic
             try:
-                cmd_pulse = f'echo "{safe_text}" | {piper_bin} --model {model_path} --output_raw | paplay --raw --format=s16le --rate=22050 --channels=1'
-                subprocess.run(cmd_pulse, shell=True, timeout=10, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                return # If successful, return
+                # Try paplay (PulseAudio)
+                cmd_play = f'paplay {temp_file}'
+                subprocess.run(cmd_play, shell=True, timeout=10, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             except:
-                pass # Fallback to aplay
+                # Fallback to aplay (ALSA)
+                cmd_play = f'aplay {temp_file}'
+                subprocess.run(cmd_play, shell=True, timeout=10, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 
-            # TRY 2: ALSA (aplay) - Fallback
-            cmd_alsa = f'echo "{safe_text}" | {piper_bin} --model {model_path} --output_raw | aplay -r 22050 -f S16_LE -t raw -'
-            subprocess.run(cmd_alsa, shell=True, timeout=10, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            # Cleanup
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
 
         except Exception as e:
             print(f"[TTS Piper error] {e}")
