@@ -64,7 +64,13 @@ class QT2120:
                 # User tried 1000, which wraps (1000%256=232). 
                 # We will set MAX stable threshold: 255.
                 # If this trigger false positives, it's electrical noise (antennas).
-                self.set_threshold(255) 
+                self.set_threshold(50) # Moderate (255 was too high/maybe wrapped?)
+                # Actually user said 255 was least sensitive. Let's try 50 first if 255 was confusing.
+                # Datasheet: Higher val causing less sensitivity?
+                # User tried 255 and got ghosts (but reg was wrong).
+                # Let's set 50 (Verified safe mid-range) + Strong Filter.
+                self.set_threshold(100) 
+                self.set_integrator(10) # 160ms robust filtering
                 self.calibrate()
             else:
                 print(f"[Touch] ❌ ID Mismatch (Exp 0x3E, Got 0x{chip_id:02X}). Wiring issue?")
@@ -73,13 +79,21 @@ class QT2120:
             self.connected = False
 
     def set_threshold(self, value):
-        """Set detection threshold (0-255). Registers 0x10-0x1B imply Keys 0-11."""
+        """Set detection threshold (0-255). Registers 0x06-0x11 for Keys 0-11."""
         # Clamp value to valid byte range
-        value = max(0, min(255, value))
-        print(f"[Touch] Setting threshold to {value} for ALL keys")
-        # Write to 0x10 (Key 0) through 0x1B (Key 11)
-        for reg in range(0x10, 0x1C): 
+        value = max(10, min(255, value))
+        print(f"[Touch] Setting threshold to {value} for ALL keys (0x06-0x11)")
+        # Keys 0-11 correspond to registers 0x06 to 0x11
+        for reg in range(0x06, 0x12): 
             self.write_reg(reg, value)
+            
+    def set_integrator(self, value):
+        """Set Detection Integrator (Noise Filter). Register 0x1C."""
+        # Value logic: Min duration = value * 16ms. Default 4.
+        # Set to 10 for robust filtering (160ms filter)
+        value = max(0, min(32, value))
+        print(f"[Touch] Setting Noise Filter (DI) to {value}")
+        self.write_reg(0x1C, value)
 
     def read_reg(self, reg):
         try:
