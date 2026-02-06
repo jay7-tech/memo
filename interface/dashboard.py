@@ -540,11 +540,17 @@ def start_server():
     log.setLevel(logging.ERROR)
     
     def stats_broadcaster():
+        print("[Dashboard] Stats broadcaster thread STARTED")
+        try:
+            from core import get_perf_monitor
+            perf = get_perf_monitor()
+        except ImportError as e:
+            print(f"[Dashboard] CRITICAL: Could not import core: {e}")
+            return
+            
         while True:
             try:
                 if scene_state_ref:
-                    from core import get_perf_monitor
-                    perf = get_perf_monitor()
                     stats = perf.get_stats()
                     
                     # Safe hardware access
