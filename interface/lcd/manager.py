@@ -121,6 +121,7 @@ class LCDManager:
 
     def play(self, name: str, loop=False, fps_ms=100, fallback_to_idle=True):
         """Thread-safe request to play animation."""
+        print(f"[LCD] >> play() called: '{name}' (loop={loop}, fps={fps_ms})")
         with self.lock:
             # Map common variants
             # if name == "happy": name = "laugh"  # Now we have real happy
