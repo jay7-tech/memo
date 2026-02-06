@@ -271,6 +271,16 @@ def index():
                             <div id="status-focus" style="font-weight: 600; font-size: 1rem;">OFF</div>
                         </div>
                     </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 0.8rem; margin-top: 12px;">
+                        <div>
+                            <div style="color: var(--text-side); font-size: 0.7rem;">HARDWARE</div>
+                            <div id="status-hw" style="font-weight: 600; font-size: 0.9rem;">--</div>
+                        </div>
+                        <div>
+                            <div style="color: var(--text-side); font-size: 0.7rem;">TOUCH</div>
+                            <div id="status-touch" style="font-weight: 600; font-size: 0.9rem;">--</div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Controls -->
@@ -456,6 +466,17 @@ def index():
                 // Update Circles
                 setProgress('cpu-ring', data.cpu, 100);
                 setProgress('fps-ring', data.fps, 30); 
+                
+                // Update Hardware
+                if (data.hardware) {
+                    const hwEl = document.getElementById('status-hw');
+                    hwEl.innerText = data.hardware.display_connected ? "LCD OK" : "NO LCD";
+                    hwEl.style.color = data.hardware.display_connected ? "#10b981" : "#ef4444";
+                    
+                    const touchEl = document.getElementById('status-touch');
+                    touchEl.innerText = data.hardware.touch_connected ? "ACTIVE" : "N/A";
+                    touchEl.style.color = data.hardware.touch_connected ? "#10b981" : "#94a3b8";
+                } 
             });
 
             socket.on('new_log', (entry) => {
@@ -514,21 +535,31 @@ def start_server():
     
     def stats_broadcaster():
         while True:
-            if scene_state_ref:
-                from core import get_perf_monitor
-                perf = get_perf_monitor()
-                stats = perf.get_stats()
-                socketio.emit('stats_update', {
-                    'human_present': scene_state_ref.human['present'],
-                    'identity': scene_state_ref.human['identity'],
-                    'focus_mode': scene_state_ref.focus_mode,
-                    'vision_active': getattr(scene_state_ref, 'vision_active', True),
-                    'voice_active': getattr(scene_state_ref, 'voice_active', True), # UPDATED
-                    'verbose_logging': getattr(scene_state_ref, 'verbose_logging', False),
-                    'objects': list(scene_state_ref.objects.keys()),
-                    'cpu': stats['cpu'],
-                    'fps': stats['fps']
-                })
+            try:
+                if scene_state_ref:
+                    from core import get_perf_monitor
+                    perf = get_perf_monitor()
+                    stats = perf.get_stats()
+                    
+                    # Safe hardware access
+                    hw = getattr(scene_state_ref, 'hardware_info', {})
+                    
+                    socketio.emit('stats_update', {
+                        'human_present': scene_state_ref.human['present'],
+                        'identity': scene_state_ref.human['identity'],
+                        'focus_mode': scene_state_ref.focus_mode,
+                        'vision_active': getattr(scene_state_ref, 'vision_active', True),
+                        'voice_active': getattr(scene_state_ref, 'voice_active', True),
+                        'verbose_logging': getattr(scene_state_ref, 'verbose_logging', False),
+                        'objects': list(scene_state_ref.objects.keys()),
+                        'cpu': stats.get('cpu', 0),
+                        'fps': stats.get('fps', 0),
+                        'hardware': hw
+                    })
+            except Exception as e:
+                print(f"[Dashboard] Stats Error: {e}")
+                time.sleep(1)
+                
             time.sleep(0.5)
             
     threading.Thread(target=stats_broadcaster, daemon=True).start()

@@ -158,7 +158,16 @@ class MEMOApp:
         if self.lcd and not self.lcd.sim_mode:
             print("[System] Physical LCD Hardware: ACTIVE")
         else:
+        if self.lcd and not self.lcd.sim_mode:
+            print("[System] Physical LCD Hardware: ACTIVE")
+        else:
             print("[System] Physical LCD Hardware: INACTIVE (Sim Mode)")
+            
+        # Update State with Hardware Info
+        self.scene_state.hardware_info['display_connected'] = not self.lcd.sim_mode
+        self.scene_state.hardware_info['touch_connected'] = self.touch_manager is not None
+        if hasattr(self.lcd, 'driver_name'):
+             self.scene_state.hardware_info['lcd_type'] = self.lcd.driver_name
     
     def _load_config(self, config_path: str) -> Dict[str, Any]:
         """Load configuration from JSON file."""
@@ -283,8 +292,10 @@ class MEMOApp:
                 from interface.dashboard import add_log
                 add_log(f"DISTRACTION ALERT: {obj}", "alert")
                 
-                # LCD Expression (New)
-                self.lcd.trigger_distraction()
+                # LCD Expression
+                # CONFLICT FIX: Do NOT trigger one-shot here. 
+                # Let the main loop handle the continuous state (loop=True) in _update_state.
+                # self.lcd.trigger_distraction()
                 
                 # Use AI for witty distraction alert
                 if 'phone' in obj.lower():

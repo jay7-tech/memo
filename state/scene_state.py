@@ -96,6 +96,13 @@ class SceneState:
         import queue
         self.pending_commands = queue.Queue()
         
+        # Hardware Status for Dashboard
+        self.hardware_info = {
+            'display_connected': False,
+            'touch_connected': False,
+            'camera_backend': 'Unknown'
+        }
+        
         self.width = 640 
         
         self.load_memory()
