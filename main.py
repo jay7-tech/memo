@@ -1074,8 +1074,9 @@ class MEMOApp:
                     # Resize to optimized preview size for dashboard
                     preview = cv2.resize(frame, (480, 270))
                     self.dashboard.update_frame(preview)
-                except:
-                    pass
+                except Exception as e:
+                    if self.frame_count % 100 == 0:  # Don't spam logs
+                        print(f"[Dashboard] Update Warning: {e}")
             
             # Display
             if self.show_display:

@@ -31,6 +31,8 @@ def add_log(message, type="info"):
 def update_frame(frame):
     global output_frame
     with lock:
+        if output_frame is None:
+             print("[Dashboard] First frame received!")
         output_frame = frame.copy()
 
 def generate():
