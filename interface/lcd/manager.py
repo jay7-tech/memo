@@ -261,6 +261,15 @@ class LCDManager:
                                 # Check fallback
                                 if self.fallback_to_idle:
                                     self.mode = "IDLE"
+                                    # Switch to idle animation immediately
+                                    if "idle_center" in self.anims:
+                                        self.current_frames = self.anims["idle_center"]
+                                        self.current_anim_name = "idle_center"
+                                        self.loop = True
+                                        self.fps_ms = 100
+                                        self.frame_idx = 0
+                                        if self.current_frames:
+                                            frame_img = self.current_frames[0]
                                 else:
                                     # Hold last frame
                                     frame_img = self.current_frames[-1]
