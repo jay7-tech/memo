@@ -23,8 +23,9 @@ class CameraSource:
         else:
             # Linux/Pi: Use integer index 0 for libcamerify compatibility
             # passing "/dev/video0" as string causes "can't be used to capture by name" error
-            print(f"[Camera] Opening camera {source} with V4L2...")
-            self.cap = cv2.VideoCapture(source, cv2.CAP_V4L2)
+            # Removing V4L2 enforcement to let libcamerify handle the interception freely
+            print(f"[Camera] Opening camera {source} (Auto Backend)...")
+            self.cap = cv2.VideoCapture(source)
             
             # Force params
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)

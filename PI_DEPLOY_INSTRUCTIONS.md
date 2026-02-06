@@ -53,9 +53,10 @@ Since Windows can only see the `bootfs` partition (Drive D: in your case), you c
     # Note: /boot/firmware/assets is where you put it on the SD card
     cp -r /boot/firmware/assets interface/lcd/
 
-    # 4. Verify
+    # 4. Verify & FIX PERMISSIONS (Crucial!)
     ls interface/lcd/assets
-    # You should see folders like 'idle_center', 'focus_scan', etc.
+    # If copied with sudo, they might be owned by root. Fix it:
+    sudo chown -R $USER:$USER interface/lcd/assets
 
     # 5. (Optional) Cleanup the boot partition
     sudo rm -r /boot/firmware/assets
