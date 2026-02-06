@@ -158,9 +158,6 @@ class MEMOApp:
         if self.lcd and not self.lcd.sim_mode:
             print("[System] Physical LCD Hardware: ACTIVE")
         else:
-        if self.lcd and not self.lcd.sim_mode:
-            print("[System] Physical LCD Hardware: ACTIVE")
-        else:
             print("[System] Physical LCD Hardware: INACTIVE (Sim Mode)")
             
         # Update State with Hardware Info
