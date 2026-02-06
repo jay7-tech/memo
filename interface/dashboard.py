@@ -548,17 +548,15 @@ def start_server():
     
     def stats_broadcaster():
         print("[Dashboard] Stats broadcaster thread STARTED")
-        counter = 0
         while True:
             try:
                 if scene_state_ref and perf_monitor_ref:
                     stats = perf_monitor_ref.get_stats()
-                    # print(f"[Dashboard] DEBUG STATS: {stats}") # Debug 
                     
                     # Safe hardware access
                     hw = getattr(scene_state_ref, 'hardware_info', {})
                     
-                    socketio.emit('stats_update', {
+                    payload = {
                         'human_present': scene_state_ref.human['present'],
                         'identity': scene_state_ref.human['identity'],
                         'focus_mode': scene_state_ref.focus_mode,
@@ -569,15 +567,17 @@ def start_server():
                         'cpu': stats.get('cpu', 0),
                         'fps': stats.get('fps', 0),
                         'hardware': hw
-                    })
+                    }
                     
-                    if counter % 10 == 0:
-                        print(f"[Dashboard] Emitted Stats: CPU={stats.get('cpu')} FPS={stats.get('fps')}")
-                    counter += 1
+                    socketio.emit('stats_update', payload)
                     
                 elif not perf_monitor_ref:
                      print("[Dashboard] Waiting for perf_monitor...")
                      time.sleep(2)
+                elif not scene_state_ref:
+                     print("[Dashboard] Waiting for scene_state...")
+                     time.sleep(2)
+
             except Exception as e:
                 print(f"[Dashboard] Stats Error: {e}")
                 time.sleep(1)
