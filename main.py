@@ -489,7 +489,7 @@ class MEMOApp:
             if is_distracted:
                 # DEBUG: Print why we think we are distracted
                 cell_obj = self.scene_state.objects.get('cell phone')
-                print(f">> FOCUS: Distraction Active! Object: {cell_obj}")
+                # print(f">> FOCUS: Distraction Active! Object: {cell_obj}")
 
                 # 1. VISUAL STATE: Warning
                 # Only switch if not already playing warning
