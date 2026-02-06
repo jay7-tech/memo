@@ -110,7 +110,11 @@ class MEMOApp:
         self.scene_state = SceneState()
         
         # LCD Face (Hardware or Sim)
-        self.lcd = LCDManager()
+        assets_path = self.config.get('system', {}).get('assets_path', None)
+        if assets_path:
+            print(f"[System] Custom Assets Path: {assets_path}")
+            
+        self.lcd = LCDManager(assets_path=assets_path)
         self.lcd.start()
         
         # Processing

@@ -53,7 +53,8 @@
     "personality_mode": "helpful",
     "tts_cooldown": 5.0,
     "save_on_exit": true,
-    "logging_level": "INFO"
+    "logging_level": "INFO",
+    "assets_path": null
   },
   "ai": {
     "backend": "ollama",
