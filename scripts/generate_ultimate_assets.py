@@ -13,6 +13,17 @@ CANVAS_SIZE = (512, 512) # 4x Supersampling
 params_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "interface", "lcd", "assets"))
 ASSETS_DIR = params_path
 
+# --- SAFETY CHECK ---
+import sys
+if os.path.exists(ASSETS_DIR):
+    print(f"⚠️  WARNING: Asset directory exists at: {ASSETS_DIR}")
+    print("Running this script will OVERWRITE your high-quality assets with generated ones.")
+    response = input("Are you sure you want to continue? (type 'yes' to confirm): ")
+    if response.lower() != 'yes':
+        print("Aborted.")
+        sys.exit(0)
+# --------------------
+
 # Palette (Ultimate Aesthetic)
 BG_COLOR = (10, 10, 15)       # Almost Black
 COLOR_CYAN = (0, 255, 255)      # Cyber Cyan

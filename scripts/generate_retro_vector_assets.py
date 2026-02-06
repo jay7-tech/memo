@@ -12,6 +12,17 @@ CANVAS_SIZE = (512, 512) # 4x Supersampling
 # Use relative path compatible with both Windows and Pi
 ASSETS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "interface", "lcd", "assets"))
 
+# --- SAFETY CHECK ---
+import sys
+if os.path.exists(ASSETS_DIR):
+    print(f"⚠️  WARNING: Asset directory exists at: {ASSETS_DIR}")
+    print("Running this script will OVERWRITE your high-quality assets with generated ones.")
+    response = input("Are you sure you want to continue? (type 'yes' to confirm): ")
+    if response.lower() != 'yes':
+        print("Aborted.")
+        sys.exit(0)
+# --------------------
+
 # Palette (Retro / Pop)
 BG_COLOR = (240, 240, 245) # Off-White Background? Or keep Dark?
 # User wants "Aesthetic Modern". Usually that implies Dark Mode for screens.

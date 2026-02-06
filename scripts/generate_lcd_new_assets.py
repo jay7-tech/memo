@@ -7,6 +7,19 @@ SRC_SIZE = (512, 512)
 OUT_SIZE = (128, 128)
 ASSETS_DIR = "interface/lcd/assets"
 
+# --- SAFETY CHECK ---
+import sys
+# Ensure absolute path for safety check just in case
+abs_asset_path = os.path.abspath(ASSETS_DIR)
+if os.path.exists(abs_asset_path):
+    print(f"⚠️  WARNING: Asset directory exists at: {abs_asset_path}")
+    print("Running this script will OVERWRITE your high-quality assets with generated ones.")
+    response = input("Are you sure you want to continue? (type 'yes' to confirm): ")
+    if response.lower() != 'yes':
+        print("Aborted.")
+        sys.exit(0)
+# --------------------
+
 def ensure_dir(path):
     if not os.path.exists(path):
         os.makedirs(path)

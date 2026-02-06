@@ -9,6 +9,9 @@ class CameraSource:
         self.lock = threading.Lock()
 
         # Enforce string for URL if it looks like one, or int for index
+        if isinstance(source, str) and source.isdigit():
+            source = int(source)
+            
         self.src = source
         self.rotation = int(rotation)
         
@@ -18,10 +21,10 @@ class CameraSource:
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
         else:
-            # Linux/Pi: FORCE /dev/video0 with V4L2 (User Fix)
-            # Auto-scan removed because OpenCV reopening is buggy on Pi
-            print(f"[Camera] Opening /dev/video0 with V4L2...")
-            self.cap = cv2.VideoCapture("/dev/video0", cv2.CAP_V4L2)
+            # Linux/Pi: Use integer index 0 for libcamerify compatibility
+            # passing "/dev/video0" as string causes "can't be used to capture by name" error
+            print(f"[Camera] Opening camera {source} with V4L2...")
+            self.cap = cv2.VideoCapture(source, cv2.CAP_V4L2)
             
             # Force params
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
