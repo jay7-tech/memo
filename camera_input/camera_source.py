@@ -27,10 +27,26 @@ class CameraSource:
             print(f"[Camera] Opening camera {source} (Auto Backend)...")
             self.cap = cv2.VideoCapture(source)
             
-            # Force params
-            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-            self.cap.set(cv2.CAP_PROP_FPS, 30)
+            # --- FALLBACK: GStreamer (libcamerasrc) ---
+            # If standard V4L2/Auto fails (common on Pi 5), try GStreamer pipeline
+            if not self.cap.isOpened():
+                print("[Camera] Auto-backend failed. Trying GStreamer (libcamerasrc)...")
+                gst_pipeline = (
+                    "libcamerasrc ! video/x-raw, width=640, height=480, framerate=30/1 ! "
+                    "videoconvert ! appsink"
+                )
+                try:
+                    self.cap = cv2.VideoCapture(gst_pipeline, cv2.CAP_GSTREAMER)
+                    if self.cap.isOpened():
+                        print("[Camera] Success: Connected via GStreamer!")
+                except Exception as e:
+                    print(f"[Camera] GStreamer failed: {e}")
+            
+            # Force params (If not GStreamer)
+            if not self.cap.get(cv2.CAP_PROP_BACKEND) == cv2.CAP_GSTREAMER:
+                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                self.cap.set(cv2.CAP_PROP_FPS, 30)
         
         if not self.cap.isOpened():
             raise RuntimeError(f"Could not open /dev/video0 (Check connection or libcamerify)")
