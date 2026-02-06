@@ -488,13 +488,18 @@ class MEMOApp:
                         {'action': 'focus_alert'}
                     ))
                     # Trigger Warning Animation (Looping?)
-                    # If we want it to persist while phone is visible:
+                    # Persist while phone is visible:
                     self.lcd.play("focus_warning", loop=True, fps_ms=100)
                     self.scene_state.last_distraction_alert = timestamp
+                    self.scene_state.last_distraction_time = timestamp # Track last seen time for debouncing
                 else:
                     # Maintain warning loop
                     self.lcd.play("focus_warning", loop=True, fps_ms=100)
+                    self.scene_state.last_distraction_time = timestamp
                     
+            elif timestamp - getattr(self.scene_state, 'last_distraction_time', 0) < 2.0:
+                 # DEBOUNCE: Keep warning for 2s after phone disappears prevents flickering
+                 self.lcd.play("focus_warning", loop=True, fps_ms=100)
             else:
                 # 2. VISUAL STATE: Scanning
                 # If no distraction, show Scanning eyes

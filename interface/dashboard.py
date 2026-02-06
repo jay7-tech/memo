@@ -468,14 +468,18 @@ def index():
                 setProgress('fps-ring', data.fps, 30); 
                 
                 // Update Hardware
-                if (data.hardware) {
-                    const hwEl = document.getElementById('status-hw');
-                    hwEl.innerText = data.hardware.display_connected ? "LCD OK" : "NO LCD";
-                    hwEl.style.color = data.hardware.display_connected ? "#10b981" : "#ef4444";
-                    
-                    const touchEl = document.getElementById('status-touch');
-                    touchEl.innerText = data.hardware.touch_connected ? "ACTIVE" : "N/A";
-                    touchEl.style.color = data.hardware.touch_connected ? "#10b981" : "#94a3b8";
+                const hw = data.hardware || {};
+                const hwEl = document.getElementById('status-hw');
+                const touchEl = document.getElementById('status-touch');
+                
+                if (hwEl) {
+                    hwEl.innerText = hw.display_connected ? "LCD OK" : (hw.display_connected === false ? "NO LCD" : "--");
+                    hwEl.style.color = hw.display_connected ? "#10b981" : "#ef4444";
+                }
+                
+                if (touchEl) {
+                    touchEl.innerText = hw.touch_connected ? "ACTIVE" : (hw.touch_connected === false ? "N/A" : "--");
+                    touchEl.style.color = hw.touch_connected ? "#10b981" : "#94a3b8";
                 } 
             });
 
