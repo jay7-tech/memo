@@ -538,6 +538,7 @@ perf_monitor_ref = None
 
 def set_perf_monitor(pm):
     global perf_monitor_ref
+    print(f"[Dashboard] Perf Monitor SET: {pm}")
     perf_monitor_ref = pm
 
 def start_server():
@@ -547,10 +548,12 @@ def start_server():
     
     def stats_broadcaster():
         print("[Dashboard] Stats broadcaster thread STARTED")
+        counter = 0
         while True:
             try:
                 if scene_state_ref and perf_monitor_ref:
                     stats = perf_monitor_ref.get_stats()
+                    # print(f"[Dashboard] DEBUG STATS: {stats}") # Debug 
                     
                     # Safe hardware access
                     hw = getattr(scene_state_ref, 'hardware_info', {})
@@ -567,6 +570,11 @@ def start_server():
                         'fps': stats.get('fps', 0),
                         'hardware': hw
                     })
+                    
+                    if counter % 10 == 0:
+                        print(f"[Dashboard] Emitted Stats: CPU={stats.get('cpu')} FPS={stats.get('fps')}")
+                    counter += 1
+                    
                 elif not perf_monitor_ref:
                      print("[Dashboard] Waiting for perf_monitor...")
                      time.sleep(2)
