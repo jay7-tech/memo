@@ -242,6 +242,11 @@ class MEMOApp:
             self.scene_state.sleep_request = True
             self.lcd.play("sleep", loop=False)
             speak("Going to sleep. Goodnight.")
+
+        elif action == 'focus_alert':
+            # Distraction Detected
+            # Use personality for variety
+            speak(self.personality.scold())
     
     def _on_voice_command(self, event: Event):
         """Handle voice commands."""
