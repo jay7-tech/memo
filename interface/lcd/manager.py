@@ -134,8 +134,8 @@ class LCDManager:
             # If the requested name isn't found, try known aliases
             if name not in self.anims:
                 aliases = {
-                    "focus_warning": ["distraction", "warn", "angry", "phone"],
-                    "focus_scan": ["focus_police", "scan", "focus_on"],
+                    "focus_warning": ["distraction", "warn", "angry"],
+                    "focus_scan": ["focus_police", "scan"],
                     "happy": ["laugh", "wink"],
                     "love": ["wink", "happy"],
                     "distraction": ["focus_warning", "warn"], # Reverse alias just in case
