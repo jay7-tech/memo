@@ -97,8 +97,10 @@ class LCDManager:
                     except Exception:
                         pass
                 if frames:
-                    self.anims[folder.name] = frames
-                    print(f"  - Loaded {folder.name} ({len(frames)} frames)")
+                    # Normalize to lowercase for robust lookup
+                    key = folder.name.lower()
+                    self.anims[key] = frames
+                    print(f"  - Loaded {key} ({len(frames)} frames)")
         
         # Set default
         self.current_frames = self.anims.get("idle_center", [])
