@@ -772,6 +772,17 @@ class AIPersonality:
             "Systems go! What's up? 🚀",
         ])
 
+    
+    def scold(self) -> str:
+        """Scold the user for being distracted in Focus Mode."""
+        return random.choice([
+            "Put that phone away right now! 📱🚫",
+            "Hey! Focus! No distractions! 😤",
+            "I see that phone! Back to work! 👮",
+            "Don't make me turn off the screen! Focus! 📺",
+            "Eyes on the prize, not the phone! 👀",
+            "You promised to focus! Put it down! 📉",
+        ])
 
 # Global instance
 _ai_personality: Optional[AIPersonality] = None
