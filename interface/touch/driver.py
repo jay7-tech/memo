@@ -67,7 +67,9 @@ class QT2120:
                 # --- Configuration for STABILITY ---
                 # 1. Thresholds (NTHR): 255 = Max Resistance to press.
                 #    Registers 0x0A - 0x15
-                self.set_threshold(150) # Start with safe high value (200 might be too hard)
+                # Lower Value = MORE SENSITIVE.
+                # Default is typically 6-10. 150 is crazy high (insensitive).
+                self.set_threshold(30) 
                  
                 # 2. Calibration
                 self.calibrate()
@@ -80,8 +82,8 @@ class QT2120:
     def set_threshold(self, value):
         """Set detection threshold (0-255). Registers 0x0A-0x15 for Keys 0-11."""
         # Clamp value
-        value = max(10, min(255, value))
-        print(f"[Touch] Setting threshold to {value} for ALL keys (0x0A-0x15)")
+        value = max(6, min(255, value))
+        print(f"[Touch] Setting threshold to {value} (More Sensitive) for ALL keys")
         # QT2120: NTHR for Keys 0-11 are at addresses 10 (0x0A) to 21 (0x15)
         for reg in range(0x0A, 0x16): 
             self.write_reg(reg, value)
