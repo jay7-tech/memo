@@ -497,20 +497,21 @@ class MEMOApp:
                 if timestamp - self.scene_state.last_distraction_alert > 5.0:
                     # New distraction event
                     print(f">> FOCUS: Distraction Detected (Cooldown Reset)")
-                    speak("Focus mode! Put that phone away!")
                     self.event_bus.publish(Event(
                         EventType.SYSTEM_ALERT,
                         {'action': 'focus_alert'}
                     ))
                     # Trigger Warning Animation (Looping?)
-                    # Persist while phone is visible:
+                    # If we want it to persist while phone is visible:
                     self.lcd.play("focus_warning", loop=True, fps_ms=100)
                     self.scene_state.last_distraction_alert = timestamp
-                    self.scene_state.last_distraction_time = timestamp # Track last seen time for debouncing
                 else:
                     # Maintain warning loop
                     self.lcd.play("focus_warning", loop=True, fps_ms=100)
-                    self.scene_state.last_distraction_time = timestamp
+                    
+                # KEY FIX: Update this EVERY FRAME so speak() knows we are currently distracted
+                # This prevents speak() from overriding the LCD with idle/speaking face
+                self.scene_state.last_distraction_time = timestamp
                     
             elif timestamp - getattr(self.scene_state, 'last_distraction_time', 0) < 2.0:
                  # DEBOUNCE: Keep warning for 2s after phone disappears prevents flickering
