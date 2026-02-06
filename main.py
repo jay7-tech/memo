@@ -48,44 +48,8 @@ from state import SceneState
 from reasoning import RulesEngine
 
 from interface import QueryHandler
-from interface import QueryHandler
-from interface.tts_engine import init_tts, speak_now, stop_tts, get_tts_engine
-
-# CENTRALIZED SPEAK FUNCTION TO PREVENT LCD FLICKER
-def speak(text: str, lcd_mgr=None, focus_mode=False):
-    """
-    Safe speak function that respects Focus Mode visual state.
-    """
-    if not text: return
-    
-    # 1. Output Audio (Global Engine)
-    engine = get_tts_engine()
-    if engine:
-        engine.speak(text)
-    else:
-        print(f"🔊 [MEMO]: {text}")
-        
-    # 2. Visuals (Only if valid LCD manager, creating weak coupling here is fine for main.py)
-    # Note: main.py usually calls this. If called from global context, lcd_mgr might be None.
-    # We will patch this properly by injecting the method into MEMOApp or using the existing global speak import 
-    # but we are replacing the global import with this definition.
-    
-    if lcd_mgr:
-        # Check Focus Mode Override
-        # If we are in Focus Mode, we usually want to KEEP the current state (Warning/Scan)
-        # unless it's a direct conversation response.
-        # But distractions call speak("Put phone away"). Use is_warning hint?
-        pass # LCD logic moved to callsites or MEMOApp methods
-
-# Re-map global speak to use the engine directly, avoiding side effects unless we want them
-def speak_audio_only(text):
-    engine = get_tts_engine()
-    if engine: engine.speak(text)
-    else: print(f"🔊 {text}")
-    
-# We will use the original import for now to correct the syntax error, 
-# but rely on logic in `_on_scan` etc to set LCD.
-from interface.tts_engine import speak # Restoring original import logic 
+from interface.tts_engine import init_tts, speak, speak_now, stop_tts, get_tts_engine
+from interface.lcd import LCDManager 
 
 from interface.lcd import LCDManager
 
