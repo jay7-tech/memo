@@ -236,6 +236,7 @@ class LCDManager:
         return None
 
     def _run_loop(self):
+        last_frame_time = time.time()
         while self.running:
             start_time = time.time()
             
@@ -246,10 +247,10 @@ class LCDManager:
                 if not self.paused:
                     if self.current_frames:
                         # Update index based on FPS
-                        elapsed = (time.time() - start_time) * 1000
-                        if elapsed > self.fps_ms:
+                        elapsed_ms = (time.time() - last_frame_time) * 1000
+                        if elapsed_ms > self.fps_ms:
                             self.frame_idx += 1
-                            start_time = time.time()
+                            last_frame_time = time.time()
                         
                         # Wrap or Stop
                         if self.frame_idx >= len(self.current_frames):
@@ -267,6 +268,7 @@ class LCDManager:
                         # Set frame if not holding (and not wrapped yet if just reset)
                         if self.frame_idx < len(self.current_frames):
                             frame_img = self.current_frames[self.frame_idx]
+
 
             # 2. Render Hardware (Sim handled externally)
             # If CLOCK mode, override frame_img with dynamic clock
