@@ -534,6 +534,12 @@ def api_command():
         return jsonify({"status": "queued"})
     return jsonify({"status": "error"})
 
+perf_monitor_ref = None
+
+def set_perf_monitor(pm):
+    global perf_monitor_ref
+    perf_monitor_ref = pm
+
 def start_server():
     import logging
     log = logging.getLogger('werkzeug')
@@ -541,17 +547,10 @@ def start_server():
     
     def stats_broadcaster():
         print("[Dashboard] Stats broadcaster thread STARTED")
-        try:
-            from core import get_perf_monitor
-            perf = get_perf_monitor()
-        except ImportError as e:
-            print(f"[Dashboard] CRITICAL: Could not import core: {e}")
-            return
-            
         while True:
             try:
-                if scene_state_ref:
-                    stats = perf.get_stats()
+                if scene_state_ref and perf_monitor_ref:
+                    stats = perf_monitor_ref.get_stats()
                     
                     # Safe hardware access
                     hw = getattr(scene_state_ref, 'hardware_info', {})
@@ -568,13 +567,15 @@ def start_server():
                         'fps': stats.get('fps', 0),
                         'hardware': hw
                     })
+                elif not perf_monitor_ref:
+                     print("[Dashboard] Waiting for perf_monitor...")
+                     time.sleep(2)
             except Exception as e:
                 print(f"[Dashboard] Stats Error: {e}")
                 time.sleep(1)
                 
             time.sleep(0.5)
             
-    threading.Thread(target=stats_broadcaster, daemon=True).start()
     threading.Thread(target=stats_broadcaster, daemon=True).start()
     
     try:

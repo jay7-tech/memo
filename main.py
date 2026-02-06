@@ -358,6 +358,7 @@ class MEMOApp:
         try:
             from interface import dashboard
             dashboard.set_scene_state(self.scene_state)
+            dashboard.set_perf_monitor(self.perf_monitor)
             dash_thread = threading.Thread(target=dashboard.start_server, daemon=True)
             dash_thread.start()
             self.dashboard = dashboard
