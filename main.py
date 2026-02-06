@@ -525,11 +525,15 @@ class MEMOApp:
                 # 2. VISUAL STATE: Scanning
                 # If no distraction, show Scanning eyes
                 # Only if not doing something else (like speaking)
-                # Ideally, focus_scan should be the "Idle" state when in Focus Mode.
-                # But LCD manager 'fallback_to_idle' goes to 'idle_center'.
-                # We need to inform LCD Manager that the "Base State" is Focus.
-                # For now, explicit call:
-                self.lcd.play("focus_scan", loop=True, fps_ms=60)
+                
+                # PRIORITY CHECK: Don't override Selfie Cam or Registration
+                if self.lcd.current_anim_name in ["selfie_cam", "love"] and self.lcd.mode == "ANIMATING":
+                    # Let it finish
+                    pass
+                else:
+                    # We need to inform LCD Manager that the "Base State" is Focus.
+                    # For now, explicit call:
+                    self.lcd.play("focus_scan", loop=True, fps_ms=60)
         persisted_id = self.scene_state.human.get('identity')
         if persisted_id and identity and identity != persisted_id:
              # Wait, this logic is tricky if identity is None but persisted is set.
