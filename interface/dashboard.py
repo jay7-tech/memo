@@ -432,21 +432,23 @@ def index():
                 // For simplicity, let's say if Vision is OFF, we might be sleeping.
                 // But better: Check if both are off?
                 const isSystemSleep = (!data.vision_active && !data.voice_active);
-                const sleepBtn = document.getElementById('btn-sleep');
-                if (isSystemSleep) {
-                     sleepBtn.classList.add('active');
-                     sleepBtn.innerText = "WAKE UP ☀️";
-                     sleepBtn.onclick = () => sendCmd('wake');
-                     sleepBtn.classList.remove('danger'); // Make it Green
-                     sleepBtn.style.background = "#10b981";
-                     sleepBtn.style.color = "white";
-                } else {
-                     sleepBtn.classList.remove('active');
-                     sleepBtn.innerText = "SYSTEM SLEEP 💤";
-                     sleepBtn.onclick = () => sendCmd('sleep');
-                     sleepBtn.classList.add('danger');
-                     sleepBtn.style.background = ""; // Reset
-                     sleepBtn.style.color = "";
+                const sleepBtn = document.getElementById('btn-idle');
+                if (sleepBtn) {
+                    if (isSystemSleep) {
+                         sleepBtn.classList.add('active');
+                         sleepBtn.innerText = "WAKE UP ☀️";
+                         sleepBtn.onclick = () => sendCmd('wake');
+                         sleepBtn.classList.remove('danger'); // Make it Green
+                         sleepBtn.style.background = "#10b981";
+                         sleepBtn.style.color = "white";
+                    } else {
+                         sleepBtn.classList.remove('active');
+                         sleepBtn.innerText = "🌑 IDLE MODE (CLOCK)";
+                         sleepBtn.onclick = () => sendCmd('sleep');
+                         sleepBtn.classList.add('danger');
+                         sleepBtn.style.background = ""; // Reset
+                         sleepBtn.style.color = "";
+                    }
                 }
                 
                 toggleBtn('btn-focus-on', data.focus_mode);
