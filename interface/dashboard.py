@@ -567,5 +567,15 @@ def start_server():
             time.sleep(0.5)
             
     threading.Thread(target=stats_broadcaster, daemon=True).start()
-    socketio.run(app, host="0.0.0.0", port=5000, debug=False, use_reloader=False, allow_unsafe_werkzeug=True)
+    threading.Thread(target=stats_broadcaster, daemon=True).start()
+    
+    try:
+        print("[Dashboard] Starting Flask-SocketIO server...")
+        socketio.run(app, host="0.0.0.0", port=5000, debug=False, use_reloader=False, allow_unsafe_werkzeug=True)
+    except TypeError:
+        print("[Dashboard] Warning: 'allow_unsafe_werkzeug' not supported, retrying without it...")
+        # Fallback for older/newer versions of Flask/Werkzeug
+        socketio.run(app, host="0.0.0.0", port=5000, debug=False, use_reloader=False)
+    except Exception as e:
+        print(f"[Dashboard] CRITICAL STARTUP ERROR: {e}")
 
