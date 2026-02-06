@@ -124,9 +124,11 @@ class LCD_ST7735:
         # BUT many clones need Inversion ON (0x21). I'll default to 0x21 (On) as it fixes the 'White Ghost'
         self.write_cmd(0x21) 
         
-        # MADCTL - Memory Access Control (BGR color)
+        # MADCTL - Memory Access Control
+        # 0xC8 = BGR (Bit 3 set)
+        # 0xC0 = RGB (Bit 3 clear) - User reported inverted colors, switching to RGB.
         self.write_cmd(0x36)
-        self.write_data(0xC8) # 0xC8 = MY, MX, BGR
+        self.write_data(0xC0)
         
         # COLMOD - 16-bit color
         self.write_cmd(0x3A)
