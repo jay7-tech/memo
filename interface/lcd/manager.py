@@ -15,6 +15,8 @@ try:
     HARDWARE_AVAILABLE = True
 except ImportError as e:
     print(f"[LCD] ⚠️ Hardware Driver Missing: {e}")
+    if "lgpio" in str(e):
+        print("[LCD] Hint: Run 'sudo apt install python3-lgpio' (Pi 5)")
     print("[LCD] Ensuring Simulation Mode.")
     HARDWARE_AVAILABLE = False
 except Exception as e:

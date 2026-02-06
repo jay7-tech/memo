@@ -160,6 +160,11 @@ class MEMOApp:
         else:
             print("[System] Physical LCD Hardware: INACTIVE (Sim Mode)")
             
+        # DEBUG: Verify Assets
+        print(f"[System] Loaded Assets: {list(self.lcd.anims.keys())}")
+        if 'focus_warning' not in self.lcd.anims:
+            print("[System] ⚠️ CRITICAL: 'focus_warning' asset missing! Please run 'python scripts/fix_assets.py'")
+            
         # Update State with Hardware Info
         self.scene_state.hardware_info['display_connected'] = not self.lcd.sim_mode
         self.scene_state.hardware_info['touch_connected'] = self.touch_manager is not None
