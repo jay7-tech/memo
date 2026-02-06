@@ -126,8 +126,34 @@ class LCDManager:
             if loop and self.mode == "ANIMATING" and self.current_anim_name == name:
                 return
 
+            # --- Aliasing / Fallback Logic ---
+            # If the requested name isn't found, try known aliases
             if name not in self.anims:
-                print(f"[LCD] ⚠️ Animation '{name}' not found! Available: {list(self.anims.keys())}")
+                aliases = {
+                    "focus_warning": ["distraction", "warn", "angry"],
+                    "focus_scan": ["focus_police", "scan"],
+                    "happy": ["laugh", "wink"],
+                    "love": ["wink", "happy"],
+                    "distraction": ["focus_warning", "warn"], # Reverse alias just in case
+                }
+                
+                found_alias = False
+                if name in aliases:
+                    for alias in aliases[name]:
+                        if alias in self.anims:
+                            print(f"[LCD] '{name}' not found. Using alias '{alias}'")
+                            name = alias
+                            found_alias = True
+                            break
+                            
+                if not found_alias:
+                    print(f"[LCD] ⚠️ Animation '{name}' not found! Available: {list(self.anims.keys())}")
+                    return 
+            
+            # ---------------------------------
+
+            if name not in self.anims:
+                print(f"[LCD] ⚠️ Animation '{name}' not found! (Double Check)")
                 return 
 
             self.current_frames = self.anims[name]
