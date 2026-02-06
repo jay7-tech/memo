@@ -121,18 +121,10 @@ class LCDManager:
 
     def play(self, name: str, loop=False, fps_ms=100, fallback_to_idle=True):
         """Thread-safe request to play animation."""
-        print(f"[LCD] >> play() called: '{name}' (loop={loop}, fps={fps_ms})")
         with self.lock:
-            # Map common variants
-            # if name == "happy": name = "laugh"  # Now we have real happy
-            # if name == "love": name = "wink"    # Now we have real love
-            
-            # Optimization: If already playing this LOOPING animation, don't reset
-            if loop and self.mode == "ANIMATING" and self.current_anim_name == name:
-                return
-
             # --- Aliasing / Fallback Logic ---
             # If the requested name isn't found, try known aliases
+            original_name = name
             if name not in self.anims:
                 aliases = {
                     "focus_warning": ["distraction", "warn", "angry"],
@@ -143,16 +135,16 @@ class LCDManager:
                 }
                 
                 found_alias = False
-                if name in aliases:
-                    for alias in aliases[name]:
+                if original_name in aliases:
+                    for alias in aliases[original_name]:
                         if alias in self.anims:
-                            print(f"[LCD] '{name}' not found. Using alias '{alias}'")
+                            print(f"[LCD] '{original_name}' not found. Using alias '{alias}'")
                             name = alias
                             found_alias = True
                             break
                             
                 if not found_alias:
-                    print(f"[LCD] ⚠️ Animation '{name}' not found! Available: {list(self.anims.keys())}")
+                    print(f"[LCD] ⚠️ Animation '{original_name}' not found! Available: {list(self.anims.keys())}")
                     return 
             
             # ---------------------------------
@@ -160,6 +152,14 @@ class LCDManager:
             if name not in self.anims:
                 print(f"[LCD] ⚠️ Animation '{name}' not found! (Double Check)")
                 return 
+            
+            # Optimization: If already playing this LOOPING animation, don't reset
+            if loop and self.mode == "ANIMATING" and self.current_anim_name == name:
+                return
+            
+            # Debug print only when actually switching
+            if self.current_anim_name != name:
+                print(f"[LCD] >> Switching to '{name}' (loop={loop}, fps={fps_ms})")
 
             self.current_frames = self.anims[name]
             self.current_anim_name = name
